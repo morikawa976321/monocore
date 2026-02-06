@@ -2,8 +2,8 @@ import { Button } from "@/components/ui/button";
 
 export default function Page() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-50 gap-6">
-      <h1 className="text-2xl font-mono tracking-tight text-zinc-900">monocore_ui_test</h1>
+    <div className="flex flex-col items-center justify-center min-h-screen bg.dark-background gap-6">
+      <h1 className="text-2xl font-mono tracking-tight text-primary">monocore_ui_test</h1>
       
       <div className="flex gap-4">
         {/* 標準のボタン */}
