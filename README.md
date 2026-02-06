@@ -20,8 +20,8 @@
 ### Backend & Database
 - **BaaS:** Supabase
 - **Database:** PostgreSQL
-- **DB Driver:** `pg` (node-postgres)
-  - **Philosophy:** 学習と透明性を重視し、ORMやSDKを介さず「生SQL」でデータベースを操作します。
+- **SDK:** `@supabase/ssr`
+  - **Philosophy:** 開発効率とアプリロジックへの集中を優先し、Supabaseが提供するエコシステムを最大限に活用します。
 
 ### Dev Tools
 - **Build Tool:** Vite / Next Build
@@ -36,7 +36,7 @@
 
 - `/app`: アプリケーションのルーティングとServer Components
 - `/components`: shadcn/ui を含む、機能美を追求したUIパーツ
-- `/lib`: 生SQLを実行するデータベースクライアントとユーティリティ
+- `/lib`: Supabaseクライアント（SSR対応）とユーティリティ
 - `/types`: データベースのスキーマと同期した、手動定義の型定義
 
 ---
@@ -47,8 +47,8 @@
    タスクも、資産の推移も、メモも。すべては等しくリソースである。
 2. **Form follows function**
    デザインは機能に従う。余計なアニメーションや装飾は排し、情報の密度と操作スピードを最大化する。
-3. **Control by Raw SQL**
-   便利なSDKに頼らず、生SQLを直接書くことで、学習と透明性を重視する。
+3. **Focus on App Logic**
+   便利なSDK（@supabase/ssr）を全面的に採用し、ボイラープレートを最小限に抑え、アプリケーションの本質的なロジック実装に注力する。
 
 ## 🛠 開発ルール
 
