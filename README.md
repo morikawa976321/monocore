@@ -30,25 +30,23 @@
 
 ---
 
-## 🏗 Directory Structure (Mental Model)
-
-各機能は「Unit」として独立しつつ、`monocore` という一枚岩（Monolith）を構成します。
-
-- `/app`: アプリケーションのルーティングとServer Components
-- `/components`: shadcn/ui を含む、機能美を追求したUIパーツ
-- `/lib`: Supabaseクライアント（SSR対応）とユーティリティ
-- `/types`: データベースのスキーマと同期した、手動定義の型定義
-
----
-
 ## 📜 Development Philosophy
 
 1. **Everything is a Resource**
    タスクも、資産の推移も、メモも。すべては等しくリソースである。
-2. **Form follows function**
-   デザインは機能に従う。余計なアニメーションや装飾は排し、情報の密度と操作スピードを最大化する。
+2. **Form follows function / Cognitive Load Minimization**
+   デザインは機能に従う。余計なアニメーションや装飾は排し、情報の密度と操作スピードを最大化する。**認知負荷の最小化**を至上命題とする。
 3. **Focus on App Logic**
    便利なSDK（@supabase/ssr）を全面的に採用し、ボイラープレートを最小限に抑え、アプリケーションの本質的なロジック実装に注力する。
+
+## 🎨 UI/UX Requirements
+
+視覚的ノイズと操作コストの最小化を追求する。
+
+- **UIコンポーネントの最小化:** 画面上のボタン、メニュー、サイドバーを最小化（または隠蔽）。
+- **アニメーションの抑制:** フェード、スライド等のアニメーションを最小化。
+- **モーダル排除:** 同一プレーンでの完結を基本とし、モーダルウィンドウを極力排除する。
+- **操作コスト低減:** クリック/タップ数の削減。
 
 ## 🛠 開発ルール
 
