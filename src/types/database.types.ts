@@ -34,7 +34,286 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      finances: {
+        Row: {
+          amount: number
+          created_at: string | null
+          date: string
+          deleted_at: string | null
+          id: string
+          note: string | null
+          type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          date: string
+          deleted_at?: string | null
+          id?: string
+          note?: string | null
+          type: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          date?: string
+          deleted_at?: string | null
+          id?: string
+          note?: string | null
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      inbox: {
+        Row: {
+          content: string
+          created_at: string | null
+          deleted_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      items: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          deleted_at: string | null
+          description: string | null
+          id: string
+          name: string
+          price: number | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          price?: number | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      knowledge: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          deleted_at: string | null
+          id: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          title: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      project_details: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          deleted_at: string | null
+          id: string
+          project_parent_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          project_parent_id: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          project_parent_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_details_project_parent_id_fkey"
+            columns: ["project_parent_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          deleted_at: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      schedules: {
+        Row: {
+          created_at: string | null
+          deleted_at: string | null
+          end_at: string | null
+          id: string
+          start_at: string
+          task_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          deleted_at?: string | null
+          end_at?: string | null
+          id?: string
+          start_at: string
+          task_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string | null
+          deleted_at?: string | null
+          end_at?: string | null
+          id?: string
+          start_at?: string
+          task_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          deleted_at: string | null
+          id: string
+          required_time: string | null
+          status: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          required_time?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          required_time?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
