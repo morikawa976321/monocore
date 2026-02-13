@@ -1,0 +1,38 @@
+monocore
+├── LICENSE
+├── README.md
+├── components.json
+├── constructure.txt
+├── docs
+│   └── directory_structure.md
+├── eslint.config.mjs
+├── next-env.d.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── public
+├── src
+│   ├── app
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── components
+│   │   ├── layout
+│   │   └── ui
+│   │       └── button.tsx
+│   ├── hooks
+│   ├── lib
+│   │   ├── supabase
+│   │   │   ├── client.ts
+│   │   │   ├── queries
+│   │   │   └── server.ts
+│   │   └── utils.ts
+│   ├── middleware.ts
+│   └── types
+│       ├── database.types.ts
+│       └── index.ts
+├── supabase
+│   └── config.toml
+├── temp.md
+└── tsconfig.json
