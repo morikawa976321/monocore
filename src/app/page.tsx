@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/server";
+import { Button } from "@/src/components/ui/button";
+import { createClient } from "@/src/lib/supabase/server";
 
 export default async function Page() {
   const supabase = await createClient();
@@ -10,7 +10,7 @@ export default async function Page() {
     .limit(1)
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg.dark-background gap-6">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-6">
       <h1 className="text-2xl font-mono tracking-tight text-primary">monocore_ui_test</h1>
 
       <div className="flex gap-4">
