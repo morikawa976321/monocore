@@ -1,4 +1,4 @@
-# 📋 monocore プロジェクト設計書 (Next.js + Supabase + Tailwind)
+# 📋 monocore ディレクトリ構造
 
 ## 1. プロジェクト構成 (Snapshot)
 
