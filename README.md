@@ -3,7 +3,6 @@
 **A minimalist all-in-one web application to unify your tasks, schedules, and projects into a single digital space.**
 
 `monocore` は、散らばった日々の断片（タスク、資産、創作メモ、スケジュール）を一箇所に集約し、自分の支配下に置くための「Personal OS」です。
-装飾を排した機能美と、生データへの直接的なアクセスを重視し、Linux端末を操作するような感覚で自分自身を管理することを目的としています。
 
 ---
 
