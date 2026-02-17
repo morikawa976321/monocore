@@ -12,8 +12,8 @@
 
 ### Frontend
 - **Framework:** Next.js 15 (App Router / TypeScript)
-- **Styling:** Tailwind CSS
-- **UI Components:** shadcn/ui (Manual installation)
+- **Styling:** Tailwind CSS (v4)
+- **UI Components:** Custom Tailwind Components (Native elements & ARIA-first approach)
 - **State Management:** React Server Components + Local State
 
 ### Backend & Database
