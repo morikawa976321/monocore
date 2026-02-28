@@ -1,19 +1,10 @@
 @import "tailwindcss";
 
 @custom-variant hover (&:hover);
+@custom-variant dark (&:is(.dark *));
 
 /* --- Design System Foundations --- */
 @theme {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@layer base {
-  body {
-    @apply bg-white text-neutral-950 antialiased;
-  }
-  
-  .dark body {
-    @apply bg-neutral-950 text-neutral-50;
-  }
 }
