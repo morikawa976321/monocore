@@ -38,7 +38,41 @@
 3. **Focus on App Logic**
    便利なSDK（@supabase/ssr）を全面的に採用し、ボイラープレートを最小限に抑え、アプリケーションの本質的なロジック実装に注力する。
 
+---
+
+## 🚀 Database Management (Supabase)
+
+データベースのスキーマ管理は Supabase CLI を使用して行います。
+
+### マイグレーション状態の確認
+ローカルとリモートの適用状況を一覧表示します。
+```bash
+npx supabase migration list
+```
+
+### マイグレーションの適用
+#### ローカル開発環境
+ローカルのDBに未適用分をすべて適用します。
+```bash
+npx supabase migration up
+```
+
+#### リモートプロジェクト (本番・ステージング)
+リンク済みのリモートDBへ新規マイグレーションをプッシュします。
+```bash
+npx supabase db push
+```
+
+#### データベースのリセット
+**（※注意：全データ削除）** ローカルDBを初期化し、全てのマイグレーションを最初から適用し直します。
+```bash
+npx supabase db reset
+```
+
+---
+
 ## 🎨 UI/UX Requirements
+
 
 視覚的ノイズと操作コストの最小化を追求する。
 
