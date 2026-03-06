@@ -30,8 +30,8 @@ AIコーディングエージェントは、本ガイドラインに記載され
 
 - **テキスト (Text)**
   - Primary: `text-neutral-900` / Dark: `text-neutral-50`
-  - Secondary: `text-neutral-600` / Dark: `text-neutral-400`
-  - Disabled: `text-neutral-400` / Dark: `text-neutral-600`
+  - Secondary: `text-neutral-700` / Dark: `text-neutral-300`
+  - Disabled: `text-neutral-500` / Dark: `text-neutral-500`
 
 - **アクセント (Accent: Amber)**
   - 用途: 主要なアクション（Primary Buttonの背景）、注意を引くバッジ、アクティブなタブインジケーターなど、直感的にユーザを導く重要な箇所のみに限定し、面積を小さく抑える。
@@ -49,10 +49,10 @@ AIコーディングエージェントは、本ガイドラインに記載され
 情報密度を高く保つため、フォントサイズとウェイトは以下に限定する。
 
 - **フォントサイズ**
-  - Text Xs (小注釈/バッジ): `text-xs`
-  - Text Sm (標準/高密度): `text-sm` （UI全体の基本サイズ）
-  - Text Base (見出しレベル3など): `text-base`
-  - Text Lg (主要見出し): `text-lg`
+  - Text Sm (注釈/バッジ/補助的テキスト): `text-sm`
+  - Text Base (標準/大部分のテキスト): `text-base` （UI全体の基本サイズ）
+  - Text Lg (主要見出し/強調要素): `text-lg`
+- **制約**: 上記3つのクラス以外（`text-xs`, `text-xl` 等）の使用、および `text-[13px]` のような数値による直接指定は一切禁止する。
 
 - **フォントウェイト**
   - 標準: `font-normal`
