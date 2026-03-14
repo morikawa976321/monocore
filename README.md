@@ -71,6 +71,18 @@ npx supabase db reset
 
 ---
 
+## 🧪 Testing
+
+### テストコードの構成
+テストコードは**コロケーションスタイル**で統一し、コンポーネントやロジックのすぐ横に配置します。実装ファイルとテストファイルを近接させることで、変更時の影響範囲の把握とメンテナンスを容易にします。
+
+- **命名規則:** `filename.test.ts` (または `filename.test.tsx`)
+- **配置例:**
+  - `src/utils/date.ts` に対するテスト → `src/utils/date.test.ts`
+  - `src/components/Card.tsx` に対するテスト → `src/components/Card.test.tsx`
+
+---
+
 ## 🎨 UI/UX Requirements
 
 
