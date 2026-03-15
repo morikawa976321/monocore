@@ -10,7 +10,6 @@ type ScheduleRow = Database['public']['Tables']['schedules']['Row']
  */
 export async function getSchedules(
     supabase: SupabaseClient<Database>,
-    activity: string,
     start_at: string,
     end_at: string,
 ): Promise<{ data: ScheduleRow[] | null; error: Error | null }> {
