@@ -9,7 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { ThemeToggle } from "./ThemeToggle";
 
-export const Sidebar = () => {
+export function Sidebar() {
     return (
         <nav className="fixed inset-y-0 left-0 z-50 flex flex-col w-12 transition-all duration-150 ease-in-out bg-transparent border-r border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 group hover:w-64 hover:bg-neutral-50 dark:hover:bg-neutral-900 overflow-hidden">
             <div className="flex flex-col flex-1 gap-2 p-2 mt-4">
@@ -25,7 +25,7 @@ export const Sidebar = () => {
             </div>
         </nav>
     );
-};
+}
 
 const SidebarItem = ({
     href,
