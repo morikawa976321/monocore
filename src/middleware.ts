@@ -34,12 +34,20 @@ export async function updateSession(request: NextRequest) {
     )
 
     // これにより、期限切れが近いセッションを自動的にリフレッシュします（重要）
-    await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // 未認証ユーザーを /login にリダイレクトする（/login, /auth/callback は除外）
+    const { pathname } = request.nextUrl
+    if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/auth/callback')) {
+        const loginUrl = request.nextUrl.clone()
+        loginUrl.pathname = '/login'
+        return NextResponse.redirect(loginUrl)
+    }
 
     return supabaseResponse
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     return await updateSession(request)
 }
 
