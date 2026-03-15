@@ -128,6 +128,31 @@ function generateDayEntries(): DayEntry[] {
 
 const INITIAL_ENTRIES = generateDayEntries();
 
+const DRAFT_STORAGE_KEY = 'schedules-draft';
+
+function writeDraftToStorage(entries: DayEntry[]): void {
+    try {
+        const draft: Record<string, string> = {};
+        for (const e of entries) {
+            const dateStr = dateLabelToDateStr(e.dateLabel);
+            if (dateStr) draft[dateStr] = e.content;
+        }
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    } catch {
+        // localStorage full or unavailable
+    }
+}
+
+function readDraftFromStorage(): Record<string, string> | null {
+    try {
+        const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as Record<string, string>;
+    } catch {
+        return null;
+    }
+}
+
 function AutoHeightTextarea({
     value,
     onChange,
@@ -175,23 +200,50 @@ export default function SchedulesPage() {
             (result: { data: ScheduleRow[] | null; error: Error | null }) => {
                 const { data, error } = result;
                 if (error || !data) return;
-            const byDate = new Map<string, ScheduleRow[]>();
-            for (const row of data) {
-                const date = utcToLocalTime(row.start_at, tz).date;
-                if (!byDate.has(date)) byDate.set(date, []);
-                byDate.get(date)!.push(row);
-            }
-            setEntries((prev) =>
-                prev.map((e) => {
-                    const dateStr = dateLabelToDateStr(e.dateLabel);
-                    const rows = byDate.get(dateStr) ?? [];
-                    const content = scheduleRowsToDayContent(rows, dateStr, tz);
-                    return { ...e, content: content || e.content };
-                })
-            );
+                const byDate = new Map<string, ScheduleRow[]>();
+                for (const row of data) {
+                    const date = utcToLocalTime(row.start_at, tz).date;
+                    if (!byDate.has(date)) byDate.set(date, []);
+                    byDate.get(date)!.push(row);
+                }
+                setEntries((prev) => {
+                    const fromApi = prev.map((e) => {
+                        const dateStr = dateLabelToDateStr(e.dateLabel);
+                        const rows = byDate.get(dateStr) ?? [];
+                        const content = scheduleRowsToDayContent(rows, dateStr, tz);
+                        return { ...e, content: content || e.content };
+                    });
+                    const draft = readDraftFromStorage();
+                    if (!draft) return fromApi;
+                    try {
+                        localStorage.removeItem(DRAFT_STORAGE_KEY);
+                    } catch {
+                        /**/
+                    }
+                    return fromApi.map((e) => {
+                        const dateStr = dateLabelToDateStr(e.dateLabel);
+                        const draftContent = dateStr ? draft[dateStr] : undefined;
+                        return draftContent !== undefined ? { ...e, content: draftContent } : e;
+                    });
+                });
             }
         );
     }, [supabase]);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            writeDraftToStorage(entriesRef.current);
+            if (debounceTimerRef.current != null) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            writeDraftToStorage(entriesRef.current);
+        };
+    }, []);
 
     const saveDay = useCallback((index: number) => {
         const entry = entriesRef.current[index];
@@ -266,9 +318,9 @@ export default function SchedulesPage() {
                                     if (debounceTimerRef.current) {
                                         clearTimeout(debounceTimerRef.current);
                                         debounceTimerRef.current = null;
-                                        lastSaveTimeRef.current = Date.now();
-                                        saveDay(index);
                                     }
+                                    lastSaveTimeRef.current = Date.now();
+                                    saveDay(index);
                                 }}
                                 className={[
                                     'w-full min-h-[4rem] resize-none bg-transparent border-none outline-none',
