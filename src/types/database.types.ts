@@ -105,7 +105,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      replace_schedules_for_day:
+        | { Args: { p_date: string; p_items: Json }; Returns: undefined }
+        | {
+            Args: {
+              p_day_end_utc: string
+              p_day_start_utc: string
+              p_items: Json
+            }
+            Returns: undefined
+          }
     }
     Enums: {
       [_ in never]: never
