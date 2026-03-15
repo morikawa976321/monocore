@@ -1,16 +1,112 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { addDays, parseISO, format } from 'date-fns';
+import { createClient } from '@/src/lib/supabase/client';
+import { getSchedules, replaceSchedulesForDay } from '@/src/lib/supabase/queries/schedules';
+import type { ReplaceScheduleItem } from '@/src/lib/supabase/queries/schedules';
+import type { Database } from '@/src/types/database.types';
+import { getDefaultTimezone, localTimeToUtc, utcToLocalTime } from '@/src/lib/date';
+
+type ScheduleRow = Database['public']['Tables']['schedules']['Row'];
 
 const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 
 type DayEntry = { dateLabel: string; content: string };
 
+/** "2026/03/01 (日)" → "2026-03-01" */
+function dateLabelToDateStr(dateLabel: string): string {
+    const parts = dateLabel.split('/');
+    if (parts.length < 3) return '';
+    const y = parts[0];
+    const m = parts[1].padStart(2, '0');
+    const d = parts[2].replace(/\s.*/, '').trim().padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+/** 行頭が HHMM または HHMM-HHMM か */
+const TIME_LINE_REGEX = /^(\d{4})(-(\d{4}))?(\s*)(.*)$/;
+
+function isValidHhmm(hhmm: string): boolean {
+    if (hhmm.length !== 4) return false;
+    const h = parseInt(hhmm.slice(0, 2), 10);
+    const m = parseInt(hhmm.slice(2, 4), 10);
+    return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+}
+
+/**
+ * テキストエリア1日分の文字列を ReplaceScheduleItem[] に変換する。
+ * 行頭が HHMM または HHMM-HHMM の行でブロックを区切り、1ブロック＝1レコード。
+ */
+function dayContentToScheduleItems(
+    dateStr: string,
+    textareaContent: string,
+    timezone: string
+): ReplaceScheduleItem[] {
+    const lines = textareaContent.split(/\r?\n/);
+    const items: ReplaceScheduleItem[] = [];
+    let i = 0;
+    while (i < lines.length) {
+        const m = lines[i].match(TIME_LINE_REGEX);
+        if (!m) {
+            i++;
+            continue;
+        }
+        const startHhmm = m[1];
+        const endHhmm = m[3] ?? null;
+        const restOfFirstLine = (m[5] ?? '').trim();
+        if (!isValidHhmm(startHhmm) || (endHhmm !== null && !isValidHhmm(endHhmm))) {
+            i++;
+            continue;
+        }
+        const activityLines: string[] = [restOfFirstLine];
+        i++;
+        while (i < lines.length && !TIME_LINE_REGEX.test(lines[i])) {
+            activityLines.push(lines[i]);
+            i++;
+        }
+        const activity = activityLines.join('\n').trim();
+        if (activity === '') continue;
+        const start_at = localTimeToUtc(dateStr, startHhmm, timezone);
+        const end_at = endHhmm ? localTimeToUtc(dateStr, endHhmm, timezone) : null;
+        items.push({ activity, start_at, end_at });
+    }
+    return items;
+}
+
+/**
+ * 1日分の ScheduleRow[] をテキストエリア用の1本の文字列に変換する。
+ * dateStr に一致する行のみ対象。
+ */
+function scheduleRowsToDayContent(
+    rows: ScheduleRow[],
+    dateStr: string,
+    timezone: string
+): string {
+    const forDay = rows
+        .filter((r) => utcToLocalTime(r.start_at, timezone).date === dateStr)
+        .sort((a, b) => (a.start_at < b.start_at ? -1 : 1));
+    const parts: string[] = [];
+    for (const row of forDay) {
+        const start = utcToLocalTime(row.start_at, timezone);
+        const end = row.end_at ? utcToLocalTime(row.end_at, timezone) : null;
+        const timePrefix = end ? `${start.hhmm}-${end.hhmm}` : start.hhmm;
+        const activityLines = (row.activity ?? '').split(/\r?\n/);
+        const firstLine = activityLines[0] ?? '';
+        const rest = activityLines.slice(1);
+        const line1 = `${timePrefix}${firstLine ? ' ' + firstLine : ''}`;
+        parts.push(rest.length > 0 ? line1 + '\n' + rest.join('\n') : line1);
+    }
+    return parts.join('\n');
+}
+
+const FIXED_TODAY = new Date(2026, 2, 1);
+const FIXED_END = new Date(2027, 10, 15);
+
 function generateDayEntries(): DayEntry[] {
-    // TODO: 今日の日付を取得して、その日が一番上になるように表示する
     // TODO: 無限スクロールを実装する（上はデフォルトで2週間前、下は半年先まで表示。交差監視方式により実装）
-    const today = new Date(2026, 2, 15); // 2026-03-15 (local)
-    const end = new Date(2027, 2, 15);   // 1 year later
+    const today = FIXED_TODAY;
+    const end = FIXED_END;
 
     const entries: DayEntry[] = [];
     const current = new Date(today);
@@ -64,6 +160,51 @@ function AutoHeightTextarea({
 
 export default function SchedulesPage() {
     const [entries, setEntries] = useState<DayEntry[]>(INITIAL_ENTRIES);
+    const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+    const supabase = useMemo(createClient, []);
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastSaveTimeRef = useRef<number>(0);
+    const entriesRef = useRef<DayEntry[]>(entries);
+    entriesRef.current = entries;
+
+    useEffect(() => {
+        const tz = getDefaultTimezone();
+        const rangeStartUtc = localTimeToUtc('2026-03-01', '0000', tz);
+        const rangeEndUtc = localTimeToUtc('2027-11-16', '0000', tz);
+        getSchedules(supabase, rangeStartUtc, rangeEndUtc).then(
+            (result: { data: ScheduleRow[] | null; error: Error | null }) => {
+                const { data, error } = result;
+                if (error || !data) return;
+            const byDate = new Map<string, ScheduleRow[]>();
+            for (const row of data) {
+                const date = utcToLocalTime(row.start_at, tz).date;
+                if (!byDate.has(date)) byDate.set(date, []);
+                byDate.get(date)!.push(row);
+            }
+            setEntries((prev) =>
+                prev.map((e) => {
+                    const dateStr = dateLabelToDateStr(e.dateLabel);
+                    const rows = byDate.get(dateStr) ?? [];
+                    const content = scheduleRowsToDayContent(rows, dateStr, tz);
+                    return { ...e, content: content || e.content };
+                })
+            );
+            }
+        );
+    }, [supabase]);
+
+    const saveDay = useCallback((index: number) => {
+        const entry = entriesRef.current[index];
+        if (!entry) return;
+            const dateStr = dateLabelToDateStr(entry.dateLabel);
+            if (!dateStr) return;
+            const tz = getDefaultTimezone();
+            const day_start_utc = localTimeToUtc(dateStr, '0000', tz);
+            const nextDateStr = format(addDays(parseISO(dateStr), 1), 'yyyy-MM-dd');
+            const day_end_utc = localTimeToUtc(nextDateStr, '0000', tz);
+            const items = dayContentToScheduleItems(dateStr, entry.content, tz);
+            replaceSchedulesForDay(supabase, day_start_utc, day_end_utc, items);
+    }, [supabase]);
 
     const updateDayContent = (index: number, value: string) => {
         setEntries((prev) => {
@@ -71,6 +212,29 @@ export default function SchedulesPage() {
             next[index] = { ...next[index], content: value };
             return next;
         });
+        if (focusedIndex !== index) return; // フォーカス中のテキストエリアのみ保存スケジュール
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+        }
+        const now = Date.now();
+        if (now - lastSaveTimeRef.current >= 10000) {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+                debounceTimerRef.current = null;
+            }
+            lastSaveTimeRef.current = now;
+            entriesRef.current = entriesRef.current.map((e, i) =>
+                i === index ? { ...e, content: value } : e
+            );
+            saveDay(index);
+        } else {
+            debounceTimerRef.current = setTimeout(() => {
+                debounceTimerRef.current = null;
+                lastSaveTimeRef.current = Date.now();
+                saveDay(index);
+            }, 1000);
+        }
     };
 
     return (
@@ -96,6 +260,16 @@ export default function SchedulesPage() {
                             <AutoHeightTextarea
                                 value={entry.content}
                                 onChange={(e) => updateDayContent(index, e.target.value)}
+                                onFocus={() => setFocusedIndex(index)}
+                                onBlur={() => {
+                                    setFocusedIndex(null);
+                                    if (debounceTimerRef.current) {
+                                        clearTimeout(debounceTimerRef.current);
+                                        debounceTimerRef.current = null;
+                                        lastSaveTimeRef.current = Date.now();
+                                        saveDay(index);
+                                    }
+                                }}
                                 className={[
                                     'w-full min-h-[4rem] resize-none bg-transparent border-none outline-none',
                                     'font-mono text-base leading-7',
