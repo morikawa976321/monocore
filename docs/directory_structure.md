@@ -113,3 +113,11 @@ UIを構成するパーツです。機能ごとにサブフォルダを作りま
     * 他のページでも使いそうなUIは最初から `components/` に置く。
 * **型安全の維持**:
     * `any` 型の使用を避け、必ず `database.types.ts` にある自動生成型を利用する。
+
+---
+
+## 7. コーディングスタイル（JavaScript/TypeScript）
+
+* **関数は関数宣言で統一する**
+    * エクスポートする関数・React コンポーネントは `export function name() { }` / `export async function name() { }` を使う。`export const name = () => { }` のアロー関数は使わない。
+    * 理由：公式ドキュメント（React 等）やチュートリアルと表記を揃えやすく、スタックトレースで名前が明確に出る。定数・設定（`metadata`、`config` など）は従来どおり `export const` でよい。
