@@ -26,7 +26,7 @@ export function isValidHhmm(hhmm: string): boolean {
     if (hhmm.length !== 4) return false;
     const h = parseInt(hhmm.slice(0, 2), 10);
     const m = parseInt(hhmm.slice(2, 4), 10);
-    return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+    return h >= 0 && h <= 24 && m >= 0 && m <= 59;
 }
 
 /**
