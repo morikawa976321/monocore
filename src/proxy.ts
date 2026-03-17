@@ -12,7 +12,7 @@ export async function updateSession(request: NextRequest) {
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
         {
             cookies: {
                 // リクエストから全クッキーを取得
@@ -47,12 +47,12 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     return await updateSession(request)
 }
 
 /**
- * ミドルウェアを適用する範囲を指定します。
+ * プロキシを適用する範囲を指定します。
  */
 export const config = {
     matcher: [
