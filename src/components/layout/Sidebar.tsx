@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
     HomeIcon,
@@ -6,24 +9,102 @@ import {
     BookOpenIcon,
     ShoppingBagIcon,
     ClockIcon,
+    Bars3Icon,
 } from "@heroicons/react/24/outline";
 import { ThemeToggle } from "./ThemeToggle";
 
+const MENU_ITEMS = [
+    { href: "/", icon: HomeIcon, label: "Inbox" },
+    { href: "/projects", icon: FolderIcon, label: "Project" },
+    { href: "/tasks", icon: CheckCircleIcon, label: "Task" },
+    { href: "/schedules", icon: ClockIcon, label: "Schedule" },
+    { href: "/knowledge", icon: BookOpenIcon, label: "Knowledge" },
+    { href: "/items", icon: ShoppingBagIcon, label: "Item" },
+] as const;
+
 export function Sidebar() {
+    const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, [isOpen]);
+
     return (
-        <nav className="fixed inset-y-0 left-0 z-50 flex flex-col w-12 transition-all duration-150 ease-in-out bg-transparent border-r border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 group hover:w-64 hover:bg-neutral-50 dark:hover:bg-neutral-900 overflow-hidden">
-            <div className="flex flex-col flex-1 gap-2 p-2 mt-4">
-                <SidebarItem href="/" icon={<HomeIcon className="w-5 h-5 flex-shrink-0" />} label="Inbox" />
-                <SidebarItem href="/projects" icon={<FolderIcon className="w-5 h-5 flex-shrink-0" />} label="Project" />
-                <SidebarItem href="/tasks" icon={<CheckCircleIcon className="w-5 h-5 flex-shrink-0" />} label="Task" />
-                <SidebarItem href="/schedules" icon={<ClockIcon className="w-5 h-5 flex-shrink-0" />} label="Schedule" />
-                <SidebarItem href="/knowledge" icon={<BookOpenIcon className="w-5 h-5 flex-shrink-0" />} label="Knowledge" />
-                <SidebarItem href="/items" icon={<ShoppingBagIcon className="w-5 h-5 flex-shrink-0" />} label="Item" />
+        <>
+            {/* Desktop: 従来のサイドバー（md 以上で表示） */}
+            <nav
+                className="hidden md:flex fixed inset-y-0 left-0 z-50 flex-col w-12 transition-all duration-150 ease-in-out bg-transparent border-r border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 group hover:w-64 hover:bg-neutral-50 dark:hover:bg-neutral-900 overflow-hidden"
+                aria-label="メインナビゲーション"
+            >
+                <div className="flex flex-col flex-1 gap-2 p-2 mt-4">
+                    {MENU_ITEMS.map(({ href, icon: Icon, label }) => (
+                        <SidebarItem
+                            key={href}
+                            href={href}
+                            icon={<Icon className="w-5 h-5 flex-shrink-0" />}
+                            label={label}
+                        />
+                    ))}
+                </div>
+                <div className="p-2 mb-4">
+                    <ThemeToggle />
+                </div>
+            </nav>
+
+            {/* Mobile: ハンバーガーボタン（左下固定） */}
+            <div className="fixed bottom-4 left-4 z-50 md:hidden">
+                <button
+                    type="button"
+                    onClick={() => setIsOpen((prev) => !prev)}
+                    aria-expanded={isOpen}
+                    aria-label={isOpen ? "メニューを閉じる" : "メニューを開く"}
+                    className="flex items-center justify-center w-12 h-12 rounded-sm border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
+                >
+                    <Bars3Icon className="w-6 h-6" />
+                </button>
             </div>
-            <div className="p-2 mb-4">
-                <ThemeToggle />
+
+            {/* Mobile: オーバーレイ（メニュー外タップで閉じる） */}
+            {isOpen && (
+                <div
+                    className="fixed inset-0 z-40 bg-neutral-950 opacity-50 dark:opacity-75 md:hidden"
+                    aria-hidden
+                    onClick={() => setIsOpen(false)}
+                />
+            )}
+
+            {/* Mobile: ドロワーパネル */}
+            <div
+                className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 transition-transform duration-150 ease-in-out md:hidden ${
+                    isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
+                }`}
+                role="dialog"
+                aria-modal="true"
+                aria-label="メニュー"
+                aria-hidden={!isOpen}
+            >
+                <div className="flex flex-col flex-1 gap-2 p-2 mt-4 overflow-auto">
+                    {MENU_ITEMS.map(({ href, icon: Icon, label }) => (
+                        <SidebarItem
+                            key={href}
+                            href={href}
+                            icon={<Icon className="w-5 h-5 flex-shrink-0" />}
+                            label={label}
+                            showLabel
+                            onNavigate={() => setIsOpen(false)}
+                        />
+                    ))}
+                </div>
+                <div className="p-2 mb-4">
+                    <ThemeToggle />
+                </div>
             </div>
-        </nav>
+        </>
     );
 }
 
@@ -31,18 +112,27 @@ const SidebarItem = ({
     href,
     icon,
     label,
+    showLabel = false,
+    onNavigate,
 }: {
     href: string;
     icon: React.ReactNode;
     label: string;
+    showLabel?: boolean;
+    onNavigate?: () => void;
 }) => {
     return (
         <Link
             href={href}
-            className="flex items-center gap-4 px-2 py-2 text-base font-medium transition-colors rounded-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-50 group-hover:px-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
+            onClick={onNavigate}
+            className="flex items-center gap-4 px-2 py-2 text-base font-medium transition-colors rounded-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-50 group-hover:px-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
         >
             <div className="flex items-center justify-center w-8 h-8 shrink-0">{icon}</div>
-            <span className="opacity-0 transition-opacity duration-150 ease-in-out whitespace-nowrap group-hover:opacity-100">
+            <span
+                className={`whitespace-nowrap transition-opacity duration-150 ease-in-out ${
+                    showLabel ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+            >
                 {label}
             </span>
         </Link>

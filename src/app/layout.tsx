@@ -36,7 +36,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Sidebar />
-          <main className="pl-12 min-h-screen">
+          <main className="pl-0 md:pl-12 min-h-screen">
             {children}
           </main>
         </ThemeProvider>
