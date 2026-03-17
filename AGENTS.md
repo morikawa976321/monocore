@@ -40,6 +40,7 @@ Reference: `docs/directory_structure.md`
 1. **Everything is a Resource** — Tasks, assets, notes, schedules are equal resources.
 2. **Form follows function / Cognitive load minimization** — No decorative animation; maximize information density and speed; minimize modals and clicks.
 3. **Focus on app logic** — Use `@supabase/ssr` fully; keep boilerplate minimal.
+4. **Prioritize development speed above all** — In this solo, small-scale project, default decisions should favor faster implementation and iteration unless they introduce major product risk.
 
 Reference: `README.md` (Technology Stack, Development Philosophy)
 
@@ -59,6 +60,7 @@ Reference: `docs/screen_layout.md`
 
 - **Exports:** Use `export function name() { }` / `export async function name() { }` for exported functions and React components. Do not use `export const name = () => { }` for those. Callbacks and short internal functions may use arrow functions. Constants (e.g. `metadata`, `config`) stay `export const`.
 - **Tests:** Colocate with source: `filename.test.ts` or `filename.test.tsx` next to the implementation.
+- **Test scope (small solo app):** Prioritize tests only for flows that are hard/time-consuming to verify manually, high-risk logic, and business-critical behavior. Avoid over-testing thin wrappers or easily verifiable UI details.
 - **Commits:** Use prefixes — `feat:`, `fix:`, `refactor:`, `docs:`, `chore:` (e.g. `feat: add search to inventory list`).
 
 Reference: `README.md` (開発ルール), `docs/directory_structure.md` (コーディングスタイル)
