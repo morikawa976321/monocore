@@ -2,7 +2,7 @@ import { localTimeToUtc, utcToLocalTime } from '../date';
 import type { ReplaceScheduleItem } from '../supabase/queries/schedules';
 import type { Database } from '../../types/database.types';
 
-type ScheduleRow = Database['public']['Tables']['schedules']['Row'];
+export type ScheduleRow = Database['public']['Tables']['schedules']['Row'];
 
 const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
@@ -118,6 +118,32 @@ export function hasOrphanLines(content: string): boolean {
         if (!inBlock && line.trim() !== '') return true;
     }
     return false;
+}
+
+/**
+ * DB から取得したスケジュール行を DayEntry[] にマージして返す。
+ * draft がある場合は DB の内容より draft を優先する。
+ */
+export function mergeSchedulesIntoEntries(
+    entries: DayEntry[],
+    rows: ScheduleRow[],
+    tz: string,
+    draft: Record<string, string> | null
+): DayEntry[] {
+    const byDate = new Map<string, ScheduleRow[]>();
+    for (const row of rows) {
+        const date = utcToLocalTime(row.start_at, tz).date;
+        if (!byDate.has(date)) byDate.set(date, []);
+        byDate.get(date)!.push(row);
+    }
+    return entries.map((e) => {
+        const dateStr = dateLabelToDateStr(e.dateLabel);
+        const draftContent = dateStr ? draft?.[dateStr] : undefined;
+        if (draftContent !== undefined) return { ...e, content: draftContent };
+        const dbRows = byDate.get(dateStr) ?? [];
+        const content = scheduleRowsToDayContent(dbRows, dateStr, tz);
+        return { ...e, content };
+    });
 }
 
 /**
