@@ -14,12 +14,8 @@ import {
 import { ThemeToggle } from "./ThemeToggle";
 
 const MENU_ITEMS = [
-    { href: "/", icon: HomeIcon, label: "Inbox" },
-    { href: "/projects", icon: FolderIcon, label: "Project" },
-    { href: "/tasks", icon: CheckCircleIcon, label: "Task" },
     { href: "/schedules", icon: ClockIcon, label: "Schedule" },
-    { href: "/knowledge", icon: BookOpenIcon, label: "Knowledge" },
-    { href: "/items", icon: ShoppingBagIcon, label: "Item" },
+    { href: "/tasks", icon: CheckCircleIcon, label: "Task" }
 ] as const;
 
 export function Sidebar() {
@@ -36,9 +32,9 @@ export function Sidebar() {
 
     return (
         <>
-            {/* Desktop: 従来のサイドバー（md 以上で表示） */}
+            {/* Desktop: 従来のサイドバー（sm 以上で表示） */}
             <nav
-                className="hidden md:flex fixed inset-y-0 left-0 z-50 flex-col w-12 transition-all duration-150 ease-in-out bg-transparent border-r border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 group hover:w-64 hover:bg-neutral-50 dark:hover:bg-neutral-900 overflow-hidden"
+                className="hidden sm:flex fixed inset-y-0 left-0 z-50 flex-col w-12 transition-all duration-150 ease-in-out bg-transparent border-r border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 group hover:w-64 hover:bg-neutral-50 dark:hover:bg-neutral-900 overflow-hidden"
                 aria-label="メインナビゲーション"
             >
                 <div className="flex flex-col flex-1 gap-2 p-2 mt-4">
@@ -57,7 +53,7 @@ export function Sidebar() {
             </nav>
 
             {/* Mobile: ハンバーガーボタン（左下固定） */}
-            <div className="fixed bottom-4 left-4 z-50 md:hidden">
+            <div className="fixed bottom-4 left-4 z-50 sm:hidden">
                 <button
                     type="button"
                     onClick={() => setIsOpen((prev) => !prev)}
@@ -72,7 +68,7 @@ export function Sidebar() {
             {/* Mobile: オーバーレイ（メニュー外タップで閉じる） */}
             {isOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-neutral-950 opacity-50 dark:opacity-75 md:hidden"
+                    className="fixed inset-0 z-40 bg-neutral-950 opacity-50 dark:opacity-75 sm:hidden"
                     aria-hidden
                     onClick={() => setIsOpen(false)}
                 />
@@ -80,7 +76,7 @@ export function Sidebar() {
 
             {/* Mobile: ドロワーパネル */}
             <div
-                className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 transition-transform duration-150 ease-in-out md:hidden ${
+                className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 transition-transform duration-150 ease-in-out sm:hidden ${
                     isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
                 }`}
                 role="dialog"
