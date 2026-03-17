@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { addDays, parseISO, format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/src/lib/supabase/client';
 import { getSchedules, replaceSchedulesForDay } from '@/src/lib/supabase/queries/schedules';
 import type { ReplaceScheduleItem } from '@/src/lib/supabase/queries/schedules';
@@ -27,6 +28,7 @@ function dateLabelToDateStr(dateLabel: string): string {
 /** 行頭が HHMM または HHMM-HHMM か */
 const TIME_LINE_REGEX = /^(\d{4})(-(\d{4}))?(\s*)(.*)$/;
 
+/** 4桁の HHMM 文字列が有効な時刻かどうかを返す。 */
 function isValidHhmm(hhmm: string): boolean {
     if (hhmm.length !== 4) return false;
     const h = parseInt(hhmm.slice(0, 2), 10);
@@ -103,6 +105,7 @@ function scheduleRowsToDayContent(
 const FIXED_TODAY = new Date(2026, 2, 1);
 const FIXED_END = new Date(2027, 10, 15);
 
+/** 表示用の日付ラベルと空コンテンツを持つ DayEntry の配列を生成する。 */
 function generateDayEntries(): DayEntry[] {
     // TODO: 無限スクロールを実装する（上はデフォルトで2週間前、下は半年先まで表示。交差監視方式により実装）
     const today = FIXED_TODAY;
@@ -130,6 +133,7 @@ const INITIAL_ENTRIES = generateDayEntries();
 
 const DRAFT_STORAGE_KEY = 'schedules-draft';
 
+/** 日付別の下書きコンテンツを localStorage に保存する。 */
 function writeDraftToStorage(entries: DayEntry[]): void {
     try {
         const draft: Record<string, string> = {};
@@ -143,6 +147,7 @@ function writeDraftToStorage(entries: DayEntry[]): void {
     }
 }
 
+/** localStorage から日付別の下書きを読み取り、日付文字列をキーとするオブジェクトで返す。 */
 function readDraftFromStorage(): Record<string, string> | null {
     try {
         const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
@@ -153,6 +158,7 @@ function readDraftFromStorage(): Record<string, string> | null {
     }
 }
 
+/** 内容に応じて高さが自動調整される textarea。 */
 function AutoHeightTextarea({
     value,
     onChange,
@@ -183,6 +189,7 @@ function AutoHeightTextarea({
     );
 }
 
+/** スケジュール一覧・編集ページ。日付ごとのテキストエリアで HHMM 形式の予定を編集し DB に保存する。 */
 export default function SchedulesPage() {
     const [entries, setEntries] = useState<DayEntry[]>(INITIAL_ENTRIES);
     const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
@@ -191,6 +198,11 @@ export default function SchedulesPage() {
     const lastSaveTimeRef = useRef<number>(0);
     const entriesRef = useRef<DayEntry[]>(entries);
     entriesRef.current = entries;
+
+    const todayStr = useMemo(
+        () => format(toZonedTime(new Date(), getDefaultTimezone()), 'yyyy-MM-dd'),
+        []
+    );
 
     useEffect(() => {
         const tz = getDefaultTimezone();
@@ -245,6 +257,7 @@ export default function SchedulesPage() {
         };
     }, []);
 
+    /** 指定インデックスの日の内容を DB に保存する（その日の範囲で replace）。 */
     const saveDay = useCallback((index: number) => {
         const entry = entriesRef.current[index];
         if (!entry) return;
@@ -258,6 +271,7 @@ export default function SchedulesPage() {
             replaceSchedulesForDay(supabase, day_start_utc, day_end_utc, items);
     }, [supabase]);
 
+    /** 指定日のテキストを更新し、フォーカス中ならデバウンスまたは間隔で saveDay を呼ぶ。 */
     const updateDayContent = (index: number, value: string) => {
         setEntries((prev) => {
             const next = [...prev];
@@ -303,7 +317,11 @@ export default function SchedulesPage() {
                 {entries.map((entry, index) => (
                     <section
                         key={entry.dateLabel}
-                        className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden"
+                        className={`rounded-lg bg-white dark:bg-neutral-900 overflow-hidden ${
+                            dateLabelToDateStr(entry.dateLabel) === todayStr
+                                ? 'border-2 border-amber-500 dark:border-amber-400'
+                                : 'border border-neutral-200 dark:border-neutral-800'
+                        }`}
                     >
                         <header className="px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 font-mono text-sm text-neutral-700 dark:text-neutral-300">
                             {entry.dateLabel}
