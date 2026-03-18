@@ -10,8 +10,10 @@ import {
     ShoppingBagIcon,
     ClockIcon,
     Bars3Icon,
+    ArrowLeftStartOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import { ThemeToggle } from "./ThemeToggle";
+import { createClient } from "@/src/lib/supabase/client";
 
 const MENU_ITEMS = [
     { href: "/schedules", icon: ClockIcon, label: "Schedule" },
@@ -20,6 +22,14 @@ const MENU_ITEMS = [
 
 export function Sidebar() {
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    async function handleLogout() {
+        setIsLoggingOut(true);
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        window.location.href = "/login";
+    }
 
     useEffect(() => {
         if (!isOpen) return;
@@ -47,7 +57,13 @@ export function Sidebar() {
                         />
                     ))}
                 </div>
-                <div className="p-2 mb-4">
+                <div className="p-2 mb-4 space-y-2">
+                    <SidebarActionButton
+                        icon={<ArrowLeftStartOnRectangleIcon className="w-5 h-5 flex-shrink-0" />}
+                        label="Logout"
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                    />
                     <ThemeToggle />
                 </div>
             </nav>
@@ -84,7 +100,20 @@ export function Sidebar() {
                 aria-label="メニュー"
                 aria-hidden={!isOpen}
             >
-                <div className="flex flex-col flex-1 gap-2 p-2 mt-4 overflow-auto">
+                <div className="p-2 mt-4 space-y-2">
+                    <SidebarActionButton
+                        icon={<ArrowLeftStartOnRectangleIcon className="w-5 h-5 flex-shrink-0" />}
+                        label="Logout"
+                        onClick={async () => {
+                            setIsOpen(false);
+                            await handleLogout();
+                        }}
+                        showLabel
+                        disabled={isLoggingOut}
+                    />
+                    <ThemeToggle showLabel />
+                </div>
+                <div className="flex flex-col gap-2 p-2 mt-auto mb-12 pb-6 overflow-auto">
                     {MENU_ITEMS.map(({ href, icon: Icon, label }) => (
                         <SidebarItem
                             key={href}
@@ -95,9 +124,6 @@ export function Sidebar() {
                             onNavigate={() => setIsOpen(false)}
                         />
                     ))}
-                </div>
-                <div className="p-2 mb-4">
-                    <ThemeToggle />
                 </div>
             </div>
         </>
@@ -132,5 +158,37 @@ const SidebarItem = ({
                 {label}
             </span>
         </Link>
+    );
+};
+
+const SidebarActionButton = ({
+    icon,
+    label,
+    onClick,
+    showLabel = false,
+    disabled = false,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    onClick: () => void | Promise<void>;
+    showLabel?: boolean;
+    disabled?: boolean;
+}) => {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className="w-full flex items-center gap-4 px-2 py-2 text-base font-medium transition-colors rounded-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-50 disabled:opacity-50 group-hover:px-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
+        >
+            <div className="flex items-center justify-center w-8 h-8 shrink-0">{icon}</div>
+            <span
+                className={`whitespace-nowrap transition-opacity duration-150 ease-in-out ${
+                    showLabel ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+            >
+                {label}
+            </span>
+        </button>
     );
 };
