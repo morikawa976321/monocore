@@ -217,8 +217,8 @@ export default function TasksPage() {
     return (
         <div className="flex flex-col h-screen">
             {/* Header */}
-            <header className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
-                <h1 className="text-base font-medium tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
+            <header className="flex items-center justify-between px-2 sm:px-6 py-2 sm:py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
+                <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
                     Tasks
                 </h1>
                 {activeTab === 'waiting' && (
@@ -233,7 +233,7 @@ export default function TasksPage() {
             </header>
 
             {/* TabBar */}
-            <div className="flex items-end gap-6 px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
+            <div className="flex items-end gap-2 sm:gap-6 px-2 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
                 {TABS.map((tab) => (
                     <button
                         key={tab.status}
@@ -242,7 +242,7 @@ export default function TasksPage() {
                             setIsAdding(false);
                         }}
                         className={[
-                            'py-3 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none',
+                            'py-2 sm:py-4 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none',
                             activeTab === tab.status
                                 ? 'border-amber-500 text-neutral-900 dark:text-neutral-50'
                                 : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300',
@@ -260,8 +260,8 @@ export default function TasksPage() {
             <div className="flex-1 overflow-y-auto">
                 {/* AddTaskForm */}
                 {activeTab === 'waiting' && isAdding && (
-                    <div className="px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
-                        <div className="flex items-center gap-4">
+                    <div className="px-2 sm:px-6 py-2 sm:py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
+                        <div className="flex items-center gap-2 sm:gap-4">
                             <input
                                 type="text"
                                 value={newTaskText}
@@ -307,12 +307,12 @@ export default function TasksPage() {
                         {visibleTasks.map((task) => (
                             <li
                                 key={task.id}
-                                className="group flex items-center gap-4 px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+                                className="group flex items-center gap-2 sm:gap-4 px-2 sm:px-6 py-2 sm:py-4 border-b border-neutral-200 dark:border-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
                             >
                                 {/* タスク内容 */}
                                 <span
                                     className={[
-                                        'flex-1 text-base',
+                                        'flex-1 text-sm leading-6 sm:text-base sm:leading-7',
                                         task.status === 'completed'
                                             ? 'line-through text-neutral-500 dark:text-neutral-500'
                                             : task.status === 'deleted'
@@ -325,22 +325,22 @@ export default function TasksPage() {
 
                                 {/* 右側メタ情報 */}
                                 {task.status === 'waiting' && task.due_at && (
-                                    <span className="text-sm text-neutral-500 dark:text-neutral-500 shrink-0">
+                                    <span className="text-sm leading-6 text-neutral-500 dark:text-neutral-500 shrink-0">
                                         {formatDateOnly(task.due_at)}
                                     </span>
                                 )}
                                 {task.status === 'completed' && (
-                                    <span className="text-sm text-neutral-500 dark:text-neutral-500 shrink-0">
+                                    <span className="text-sm leading-6 text-neutral-500 dark:text-neutral-500 shrink-0">
                                         {formatDate(task.status_changed_at)}
                                     </span>
                                 )}
                                 {task.status === 'deleted' && (
-                                    <span className="text-sm text-neutral-500 dark:text-neutral-500 shrink-0">
+                                    <span className="text-sm leading-6 text-neutral-500 dark:text-neutral-500 shrink-0">
                                         {formatDate(task.status_changed_at)}
                                     </span>
                                 )}
                                 {task.status === 'archived' && (
-                                    <span className="text-sm text-neutral-500 dark:text-neutral-500 shrink-0">
+                                    <span className="text-sm leading-6 text-neutral-500 dark:text-neutral-500 shrink-0">
                                         {formatDate(task.unarchive_at)} まで
                                     </span>
                                 )}
@@ -388,18 +388,18 @@ export default function TasksPage() {
             {/* ArchiveDialog */}
             {archiveTargetId && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/50">
-                    <div className="bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded p-6 w-96">
-                        <h2 className="text-base font-medium text-neutral-900 dark:text-neutral-50 mb-4">
+                    <div className="bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded p-2 sm:p-6 w-full max-w-sm sm:w-96 mx-2">
+                        <h2 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 text-neutral-900 dark:text-neutral-50 mb-4">
                             アーカイブ
                         </h2>
-                        <p className="text-sm text-neutral-700 dark:text-neutral-300 mb-4">
+                        <p className="text-sm leading-6 text-neutral-700 dark:text-neutral-300 mb-4">
                             いつまでアーカイブしますか？（空欄の場合は無期限）
                         </p>
                         <input
                             type="datetime-local"
                             value={unarchiveAt}
                             onChange={(e) => setUnarchiveAt(e.target.value)}
-                            className="w-full mb-6 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
+                            className="w-full mb-4 sm:mb-6 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
                         />
                         <div className="flex items-center justify-end gap-2">
                             <button

@@ -242,8 +242,8 @@ export default function SchedulesPage() {
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             {/* Header */}
-            <header className="flex items-center px-6 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
-                <h1 className="text-base font-medium tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
+            <header className="flex items-center px-2 sm:px-6 py-2 sm:py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
+                <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
                     Schedules
                 </h1>
             </header>
@@ -251,7 +251,7 @@ export default function SchedulesPage() {
             {/* Scroll container */}
             <div
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+                className="flex-1 overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4"
                 style={{ overflowAnchor: 'none' }}
             >
                 {/* 上端 sentinel */}
@@ -260,7 +260,7 @@ export default function SchedulesPage() {
                 {/* 過去方向ローディング */}
                 {loadingTop && (
                     <div className="flex justify-center py-2">
-                        <span className="text-sm text-neutral-500">Loading...</span>
+                        <span className="text-sm leading-6 text-neutral-500">Loading...</span>
                     </div>
                 )}
 
@@ -278,7 +278,7 @@ export default function SchedulesPage() {
                                     : 'border border-neutral-200 dark:border-neutral-800'
                             }`}
                         >
-                            <header className="px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 font-mono text-sm text-neutral-700 dark:text-neutral-300 flex items-center">
+                            <header className="px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 text-neutral-700 dark:text-neutral-300 flex items-center">
                                 <span>{entry.dateLabel}</span>
                                 {hasOrphanLines(entry.content) && (
                                     <span className="ml-2 px-1 py-0.5 rounded-sm border border-amber-500 dark:border-amber-400 text-amber-600 dark:text-amber-400 text-sm font-medium leading-none">
@@ -286,7 +286,7 @@ export default function SchedulesPage() {
                                     </span>
                                 )}
                             </header>
-                            <div className="p-3">
+                            <div className="p-1 sm:p-4">
                                 <AutoHeightTextarea
                                     value={entry.content}
                                     onChange={(e) =>
@@ -301,7 +301,7 @@ export default function SchedulesPage() {
                                     }}
                                     className={[
                                         'w-full min-h-[4rem] resize-none bg-transparent border-none outline-none',
-                                        'font-mono text-base leading-7',
+                                        'text-sm leading-6 sm:text-base sm:leading-7',
                                         'text-neutral-900 dark:text-neutral-100',
                                         'placeholder:text-neutral-400 dark:placeholder:text-neutral-600',
                                     ].join(' ')}
@@ -318,7 +318,7 @@ export default function SchedulesPage() {
                 {/* 未来方向ローディング */}
                 {loadingBottom && (
                     <div className="flex justify-center py-2">
-                        <span className="text-sm text-neutral-500">Loading...</span>
+                        <span className="text-sm leading-6 text-neutral-500">Loading...</span>
                     </div>
                 )}
 

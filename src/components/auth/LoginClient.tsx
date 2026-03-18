@@ -47,20 +47,20 @@ export function LoginClient({ initialErrorCode }: LoginClientProps) {
 
     return (
         <div className="flex items-center justify-center min-h-screen -ml-12 bg-neutral-100 dark:bg-neutral-950">
-            <div className="w-full max-w-sm px-6">
-                <h1 className="text-base font-medium tracking-widest uppercase text-neutral-900 dark:text-neutral-100 mb-8 text-center">
+            <div className="w-full max-w-sm px-2 sm:px-6">
+                <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100 mb-4 sm:mb-12 text-center">
                     Login
                 </h1>
 
                 {sent ? (
-                    <div className="text-center space-y-4">
-                        <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                    <div className="text-center space-y-2 sm:space-y-4">
+                        <p className="text-sm leading-6 text-neutral-700 dark:text-neutral-300">
                             <span className="font-medium text-neutral-900 dark:text-neutral-50">
                                 {email}
                             </span>
                             {' '}にログインリンクを送信しました。
                         </p>
-                        <p className="text-sm text-neutral-500">
+                        <p className="text-sm leading-6 text-neutral-500">
                             メールを確認してリンクをクリックしてください。
                         </p>
                         <button
@@ -74,7 +74,7 @@ export function LoginClient({ initialErrorCode }: LoginClientProps) {
                         </button>
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-4">
                         <input
                             type="email"
                             value={email}
