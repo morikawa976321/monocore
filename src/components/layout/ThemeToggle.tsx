@@ -4,7 +4,11 @@ import { useTheme } from "next-themes";
 import { SunIcon, MoonIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 
-export function ThemeToggle() {
+type ThemeToggleProps = {
+    showLabel?: boolean;
+};
+
+export function ThemeToggle({ showLabel = false }: ThemeToggleProps) {
     const { resolvedTheme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
 
@@ -34,7 +38,11 @@ export function ThemeToggle() {
                     <SunIcon className="w-5 h-5 flex-shrink-0" />
                 )}
             </div>
-            <span className="opacity-0 transition-opacity duration-150 ease-in-out whitespace-nowrap group-hover:opacity-100">
+            <span
+                className={`transition-opacity duration-150 ease-in-out whitespace-nowrap ${
+                    showLabel ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+            >
                 Toggle Theme
             </span>
         </button>
