@@ -158,6 +158,7 @@ export default function TasksPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [activeTab, setActiveTab] = useState<TaskStatus>('waiting');
     const [isAdding, setIsAdding] = useState(false);
+    const [mobileKeyboardOffset, setMobileKeyboardOffset] = useState(0);
     const [newTaskText, setNewTaskText] = useState('');
     const [newDueInput, setNewDueInput] = useState('');
     const [newDueInputError, setNewDueInputError] = useState('');
@@ -206,6 +207,32 @@ export default function TasksPage() {
             resizeNewTaskTextarea(mobileTaskTextareaRef.current);
         }
     }, [isAdding, newTaskText]);
+
+    useEffect(() => {
+        if (!isAdding) {
+            setMobileKeyboardOffset(0);
+            return;
+        }
+        if (typeof window === 'undefined' || !window.visualViewport) return;
+
+        const viewport = window.visualViewport;
+        const updateMobileKeyboardOffset = () => {
+            const keyboardHeight = Math.max(
+                0,
+                window.innerHeight - (viewport.height + viewport.offsetTop)
+            );
+            setMobileKeyboardOffset(keyboardHeight);
+        };
+
+        updateMobileKeyboardOffset();
+        viewport.addEventListener('resize', updateMobileKeyboardOffset);
+        viewport.addEventListener('scroll', updateMobileKeyboardOffset);
+
+        return () => {
+            viewport.removeEventListener('resize', updateMobileKeyboardOffset);
+            viewport.removeEventListener('scroll', updateMobileKeyboardOffset);
+        };
+    }, [isAdding]);
 
     // --- アクション ---
     async function addTask() {
@@ -420,7 +447,10 @@ export default function TasksPage() {
                             className="absolute inset-0 bg-neutral-950/50"
                         />
                         <div
-                            className="absolute inset-0 flex items-center justify-center p-2 z-50"
+                            className="absolute inset-0 z-50 flex items-end justify-center p-2"
+                            style={{
+                                paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${mobileKeyboardOffset}px)`,
+                            }}
                             onClick={() => setIsAdding(false)}
                         >
                             <div
