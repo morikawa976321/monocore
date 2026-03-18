@@ -25,21 +25,12 @@ import {
 export default function SchedulesPage() {
     const tz = useMemo(getDefaultTimezone, []);
 
-    const todayStr = useMemo(
-        () => format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'),
-        [tz]
-    );
-
-    const today = useMemo(() => parseISO(todayStr), [todayStr]);
-
-    // --- range state ---
-    const [rangeStart, setRangeStart] = useState(() => addDays(today, -7));
-    const [rangeEnd, setRangeEnd] = useState(() => addMonths(today, 2));
-
-    // --- entries & loading state ---
-    const [entries, setEntries] = useState<DayEntry[]>(() =>
-        generateDayEntries(addDays(today, -7), addMonths(today, 2))
-    );
+    // new Date() はサーバーとクライアントで値が異なるためハイドレーションエラーを避けるよう
+    // SSR では null、useEffect（クライアントのみ）で確定させる。
+    const [todayStr, setTodayStr] = useState<string | null>(null);
+    const [rangeStart, setRangeStart] = useState<Date | null>(null);
+    const [rangeEnd, setRangeEnd] = useState<Date | null>(null);
+    const [entries, setEntries] = useState<DayEntry[]>([]);
     const [focusedDateLabel, setFocusedDateLabel] = useState<string | null>(null);
     const [loadingTop, setLoadingTop] = useState(false);
     const [loadingBottom, setLoadingBottom] = useState(false);
@@ -60,33 +51,42 @@ export default function SchedulesPage() {
     const bottomSentinelRef = useRef<HTMLDivElement>(null);
     const todaySectionRef = useRef<HTMLElement>(null);
 
-    // --- 初回: 今日へスクロール + 初期 DB fetch ---
+    // --- 初回（クライアントのみ）: 日付確定 → entries 生成 → DB fetch → 今日へスクロール ---
     useEffect(() => {
-        todaySectionRef.current?.scrollIntoView({ block: 'start' });
-    }, []);
+        const str = format(toZonedTime(new Date(), tz), 'yyyy-MM-dd');
+        const today = parseISO(str);
+        const start = addDays(today, -7);
+        const end = addMonths(today, 2);
+        setTodayStr(str);
+        setRangeStart(start);
+        setRangeEnd(end);
+        const initial = generateDayEntries(start, end);
+        setEntries(initial);
 
-    useEffect(() => {
-        const startUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
-        const endUtc = localTimeToUtc(
-            format(addDays(rangeEnd, 1), 'yyyy-MM-dd'),
-            '0000',
-            tz
-        );
+        const startUtc = localTimeToUtc(format(start, 'yyyy-MM-dd'), '0000', tz);
+        const endUtc = localTimeToUtc(format(addDays(end, 1), 'yyyy-MM-dd'), '0000', tz);
         getSchedules(supabase, startUtc, endUtc).then(({ data, error }) => {
             if (error || !data) return;
             const draft = readDraftFromStorage();
             if (draft) clearDraftFromStorage();
             setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz, draft));
         });
-        // 初回のみ実行（rangeStart/rangeEnd は増分 fetch で変更される）
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // --- beforeunload: 下書き保存 ---
+    // entries 初期生成後に今日のセクションへスクロール
+    useEffect(() => {
+        if (!todayStr || entries.length === 0) return;
+        todaySectionRef.current?.scrollIntoView({ block: 'start' });
+        // todayStr が確定した直後の1回のみ実行
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [todayStr]);
+
+    // --- beforeunload: 未保存の変更がある場合のみ下書き保存 ---
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            writeDraftToStorage(entriesRef.current);
             if (debounceTimerRef.current != null) {
+                writeDraftToStorage(entriesRef.current);
                 e.preventDefault();
                 e.returnValue = '';
             }
@@ -94,7 +94,9 @@ export default function SchedulesPage() {
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
-            writeDraftToStorage(entriesRef.current);
+            if (debounceTimerRef.current != null) {
+                writeDraftToStorage(entriesRef.current);
+            }
         };
     }, []);
 
@@ -165,7 +167,7 @@ export default function SchedulesPage() {
 
     // --- 未来方向: loadMoreFuture ---
     const loadMoreFuture = useCallback(async () => {
-        if (loadingBottom) return;
+        if (loadingBottom || !rangeEnd) return;
         setLoadingBottom(true);
         const newEnd = addMonths(rangeEnd, 1);
         const newEntries = generateDayEntries(addDays(rangeEnd, 1), newEnd);
@@ -184,7 +186,7 @@ export default function SchedulesPage() {
 
     // --- 過去方向: loadMorePast ---
     const loadMorePast = useCallback(async () => {
-        if (loadingTop || !hasMorePast) return;
+        if (loadingTop || !hasMorePast || !rangeStart) return;
         setLoadingTop(true);
         const newStart = subMonths(rangeStart, 1);
         const newEntries = generateDayEntries(newStart, addDays(rangeStart, -1));
