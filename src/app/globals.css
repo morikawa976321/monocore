@@ -5,6 +5,6 @@
 
 /* --- Design System Foundations --- */
 @theme {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-geist-sans), var(--font-noto-sans-jp);
   --font-mono: var(--font-geist-mono);
 }

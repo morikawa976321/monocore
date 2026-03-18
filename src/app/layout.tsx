@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/src/components/layout/Sidebar";
 import { ThemeProvider } from "@/src/components/providers/ThemeProvider";
@@ -12,6 +12,12 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const notoSansJp = Noto_Sans_JP({
+  variable: "--font-noto-sans-jp",
+  subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -27,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-neutral-100 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-50 text-sm min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} ${notoSansJp.variable} antialiased bg-neutral-100 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-50 text-sm leading-6 sm:leading-7 min-h-screen`}
       >
         <ThemeProvider
           attribute="class"
