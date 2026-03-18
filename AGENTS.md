@@ -103,6 +103,18 @@ Reference: `README.md` (開発ルール), `docs/directory_structure.md` (コー�
 5. Every color/layout has `dark:` where applicable.
 6. No decorative `animate-*` classes.
 
+### z-index Layering Rule
+
+- Do not assign `z-*` ad hoc. Use a fixed semantic scale:
+  - `z-0`: regular page content
+  - `z-10`: page-level fixed helpers (e.g. floating action button)
+  - `z-20`: menu/backdrop overlays
+  - `z-30`: navigation/drawer panels and nav triggers
+  - `z-40`: modal backdrop
+  - `z-50`: modal/dialog surface (top-most interactive layer)
+- Keep ordering consistent: **backdrop < panel/dialog**.
+- If a modal is open, interactive navigation elements must stay behind it.
+
 Reference: `README-design.md`
 
 ---

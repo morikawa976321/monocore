@@ -96,7 +96,24 @@ AIエージェントは、以下のクラスの組み合わせルールにのみ
   - Dark: `dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600`
   - 共通: `px-3 py-2 text-sm rounded-sm outline-none transition-colors`
 
-## 9. 禁止事項の確認（Agent Checking Rules）
+## 9. z-index レイヤールール
+
+`z-*` は場当たり的に増やさず、以下の固定スケールを使うこと。
+
+- `z-0`: 通常コンテンツ
+- `z-10`: ページ内の固定補助要素（例: FAB）
+- `z-20`: メニュー/ドロワー等の背景オーバーレイ
+- `z-30`: ナビゲーション/ドロワーパネル/トリガー
+- `z-40`: モーダル背景
+- `z-50`: モーダル本体（最前面インタラクション）
+
+運用ルール:
+
+1. 常に **背景 < パネル/本体** の順序を守る。
+2. モーダル表示中は、ナビゲーション要素が前面で操作可能にならないようにする。
+3. 競合時は局所的に `z-*` を足さず、スケール全体で再配置する。
+
+## 10. 禁止事項の確認（Agent Checking Rules）
 実装完了時、Agentは生成したコードが以下の条件を満たしているか自己検証しなければならない。
 1. `shadow` で始まるクラスが一つもないか？
 2. `[ ]` を使った任意値の Tailwind クラス指定がないか？
