@@ -40,7 +40,7 @@ export function Sidebar() {
         <>
             {/* Desktop: 従来のサイドバー（sm 以上で表示） */}
             <nav
-                className="hidden sm:flex fixed inset-y-0 left-0 z-50 flex-col w-12 transition-all duration-150 ease-in-out bg-transparent border-r border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 group hover:w-64 hover:bg-neutral-50 dark:hover:bg-neutral-900 overflow-hidden"
+                className="hidden sm:flex fixed inset-y-0 left-0 z-30 flex-col w-12 transition-all duration-150 ease-in-out bg-transparent border-r border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 group hover:w-64 hover:bg-neutral-50 dark:hover:bg-neutral-900 overflow-hidden"
                 aria-label="メインナビゲーション"
             >
                 <div className="flex flex-col flex-1 gap-2 p-1 mt-4">
@@ -65,7 +65,7 @@ export function Sidebar() {
             </nav>
 
             {/* Mobile: ハンバーガーボタン（左下固定） */}
-            <div className="fixed bottom-4 left-4 z-50 sm:hidden">
+            <div className="fixed bottom-4 left-4 z-30 sm:hidden">
                 <button
                     type="button"
                     onClick={() => setIsOpen((prev) => !prev)}
@@ -80,7 +80,7 @@ export function Sidebar() {
             {/* Mobile: オーバーレイ（メニュー外タップで閉じる） */}
             {isOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-neutral-950 opacity-50 dark:opacity-75 sm:hidden"
+                    className="fixed inset-0 z-20 bg-neutral-950 opacity-50 dark:opacity-75 sm:hidden"
                     aria-hidden
                     onClick={() => setIsOpen(false)}
                 />
@@ -88,7 +88,7 @@ export function Sidebar() {
 
             {/* Mobile: ドロワーパネル */}
             <div
-                className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 transition-transform duration-150 ease-in-out sm:hidden ${
+                className={`fixed inset-y-0 left-0 z-30 w-64 flex flex-col border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 transition-transform duration-150 ease-in-out sm:hidden ${
                     isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
                 }`}
                 role="dialog"
