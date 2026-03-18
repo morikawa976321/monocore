@@ -1,14 +1,18 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {Check, Archive, Copy, Trash2, Plus, X} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { createClient } from '@/src/lib/supabase/client';
-import {createTask,
+import {
+    createTask,
     getTasksByStatus,
     type TaskStatus,
     updateTaskStatus as updateTaskStatusQuery,
 } from '@/src/lib/supabase/queries/tasks';
 import type { Database } from '@/src/types/database.types';
+import { AddTaskForm } from '@/src/components/tasks/AddTaskForm';
+import { TaskCard } from '@/src/components/tasks/TaskCard';
+import { parseDueInput } from '@/src/lib/tasks/due-date';
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -26,6 +30,7 @@ type Task = {
 
 const TASK_STATUSES: TaskStatus[] = ['waiting', 'completed', 'deleted', 'archived'];
 
+// Supabaseの行データを画面用のTask型に正規化する。
 function toTaskOrNull(row: TaskRow): Task | null {
     if (!TASK_STATUSES.includes(row.status as TaskStatus)) return null;
     return {
@@ -36,109 +41,6 @@ function toTaskOrNull(row: TaskRow): Task | null {
         status_changed_at: row.status_changed_at,
         unarchive_at: row.unarchive_at,
     };
-}
-
-// ---------------------------------------------------------------------------
-// 日時フォーマットユーティリティ
-// ---------------------------------------------------------------------------
-function formatDate(iso: string | null): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
-}
-
-function formatDateOnly(iso: string | null): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}/${mm}/${dd}`;
-}
-
-function createDateOrNull(
-    year: number,
-    month: number,
-    day: number,
-    hour: number,
-    minute: number
-): Date | null {
-    const date = new Date(year, month - 1, day, hour, minute, 0, 0);
-    if (
-        date.getFullYear() !== year ||
-        date.getMonth() !== month - 1 ||
-        date.getDate() !== day ||
-        date.getHours() !== hour ||
-        date.getMinutes() !== minute
-    ) {
-        return null;
-    }
-    return date;
-}
-
-function resolveNearestFutureYear(month: number, day: number, hour: number, minute: number): number {
-    const now = new Date();
-    const baseYear = now.getFullYear();
-    for (let offset = 0; offset <= 8; offset += 1) {
-        const year = baseYear + offset;
-        const candidate = createDateOrNull(year, month, day, hour, minute);
-        if (!candidate) continue;
-        if (candidate.getTime() >= now.getTime()) return year;
-    }
-    return baseYear;
-}
-
-function parseDueInput(raw: string): Date | null {
-    const digits = raw.replace(/\D/g, '');
-    if (!digits) return null;
-
-    // YYYYMMDDHHMM
-    if (digits.length === 12) {
-        const year = Number(digits.slice(0, 4));
-        const month = Number(digits.slice(4, 6));
-        const day = Number(digits.slice(6, 8));
-        const hour = Number(digits.slice(8, 10));
-        const minute = Number(digits.slice(10, 12));
-        return createDateOrNull(year, month, day, hour, minute);
-    }
-
-    // YYYYMMDD または MMDDHHMM
-    if (digits.length === 8) {
-        const head = Number(digits.slice(0, 4));
-        const tailA = Number(digits.slice(4, 6));
-        const tailB = Number(digits.slice(6, 8));
-
-        // YYYYMMDD: HHMM は 2359 を補完
-        if (head >= 1900) {
-            const year = head;
-            const month = tailA;
-            const day = tailB;
-            return createDateOrNull(year, month, day, 23, 59);
-        }
-
-        // MMDDHHMM: YYYY は最も近い未来年を補完
-        const month = Number(digits.slice(0, 2));
-        const day = Number(digits.slice(2, 4));
-        const hour = Number(digits.slice(4, 6));
-        const minute = Number(digits.slice(6, 8));
-        const year = resolveNearestFutureYear(month, day, hour, minute);
-        return createDateOrNull(year, month, day, hour, minute);
-    }
-
-    // MMDD: HHMM は 2359, YYYY は最も近い未来年を補完
-    if (digits.length === 4) {
-        const month = Number(digits.slice(0, 2));
-        const day = Number(digits.slice(2, 4));
-        const year = resolveNearestFutureYear(month, day, 23, 59);
-        return createDateOrNull(year, month, day, 23, 59);
-    }
-
-    return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,13 +68,12 @@ export default function TasksPage() {
     const [unarchiveAt, setUnarchiveAt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [crudError, setCrudError] = useState('');
-    const desktopTaskTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const mobileTaskTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
     const supabase = useMemo(createClient, []);
     const visibleTasks = tasks;
     const isDueInputValid = newDueInput.trim() === '' || parseDueInput(newDueInput.trim()) !== null;
 
+    // 選択中タブのタスクを取得して一覧に反映する。
     useEffect(() => {
         let isSubscribed = true;
         setIsLoading(true);
@@ -198,16 +99,7 @@ export default function TasksPage() {
         };
     }, [activeTab, supabase]);
 
-    useEffect(() => {
-        if (!isAdding) return;
-        if (desktopTaskTextareaRef.current) {
-            resizeNewTaskTextarea(desktopTaskTextareaRef.current);
-        }
-        if (mobileTaskTextareaRef.current) {
-            resizeNewTaskTextarea(mobileTaskTextareaRef.current);
-        }
-    }, [isAdding, newTaskText]);
-
+    // モバイルでキーボードが開いた分だけ入力パネル位置を持ち上げる。
     useEffect(() => {
         if (!isAdding) {
             setMobileKeyboardOffset(0);
@@ -235,6 +127,7 @@ export default function TasksPage() {
     }, [isAdding]);
 
     // --- アクション ---
+    // 入力値を検証し、waitingタブの先頭に新規タスクを追加する。
     async function addTask() {
         const text = newTaskText.trim();
         if (!text) return;
@@ -274,6 +167,7 @@ export default function TasksPage() {
         setCrudError('');
     }
 
+    // ステータス更新後に現在一覧から対象タスクを除外する共通処理。
     async function updateStatusAndRemoveFromList(
         id: string,
         status: TaskStatus,
@@ -293,6 +187,7 @@ export default function TasksPage() {
         void updateStatusAndRemoveFromList(id, 'completed');
     }
 
+    // タスク本文をクリップボードへコピーする。
     async function copyTask(id: string) {
         const sourceTask = tasks.find((task) => task.id === id);
         if (!sourceTask) {
@@ -311,16 +206,13 @@ export default function TasksPage() {
         void updateStatusAndRemoveFromList(id, 'deleted');
     }
 
+    // アーカイブ設定モーダルを開き、入力値を初期化する。
     function openArchiveDialog(id: string) {
         setArchiveTargetId(id);
         setUnarchiveAt('');
     }
 
-    function resizeNewTaskTextarea(target: HTMLTextAreaElement) {
-        target.style.height = 'auto';
-        target.style.height = `${target.scrollHeight}px`;
-    }
-
+    // アーカイブ確定時にステータスと解除日時を更新する。
     async function confirmArchive() {
         if (!archiveTargetId) return;
         const nextUnarchiveAt = unarchiveAt ? new Date(unarchiveAt).toISOString() : null;
@@ -334,6 +226,7 @@ export default function TasksPage() {
         }
     }
 
+    // 完了/削除/アーカイブから未完了へ戻す。
     function moveTaskToWaiting(id: string) {
         void updateStatusAndRemoveFromList(id, 'waiting', null);
     }
@@ -385,137 +278,39 @@ export default function TasksPage() {
             <div className="flex-1 overflow-y-auto pb-12 sm:pb-0">
                 {/* AddTaskForm */}
                 {activeTab === 'waiting' && isAdding && (
-                    <div className="hidden sm:block px-2 sm:px-4 py-2 sm:py-4 mb-2 sm:mb-0">
-                        <div className="rounded border border-neutral-400 dark:border-neutral-600 p-2 sm:p-4">
-                            <div className="flex items-start gap-2 sm:gap-4">
-                                <textarea
-                                    ref={desktopTaskTextareaRef}
-                                    value={newTaskText}
-                                    onChange={(e) => {
-                                        setNewTaskText(e.target.value);
-                                        resizeNewTaskTextarea(e.currentTarget);
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                                            void addTask();
-                                        }
-                                        if (e.key === 'Escape') setIsAdding(false);
-                                    }}
-                                    placeholder="タスクの内容"
-                                    autoFocus
-                                    rows={1}
-                                    className="flex-1 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600 min-h-10 resize-none overflow-hidden"
-                                />
-                                <input
-                                    type="text"
-                                    value={newDueInput}
-                                    onChange={(e) => {
-                                        setNewDueInput(e.target.value);
-                                        if (newDueInputError) setNewDueInputError('');
-                                    }}
-                                    inputMode="numeric"
-                                    placeholder="締切"
-                                    className="w-36 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
-                                />
-                                <button
-                                    onClick={() => void addTask()}
-                                    disabled={!newTaskText.trim() || !isDueInputValid}
-                                    className="px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400 disabled:opacity-40"
-                                >
-                                    Add
-                                </button>
-                                <button
-                                    onClick={() => setIsAdding(false)}
-                                    className="p-2 text-sm font-medium rounded-sm transition-colors text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            </div>
-                            {newDueInputError && (
-                                <p className="mt-2 text-sm leading-6 text-amber-600 dark:text-amber-400">
-                                    {newDueInputError}
-                                </p>
-                            )}
-                        </div>
-                    </div>
+                    // デスクトップ用追加フォーム。
+                    <AddTaskForm
+                        mode="desktop"
+                        text={newTaskText}
+                        dueInput={newDueInput}
+                        dueInputError={newDueInputError}
+                        isDueInputValid={isDueInputValid}
+                        onTextChange={setNewTaskText}
+                        onDueInputChange={(value) => {
+                            setNewDueInput(value);
+                            if (newDueInputError) setNewDueInputError('');
+                        }}
+                        onSubmit={() => void addTask()}
+                        onClose={() => setIsAdding(false)}
+                    />
                 )}
                 {activeTab === 'waiting' && isAdding && (
-                    <div className="sm:hidden fixed inset-0 z-40">
-                        <button
-                            aria-label="追加パネルを閉じる"
-                            onClick={() => setIsAdding(false)}
-                            className="absolute inset-0 bg-neutral-950/50"
-                        />
-                        <div
-                            className="absolute inset-0 z-50 flex items-end justify-center p-2"
-                            style={{
-                                paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${mobileKeyboardOffset}px + 0.5rem)`,
-                            }}
-                            onClick={() => setIsAdding(false)}
-                        >
-                            <div
-                                className="w-full max-w-sm rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 p-2"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                            <div className="flex items-start gap-2">
-                                <textarea
-                                    ref={mobileTaskTextareaRef}
-                                    value={newTaskText}
-                                    onChange={(e) => {
-                                        setNewTaskText(e.target.value);
-                                        resizeNewTaskTextarea(e.currentTarget);
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                                            void addTask();
-                                        }
-                                        if (e.key === 'Escape') setIsAdding(false);
-                                    }}
-                                    placeholder="タスクの内容"
-                                    autoFocus
-                                    rows={1}
-                                    className="flex-1 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600 min-h-10 resize-none overflow-hidden"
-                                />
-                            </div>
-                            <div className="mt-2">
-                                <input
-                                    type="text"
-                                    value={newDueInput}
-                                    onChange={(e) => {
-                                        setNewDueInput(e.target.value);
-                                        if (newDueInputError) setNewDueInputError('');
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Escape') setIsAdding(false);
-                                    }}
-                                    inputMode="numeric"
-                                    placeholder="締切"
-                                    className="w-full px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
-                                />
-                            </div>
-                            <div className="mt-2 flex items-center justify-end gap-2">
-                                <button
-                                    onClick={() => setIsAdding(false)}
-                                    className="px-4 py-2 text-sm font-medium rounded-sm transition-colors bg-transparent text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
-                                >
-                                    閉じる
-                                </button>
-                                <button
-                                    onClick={() => void addTask()}
-                                    disabled={!newTaskText.trim() || !isDueInputValid}
-                                    className="px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400 disabled:opacity-40"
-                                >
-                                    Add
-                                </button>
-                            </div>
-                            {newDueInputError && (
-                                <p className="mt-2 text-sm leading-6 text-amber-600 dark:text-amber-400">
-                                    {newDueInputError}
-                                </p>
-                            )}
-                            </div>
-                        </div>
-                    </div>
+                    // モバイル用追加フォーム（キーボードオフセット対応）。
+                    <AddTaskForm
+                        mode="mobile"
+                        text={newTaskText}
+                        dueInput={newDueInput}
+                        dueInputError={newDueInputError}
+                        isDueInputValid={isDueInputValid}
+                        mobileKeyboardOffset={mobileKeyboardOffset}
+                        onTextChange={setNewTaskText}
+                        onDueInputChange={(value) => {
+                            setNewDueInput(value);
+                            if (newDueInputError) setNewDueInputError('');
+                        }}
+                        onSubmit={() => void addTask()}
+                        onClose={() => setIsAdding(false)}
+                    />
                 )}
 
                 {/* TaskList */}
@@ -540,98 +335,22 @@ export default function TasksPage() {
                         ].join(' ')}
                     >
                         {visibleTasks.map((task) => (
-                            <li
+                            <TaskCard
                                 key={task.id}
-                                className="group rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors p-1 sm:p-2"
-                            >
-                                <div className="flex items-start justify-between gap-2 sm:gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm sm:text-base leading-6 sm:leading-7 text-neutral-900 dark:text-neutral-50 break-words">
-                                            {task.task}
-                                        </p>
-                                        {task.status === 'waiting' && task.due_at && (
-                                            <p className="text-sm leading-6 text-neutral-700 dark:text-neutral-300">
-                                                締切: {formatDateOnly(task.due_at)}
-                                            </p>
-                                        )}
-                                        {task.status === 'completed' && (
-                                            <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-500">
-                                                完了日: {formatDateOnly(task.status_changed_at)}
-                                            </p>
-                                        )}
-                                        {task.status === 'deleted' && (
-                                            <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-500">
-                                                削除日: {formatDateOnly(task.status_changed_at)}
-                                            </p>
-                                        )}
-                                        {task.status === 'archived' && (
-                                            <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-500">
-                                                アーカイブ解除予定: {formatDate(task.unarchive_at)}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {/* アクションボタン */}
-                                    {task.status === 'waiting' && (
-                                        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150">
-                                             <ActionButton
-                                                title="コピー"
-                                                onClick={() => void copyTask(task.id)}
-                                            >
-                                                <Copy className="w-4 h-4" />
-                                            </ActionButton>
-                                            <ActionButton
-                                                title="完了"
-                                                onClick={() => completeTask(task.id)}
-                                            >
-                                                <Check className="w-4 h-4" />
-                                            </ActionButton>
-                                            <ActionButton
-                                                title="アーカイブ"
-                                                onClick={() => openArchiveDialog(task.id)}
-                                            >
-                                                <Archive className="w-4 h-4" />
-                                            </ActionButton>
-                                            <ActionButton
-                                                title="削除"
-                                                onClick={() => deleteTask(task.id)}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </ActionButton>
-                                        </div>
-                                    )}
-                                    {task.status === 'completed' && (
-                                        <button
-                                            onClick={() => moveTaskToWaiting(task.id)}
-                                            className="px-3 py-1 text-sm font-medium rounded-sm transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
-                                        >
-                                            未完了に移行
-                                        </button>
-                                    )}
-                                    {task.status === 'deleted' && (
-                                        <button
-                                            onClick={() => moveTaskToWaiting(task.id)}
-                                            className="px-3 py-1 text-sm font-medium rounded-sm transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
-                                        >
-                                            未完了に移行
-                                        </button>
-                                    )}
-                                    {task.status === 'archived' && (
-                                        <button
-                                            onClick={() => moveTaskToWaiting(task.id)}
-                                            className="px-3 py-1 text-sm font-medium rounded-sm transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
-                                        >
-                                            取り消して未完了に移行
-                                        </button>
-                                    )}
-                                </div>
-                            </li>
+                                task={task}
+                                onCopy={(id) => void copyTask(id)}
+                                onComplete={completeTask}
+                                onArchive={openArchiveDialog}
+                                onDelete={deleteTask}
+                                onMoveToWaiting={moveTaskToWaiting}
+                            />
                         ))}
                     </ul>
                 )}
             </div>
 
             {activeTab === 'waiting' && (
+                // モバイルの追加ボタン（固定表示）。
                 <button
                     onClick={() => setIsAdding((v) => !v)}
                     className="sm:hidden fixed right-4 bottom-4 z-10 flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400"
@@ -643,6 +362,7 @@ export default function TasksPage() {
 
             {/* ArchiveDialog */}
             {archiveTargetId && (
+                // アーカイブ解除日時を設定するセンターモーダル。
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/50">
                     <div className="bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded p-2 sm:p-6 w-full max-w-sm sm:w-96 mx-2">
                         <h2 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 text-neutral-900 dark:text-neutral-50 mb-4">
@@ -675,28 +395,5 @@ export default function TasksPage() {
                 </div>
             )}
         </div>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// ActionButton（アイコンゴーストボタン）
-// ---------------------------------------------------------------------------
-function ActionButton({
-    children,
-    onClick,
-    title,
-}: {
-    children: React.ReactNode;
-    onClick: () => void;
-    title: string;
-}) {
-    return (
-        <button
-            title={title}
-            onClick={onClick}
-            className="p-2 rounded-sm transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
-        >
-            {children}
-        </button>
     );
 }
