@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-    Check,
-    Archive,
-    Trash2,
-    Plus,
-    X,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {Check, Archive, Copy, Trash2, Plus, X} from 'lucide-react';
+import { createClient } from '@/src/lib/supabase/client';
+import {createTask,
+    getTasksByStatus,
+    type TaskStatus,
+    updateTaskStatus as updateTaskStatusQuery,
+} from '@/src/lib/supabase/queries/tasks';
+import type { Database } from '@/src/types/database.types';
 
 // ---------------------------------------------------------------------------
 // 型定義
 // ---------------------------------------------------------------------------
-type TaskStatus = 'waiting' | 'completed' | 'archived' | 'deleted';
+type TaskRow = Database['public']['Tables']['tasks']['Row'];
 
 type Task = {
     id: string;
@@ -23,75 +24,19 @@ type Task = {
     unarchive_at: string | null;
 };
 
-// ---------------------------------------------------------------------------
-// モックデータ
-// ---------------------------------------------------------------------------
-const MOCK_TASKS: Task[] = [
-    {
-        id: '1',
-        task: 'デザインレビューの資料を作成する',
-        status: 'waiting',
-        due_at: '2026-03-10T18:00:00+09:00',
-        status_changed_at: null,
-        unarchive_at: null,
-    },
-    {
-        id: '2',
-        task: '週次ミーティングのアジェンダを共有する',
-        status: 'waiting',
-        due_at: '2026-03-08T09:00:00+09:00',
-        status_changed_at: null,
-        unarchive_at: null,
-    },
-    {
-        id: '3',
-        task: 'ユーザーインタビューのスケジュールを調整する',
-        status: 'waiting',
-        due_at: null,
-        status_changed_at: null,
-        unarchive_at: null,
-    },
-    {
-        id: '4',
-        task: 'プロトタイプのフィードバックをまとめる',
-        status: 'completed',
-        due_at: null,
-        status_changed_at: '2026-03-06T14:30:00+09:00',
-        unarchive_at: null,
-    },
-    {
-        id: '5',
-        task: '競合調査レポートを提出する',
-        status: 'completed',
-        due_at: '2026-03-05T17:00:00+09:00',
-        status_changed_at: '2026-03-05T16:50:00+09:00',
-        unarchive_at: null,
-    },
-    {
-        id: '6',
-        task: '不要なSlackチャンネルを整理する',
-        status: 'deleted',
-        due_at: null,
-        status_changed_at: '2026-03-04T11:00:00+09:00',
-        unarchive_at: null,
-    },
-    {
-        id: '7',
-        task: '旧バージョンのドキュメントを削除する',
-        status: 'deleted',
-        due_at: null,
-        status_changed_at: '2026-03-03T09:15:00+09:00',
-        unarchive_at: null,
-    },
-    {
-        id: '8',
-        task: '四半期ロードマップの草案を作成する',
-        status: 'archived',
-        due_at: null,
-        status_changed_at: '2026-03-02T10:00:00+09:00',
-        unarchive_at: '2026-03-20T09:00:00+09:00',
-    },
-];
+const TASK_STATUSES: TaskStatus[] = ['waiting', 'completed', 'deleted', 'archived'];
+
+function toTaskOrNull(row: TaskRow): Task | null {
+    if (!TASK_STATUSES.includes(row.status as TaskStatus)) return null;
+    return {
+        id: row.id,
+        task: row.task,
+        status: row.status as TaskStatus,
+        due_at: row.due_at,
+        status_changed_at: row.status_changed_at,
+        unarchive_at: row.unarchive_at,
+    };
+}
 
 // ---------------------------------------------------------------------------
 // 日時フォーマットユーティリティ
@@ -116,6 +61,86 @@ function formatDateOnly(iso: string | null): string {
     return `${yyyy}/${mm}/${dd}`;
 }
 
+function createDateOrNull(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number
+): Date | null {
+    const date = new Date(year, month - 1, day, hour, minute, 0, 0);
+    if (
+        date.getFullYear() !== year ||
+        date.getMonth() !== month - 1 ||
+        date.getDate() !== day ||
+        date.getHours() !== hour ||
+        date.getMinutes() !== minute
+    ) {
+        return null;
+    }
+    return date;
+}
+
+function resolveNearestFutureYear(month: number, day: number, hour: number, minute: number): number {
+    const now = new Date();
+    const baseYear = now.getFullYear();
+    for (let offset = 0; offset <= 8; offset += 1) {
+        const year = baseYear + offset;
+        const candidate = createDateOrNull(year, month, day, hour, minute);
+        if (!candidate) continue;
+        if (candidate.getTime() >= now.getTime()) return year;
+    }
+    return baseYear;
+}
+
+function parseDueInput(raw: string): Date | null {
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return null;
+
+    // YYYYMMDDHHMM
+    if (digits.length === 12) {
+        const year = Number(digits.slice(0, 4));
+        const month = Number(digits.slice(4, 6));
+        const day = Number(digits.slice(6, 8));
+        const hour = Number(digits.slice(8, 10));
+        const minute = Number(digits.slice(10, 12));
+        return createDateOrNull(year, month, day, hour, minute);
+    }
+
+    // YYYYMMDD または MMDDHHMM
+    if (digits.length === 8) {
+        const head = Number(digits.slice(0, 4));
+        const tailA = Number(digits.slice(4, 6));
+        const tailB = Number(digits.slice(6, 8));
+
+        // YYYYMMDD: HHMM は 2359 を補完
+        if (head >= 1900) {
+            const year = head;
+            const month = tailA;
+            const day = tailB;
+            return createDateOrNull(year, month, day, 23, 59);
+        }
+
+        // MMDDHHMM: YYYY は最も近い未来年を補完
+        const month = Number(digits.slice(0, 2));
+        const day = Number(digits.slice(2, 4));
+        const hour = Number(digits.slice(4, 6));
+        const minute = Number(digits.slice(6, 8));
+        const year = resolveNearestFutureYear(month, day, hour, minute);
+        return createDateOrNull(year, month, day, hour, minute);
+    }
+
+    // MMDD: HHMM は 2359, YYYY は最も近い未来年を補完
+    if (digits.length === 4) {
+        const month = Number(digits.slice(0, 2));
+        const day = Number(digits.slice(2, 4));
+        const year = resolveNearestFutureYear(month, day, 23, 59);
+        return createDateOrNull(year, month, day, 23, 59);
+    }
+
+    return null;
+}
+
 // ---------------------------------------------------------------------------
 // タブ設定
 // ---------------------------------------------------------------------------
@@ -130,54 +155,133 @@ const TABS: { status: TaskStatus; label: string }[] = [
 // メインページ
 // ---------------------------------------------------------------------------
 export default function TasksPage() {
-    const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+    const [tasks, setTasks] = useState<Task[]>([]);
     const [activeTab, setActiveTab] = useState<TaskStatus>('waiting');
     const [isAdding, setIsAdding] = useState(false);
     const [newTaskText, setNewTaskText] = useState('');
-    const [newDueAt, setNewDueAt] = useState('');
+    const [newDueInput, setNewDueInput] = useState('');
+    const [newDueInputError, setNewDueInputError] = useState('');
     const [archiveTargetId, setArchiveTargetId] = useState<string | null>(null);
     const [unarchiveAt, setUnarchiveAt] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [crudError, setCrudError] = useState('');
+    const desktopTaskTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const mobileTaskTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-    const visibleTasks = tasks.filter((t) => t.status === activeTab);
+    const supabase = useMemo(createClient, []);
+    const visibleTasks = tasks;
+    const isDueInputValid = newDueInput.trim() === '' || parseDueInput(newDueInput.trim()) !== null;
+
+    useEffect(() => {
+        let isSubscribed = true;
+        setIsLoading(true);
+        setCrudError('');
+
+        void getTasksByStatus(supabase, activeTab).then(({ data, error }) => {
+            if (!isSubscribed) return;
+            if (error) {
+                setCrudError('タスクの取得に失敗しました');
+                setTasks([]);
+                setIsLoading(false);
+                return;
+            }
+            const normalizedTasks = (data ?? [])
+                .map(toTaskOrNull)
+                .filter((task): task is Task => task !== null);
+            setTasks(normalizedTasks);
+            setIsLoading(false);
+        });
+
+        return () => {
+            isSubscribed = false;
+        };
+    }, [activeTab, supabase]);
+
+    useEffect(() => {
+        if (!isAdding) return;
+        if (desktopTaskTextareaRef.current) {
+            resizeNewTaskTextarea(desktopTaskTextareaRef.current);
+        }
+        if (mobileTaskTextareaRef.current) {
+            resizeNewTaskTextarea(mobileTaskTextareaRef.current);
+        }
+    }, [isAdding, newTaskText]);
 
     // --- アクション ---
-    const now = () => new Date().toISOString();
-
-    function addTask() {
+    async function addTask() {
         const text = newTaskText.trim();
         if (!text) return;
-        const newTask: Task = {
-            id: crypto.randomUUID(),
-            task: text,
-            status: 'waiting',
-            due_at: newDueAt ? new Date(newDueAt).toISOString() : null,
-            status_changed_at: null,
-            unarchive_at: null,
-        };
-        setTasks((prev) => [newTask, ...prev]);
+        const dueText = newDueInput.trim();
+        let parsedDue: Date | null = null;
+        if (dueText) {
+            parsedDue = parseDueInput(dueText);
+            if (!parsedDue) {
+                setNewDueInputError('締切形式が不正です（例: 202603182359, 20260318, 03182359, 0318）');
+                return;
+            }
+        }
+
+        const { data, error } = await createTask(
+            supabase,
+            text,
+            parsedDue ? parsedDue.toISOString() : null
+        );
+        if (error || !data) {
+            setCrudError('タスクの作成に失敗しました');
+            return;
+        }
+
+        const createdTask = toTaskOrNull(data);
+        if (!createdTask) {
+            setCrudError('作成したタスクの形式が不正です');
+            return;
+        }
+
+        if (activeTab === 'waiting') {
+            setTasks((prev) => [createdTask, ...prev]);
+        }
         setNewTaskText('');
-        setNewDueAt('');
+        setNewDueInput('');
+        setNewDueInputError('');
         setIsAdding(false);
+        setCrudError('');
+    }
+
+    async function updateStatusAndRemoveFromList(
+        id: string,
+        status: TaskStatus,
+        nextUnarchiveAt?: string | null
+    ): Promise<boolean> {
+        const { error } = await updateTaskStatusQuery(supabase, id, status, nextUnarchiveAt);
+        if (error) {
+            setCrudError('タスクの更新に失敗しました');
+            return false;
+        }
+        setTasks((prev) => prev.filter((t) => t.id !== id));
+        setCrudError('');
+        return true;
     }
 
     function completeTask(id: string) {
-        setTasks((prev) =>
-            prev.map((t) =>
-                t.id === id
-                    ? { ...t, status: 'completed', status_changed_at: now() }
-                    : t
-            )
-        );
+        void updateStatusAndRemoveFromList(id, 'completed');
+    }
+
+    async function copyTask(id: string) {
+        const sourceTask = tasks.find((task) => task.id === id);
+        if (!sourceTask) {
+            setCrudError('コピー元タスクが見つかりません');
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(sourceTask.task);
+            setCrudError('');
+        } catch {
+            setCrudError('クリップボードへのコピーに失敗しました');
+        }
     }
 
     function deleteTask(id: string) {
-        setTasks((prev) =>
-            prev.map((t) =>
-                t.id === id
-                    ? { ...t, status: 'deleted', status_changed_at: now() }
-                    : t
-            )
-        );
+        void updateStatusAndRemoveFromList(id, 'deleted');
     }
 
     function openArchiveDialog(id: string) {
@@ -185,55 +289,52 @@ export default function TasksPage() {
         setUnarchiveAt('');
     }
 
-    function confirmArchive() {
-        if (!archiveTargetId) return;
-        setTasks((prev) =>
-            prev.map((t) =>
-                t.id === archiveTargetId
-                    ? {
-                        ...t,
-                        status: 'archived',
-                        status_changed_at: now(),
-                        unarchive_at: unarchiveAt
-                            ? new Date(unarchiveAt).toISOString()
-                            : null,
-                    }
-                    : t
-            )
-        );
-        setArchiveTargetId(null);
+    function resizeNewTaskTextarea(target: HTMLTextAreaElement) {
+        target.style.height = 'auto';
+        target.style.height = `${target.scrollHeight}px`;
     }
 
-    function unarchiveTask(id: string) {
-        setTasks((prev) =>
-            prev.map((t) =>
-                t.id === id
-                    ? { ...t, status: 'waiting', status_changed_at: now(), unarchive_at: null }
-                    : t
-            )
+    async function confirmArchive() {
+        if (!archiveTargetId) return;
+        const nextUnarchiveAt = unarchiveAt ? new Date(unarchiveAt).toISOString() : null;
+        const isUpdated = await updateStatusAndRemoveFromList(
+            archiveTargetId,
+            'archived',
+            nextUnarchiveAt
         );
+        if (isUpdated) {
+            setArchiveTargetId(null);
+        }
+    }
+
+    function moveTaskToWaiting(id: string) {
+        void updateStatusAndRemoveFromList(id, 'waiting', null);
     }
 
     return (
-        <div className="flex flex-col h-screen">
+        <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             {/* Header */}
             <header className="flex items-center justify-between px-2 sm:px-6 py-2 sm:py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
                 <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
                     Tasks
                 </h1>
-                {activeTab === 'waiting' && (
-                    <button
-                        onClick={() => setIsAdding((v) => !v)}
-                        className="flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add
-                    </button>
-                )}
+                <div className="hidden sm:flex h-9 w-20 items-center justify-end">
+                    {activeTab === 'waiting' ? (
+                        <button
+                            onClick={() => setIsAdding((v) => !v)}
+                            className="flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add
+                        </button>
+                    ) : (
+                        <span aria-hidden="true" className="block h-9 w-20" />
+                    )}
+                </div>
             </header>
 
             {/* TabBar */}
-            <div className="flex items-end gap-2 sm:gap-6 px-2 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
+            <div className="grid grid-cols-4 px-2 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
                 {TABS.map((tab) => (
                     <button
                         key={tab.status}
@@ -242,148 +343,273 @@ export default function TasksPage() {
                             setIsAdding(false);
                         }}
                         className={[
-                            'py-2 sm:py-4 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none',
+                            'w-full py-2 sm:py-4 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none',
                             activeTab === tab.status
                                 ? 'border-amber-500 text-neutral-900 dark:text-neutral-50'
                                 : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300',
                         ].join(' ')}
                     >
                         {tab.label}
-                        <span className="ml-2 text-sm text-neutral-400 dark:text-neutral-600">
-                            {tasks.filter((t) => t.status === tab.status).length}
-                        </span>
                     </button>
                 ))}
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto pb-12 sm:pb-0">
                 {/* AddTaskForm */}
                 {activeTab === 'waiting' && isAdding && (
-                    <div className="px-2 sm:px-6 py-2 sm:py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
-                        <div className="flex items-center gap-2 sm:gap-4">
-                            <input
-                                type="text"
-                                value={newTaskText}
-                                onChange={(e) => setNewTaskText(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') addTask();
-                                    if (e.key === 'Escape') setIsAdding(false);
-                                }}
-                                placeholder="タスクの内容"
-                                autoFocus
-                                className="flex-1 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
-                            />
-                            <input
-                                type="datetime-local"
-                                value={newDueAt}
-                                onChange={(e) => setNewDueAt(e.target.value)}
-                                className="px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
-                            />
-                            <button
-                                onClick={addTask}
-                                disabled={!newTaskText.trim()}
-                                className="px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400 disabled:opacity-40"
+                    <div className="hidden sm:block px-2 sm:px-4 py-2 sm:py-4 mb-2 sm:mb-0">
+                        <div className="rounded border border-neutral-400 dark:border-neutral-600 p-2 sm:p-4">
+                            <div className="flex items-start gap-2 sm:gap-4">
+                                <textarea
+                                    ref={desktopTaskTextareaRef}
+                                    value={newTaskText}
+                                    onChange={(e) => {
+                                        setNewTaskText(e.target.value);
+                                        resizeNewTaskTextarea(e.currentTarget);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                            void addTask();
+                                        }
+                                        if (e.key === 'Escape') setIsAdding(false);
+                                    }}
+                                    placeholder="タスクの内容"
+                                    autoFocus
+                                    rows={1}
+                                    className="flex-1 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600 min-h-10 resize-none overflow-hidden"
+                                />
+                                <input
+                                    type="text"
+                                    value={newDueInput}
+                                    onChange={(e) => {
+                                        setNewDueInput(e.target.value);
+                                        if (newDueInputError) setNewDueInputError('');
+                                    }}
+                                    inputMode="numeric"
+                                    placeholder="締切"
+                                    className="px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
+                                />
+                                <button
+                                    onClick={() => void addTask()}
+                                    disabled={!newTaskText.trim() || !isDueInputValid}
+                                    className="px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400 disabled:opacity-40"
+                                >
+                                    Add
+                                </button>
+                                <button
+                                    onClick={() => setIsAdding(false)}
+                                    className="p-2 text-sm font-medium rounded-sm transition-colors text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            {newDueInputError && (
+                                <p className="mt-2 text-sm leading-6 text-amber-600 dark:text-amber-400">
+                                    {newDueInputError}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
+                {activeTab === 'waiting' && isAdding && (
+                    <div className="sm:hidden fixed inset-0 z-40">
+                        <button
+                            aria-label="追加パネルを閉じる"
+                            onClick={() => setIsAdding(false)}
+                            className="absolute inset-0 bg-neutral-950/50"
+                        />
+                        <div
+                            className="absolute inset-0 flex items-center justify-center p-2 z-50"
+                            onClick={() => setIsAdding(false)}
+                        >
+                            <div
+                                className="w-full max-w-sm rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 p-2"
+                                onClick={(e) => e.stopPropagation()}
                             >
-                                追加
-                            </button>
-                            <button
-                                onClick={() => setIsAdding(false)}
-                                className="p-2 text-sm font-medium rounded-sm transition-colors text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-start gap-2">
+                                <textarea
+                                    ref={mobileTaskTextareaRef}
+                                    value={newTaskText}
+                                    onChange={(e) => {
+                                        setNewTaskText(e.target.value);
+                                        resizeNewTaskTextarea(e.currentTarget);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                            void addTask();
+                                        }
+                                        if (e.key === 'Escape') setIsAdding(false);
+                                    }}
+                                    placeholder="タスクの内容"
+                                    autoFocus
+                                    rows={1}
+                                    className="flex-1 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600 min-h-10 resize-none overflow-hidden"
+                                />
+                            </div>
+                            <div className="mt-2">
+                                <input
+                                    type="text"
+                                    value={newDueInput}
+                                    onChange={(e) => {
+                                        setNewDueInput(e.target.value);
+                                        if (newDueInputError) setNewDueInputError('');
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Escape') setIsAdding(false);
+                                    }}
+                                    inputMode="numeric"
+                                    placeholder="締切"
+                                    className="w-full px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
+                                />
+                            </div>
+                            <div className="mt-2 flex items-center justify-end gap-2">
+                                <button
+                                    onClick={() => setIsAdding(false)}
+                                    className="px-4 py-2 text-sm font-medium rounded-sm transition-colors bg-transparent text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
+                                >
+                                    閉じる
+                                </button>
+                                <button
+                                    onClick={() => void addTask()}
+                                    disabled={!newTaskText.trim() || !isDueInputValid}
+                                    className="px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400 disabled:opacity-40"
+                                >
+                                    Add
+                                </button>
+                            </div>
+                            {newDueInputError && (
+                                <p className="mt-2 text-sm leading-6 text-amber-600 dark:text-amber-400">
+                                    {newDueInputError}
+                                </p>
+                            )}
+                            </div>
                         </div>
                     </div>
                 )}
 
                 {/* TaskList */}
-                {visibleTasks.length === 0 ? (
+                {crudError && (
+                    <div className="px-2 sm:px-6 py-2 text-sm leading-6 text-amber-600 dark:text-amber-400">
+                        {crudError}
+                    </div>
+                )}
+                {isLoading ? (
+                    <div className="flex items-center justify-center h-32 text-neutral-500 dark:text-neutral-500 text-sm">
+                        読み込み中...
+                    </div>
+                ) : visibleTasks.length === 0 ? (
                     <div className="flex items-center justify-center h-32 text-neutral-500 dark:text-neutral-500 text-sm">
                         タスクはありません
                     </div>
                 ) : (
-                    <ul>
+                    <ul
+                        className={[
+                            'px-2 sm:px-2 pb-2 sm:pb-2 space-y-2 sm:space-y-2',
+                            isAdding ? 'pt-2 sm:pt-0' : 'pt-2 sm:pt-2',
+                        ].join(' ')}
+                    >
                         {visibleTasks.map((task) => (
                             <li
                                 key={task.id}
-                                className="group flex items-center gap-2 sm:gap-4 px-2 sm:px-6 py-2 sm:py-4 border-b border-neutral-200 dark:border-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+                                className="group rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors p-1 sm:p-2"
                             >
-                                {/* タスク内容 */}
-                                <span
-                                    className={[
-                                        'flex-1 text-sm leading-6 sm:text-base sm:leading-7',
-                                        task.status === 'completed'
-                                            ? 'line-through text-neutral-500 dark:text-neutral-500'
-                                            : task.status === 'deleted'
-                                                ? 'text-neutral-500 dark:text-neutral-500'
-                                                : 'text-neutral-900 dark:text-neutral-50',
-                                    ].join(' ')}
-                                >
-                                    {task.task}
-                                </span>
-
-                                {/* 右側メタ情報 */}
-                                {task.status === 'waiting' && task.due_at && (
-                                    <span className="text-sm leading-6 text-neutral-500 dark:text-neutral-500 shrink-0">
-                                        {formatDateOnly(task.due_at)}
-                                    </span>
-                                )}
-                                {task.status === 'completed' && (
-                                    <span className="text-sm leading-6 text-neutral-500 dark:text-neutral-500 shrink-0">
-                                        {formatDate(task.status_changed_at)}
-                                    </span>
-                                )}
-                                {task.status === 'deleted' && (
-                                    <span className="text-sm leading-6 text-neutral-500 dark:text-neutral-500 shrink-0">
-                                        {formatDate(task.status_changed_at)}
-                                    </span>
-                                )}
-                                {task.status === 'archived' && (
-                                    <span className="text-sm leading-6 text-neutral-500 dark:text-neutral-500 shrink-0">
-                                        {formatDate(task.unarchive_at)} まで
-                                    </span>
-                                )}
-
-                                {/* アクションボタン */}
-                                {task.status === 'waiting' && (
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                                        <ActionButton
-                                            title="完了"
-                                            onClick={() => completeTask(task.id)}
-                                        >
-                                            <Check className="w-4 h-4" />
-                                        </ActionButton>
-                                        <ActionButton
-                                            title="アーカイブ"
-                                            onClick={() => openArchiveDialog(task.id)}
-                                        >
-                                            <Archive className="w-4 h-4" />
-                                        </ActionButton>
-                                        <ActionButton
-                                            title="削除"
-                                            onClick={() => deleteTask(task.id)}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </ActionButton>
+                                <div className="flex items-start justify-between gap-2 sm:gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm sm:text-base leading-6 sm:leading-7 text-neutral-900 dark:text-neutral-50 break-words">
+                                            {task.task}
+                                        </p>
+                                        {task.status === 'waiting' && task.due_at && (
+                                            <p className="text-sm leading-6 text-neutral-700 dark:text-neutral-300">
+                                                締切: {formatDateOnly(task.due_at)}
+                                            </p>
+                                        )}
+                                        {task.status === 'completed' && (
+                                            <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-500">
+                                                完了日: {formatDateOnly(task.status_changed_at)}
+                                            </p>
+                                        )}
+                                        {task.status === 'deleted' && (
+                                            <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-500">
+                                                削除日: {formatDateOnly(task.status_changed_at)}
+                                            </p>
+                                        )}
+                                        {task.status === 'archived' && (
+                                            <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-500">
+                                                アーカイブ解除予定: {formatDate(task.unarchive_at)}
+                                            </p>
+                                        )}
                                     </div>
-                                )}
-                                {task.status === 'archived' && (
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+
+                                    {/* アクションボタン */}
+                                    {task.status === 'waiting' && (
+                                        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150">
+                                             <ActionButton
+                                                title="コピー"
+                                                onClick={() => void copyTask(task.id)}
+                                            >
+                                                <Copy className="w-4 h-4" />
+                                            </ActionButton>
+                                            <ActionButton
+                                                title="完了"
+                                                onClick={() => completeTask(task.id)}
+                                            >
+                                                <Check className="w-4 h-4" />
+                                            </ActionButton>
+                                            <ActionButton
+                                                title="アーカイブ"
+                                                onClick={() => openArchiveDialog(task.id)}
+                                            >
+                                                <Archive className="w-4 h-4" />
+                                            </ActionButton>
+                                            <ActionButton
+                                                title="削除"
+                                                onClick={() => deleteTask(task.id)}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </ActionButton>
+                                        </div>
+                                    )}
+                                    {task.status === 'completed' && (
                                         <button
-                                            title="アーカイブ解除"
-                                            onClick={() => unarchiveTask(task.id)}
+                                            onClick={() => moveTaskToWaiting(task.id)}
                                             className="px-3 py-1 text-sm font-medium rounded-sm transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
                                         >
-                                            解除
+                                            未完了に移行
                                         </button>
-                                    </div>
-                                )}
+                                    )}
+                                    {task.status === 'deleted' && (
+                                        <button
+                                            onClick={() => moveTaskToWaiting(task.id)}
+                                            className="px-3 py-1 text-sm font-medium rounded-sm transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
+                                        >
+                                            未完了に移行
+                                        </button>
+                                    )}
+                                    {task.status === 'archived' && (
+                                        <button
+                                            onClick={() => moveTaskToWaiting(task.id)}
+                                            className="px-3 py-1 text-sm font-medium rounded-sm transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
+                                        >
+                                            取り消して未完了に移行
+                                        </button>
+                                    )}
+                                </div>
                             </li>
                         ))}
                     </ul>
                 )}
             </div>
+
+            {activeTab === 'waiting' && (
+                <button
+                    onClick={() => setIsAdding((v) => !v)}
+                    className="sm:hidden fixed right-4 bottom-4 z-10 flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400"
+                >
+                    <Plus className="w-4 h-4" />
+                    Add
+                </button>
+            )}
 
             {/* ArchiveDialog */}
             {archiveTargetId && (
@@ -409,7 +635,7 @@ export default function TasksPage() {
                                 キャンセル
                             </button>
                             <button
-                                onClick={confirmArchive}
+                                onClick={() => void confirmArchive()}
                                 className="px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400"
                             >
                                 確定
