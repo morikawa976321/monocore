@@ -61,6 +61,7 @@ Reference: `docs/screen_layout.md`
 - **Exports:** Use `export function name() { }` / `export async function name() { }` for exported functions and React components. Do not use `export const name = () => { }` for those. Callbacks and short internal functions may use arrow functions. Constants (e.g. `metadata`, `config`) stay `export const`.
 - **Tests:** Colocate with source: `filename.test.ts` or `filename.test.tsx` next to the implementation.
 - **Test scope (small solo app):** Prioritize tests only for flows that are hard/time-consuming to verify manually, high-risk logic, and business-critical behavior. Avoid over-testing thin wrappers or easily verifiable UI details.
+- **Icons:** Use `lucide-react` only. Do not import icons from other packages.
 - **Commits:** Use prefixes — `feat:`, `fix:`, `refactor:`, `docs:`, `chore:` (e.g. `feat: add search to inventory list`).
 
 Reference: `README.md` (開発ルール), `docs/directory_structure.md` (コーディングスタイル)

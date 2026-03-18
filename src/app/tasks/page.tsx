@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 import {
-    CheckIcon,
-    ArchiveBoxIcon,
-    TrashIcon,
-    PlusIcon,
-    XMarkIcon,
-} from '@heroicons/react/24/outline';
+    Check,
+    Archive,
+    Trash2,
+    Plus,
+    X,
+} from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -226,7 +226,7 @@ export default function TasksPage() {
                         onClick={() => setIsAdding((v) => !v)}
                         className="flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400"
                     >
-                        <PlusIcon className="w-4 h-4" />
+                        <Plus className="w-4 h-4" />
                         Add
                     </button>
                 )}
@@ -291,7 +291,7 @@ export default function TasksPage() {
                                 onClick={() => setIsAdding(false)}
                                 className="p-2 text-sm font-medium rounded-sm transition-colors text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
                             >
-                                <XMarkIcon className="w-4 h-4" />
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
                     </div>
@@ -352,19 +352,19 @@ export default function TasksPage() {
                                             title="完了"
                                             onClick={() => completeTask(task.id)}
                                         >
-                                            <CheckIcon className="w-4 h-4" />
+                                            <Check className="w-4 h-4" />
                                         </ActionButton>
                                         <ActionButton
                                             title="アーカイブ"
                                             onClick={() => openArchiveDialog(task.id)}
                                         >
-                                            <ArchiveBoxIcon className="w-4 h-4" />
+                                            <Archive className="w-4 h-4" />
                                         </ActionButton>
                                         <ActionButton
                                             title="削除"
                                             onClick={() => deleteTask(task.id)}
                                         >
-                                            <TrashIcon className="w-4 h-4" />
+                                            <Trash2 className="w-4 h-4" />
                                         </ActionButton>
                                     </div>
                                 )}

@@ -3,21 +3,17 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-    HomeIcon,
-    FolderIcon,
-    CheckCircleIcon,
-    BookOpenIcon,
-    ShoppingBagIcon,
-    ClockIcon,
-    Bars3Icon,
-    ArrowLeftStartOnRectangleIcon,
-} from "@heroicons/react/24/outline";
+    Clock,
+    ListTodo,
+    Menu,
+    LogOut,
+} from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { createClient } from "@/src/lib/supabase/client";
 
 const MENU_ITEMS = [
-    { href: "/schedules", icon: ClockIcon, label: "Schedule" },
-    { href: "/tasks", icon: CheckCircleIcon, label: "Task" }
+    { href: "/schedules", icon: Clock, label: "Schedule" },
+    { href: "/tasks", icon: ListTodo, label: "Task" }
 ] as const;
 
 export function Sidebar() {
@@ -59,7 +55,7 @@ export function Sidebar() {
                 </div>
                 <div className="p-2 mb-4 space-y-2">
                     <SidebarActionButton
-                        icon={<ArrowLeftStartOnRectangleIcon className="w-5 h-5 flex-shrink-0" />}
+                        icon={<LogOut className="w-5 h-5 flex-shrink-0" />}
                         label="Logout"
                         onClick={handleLogout}
                         disabled={isLoggingOut}
@@ -77,7 +73,7 @@ export function Sidebar() {
                     aria-label={isOpen ? "メニューを閉じる" : "メニューを開く"}
                     className="flex items-center justify-center w-12 h-12 rounded-sm border-2 border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
                 >
-                    <Bars3Icon className="w-6 h-6" />
+                    <Menu className="w-6 h-6" />
                 </button>
             </div>
 
@@ -102,7 +98,7 @@ export function Sidebar() {
             >
                 <div className="p-1 sm:p-2 mt-4 space-y-2">
                     <SidebarActionButton
-                        icon={<ArrowLeftStartOnRectangleIcon className="w-5 h-5 flex-shrink-0" />}
+                        icon={<LogOut className="w-5 h-5 flex-shrink-0" />}
                         label="Logout"
                         onClick={async () => {
                             setIsOpen(false);

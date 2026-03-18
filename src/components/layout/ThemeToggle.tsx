@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { SunIcon, MoonIcon } from "@heroicons/react/24/outline";
+import { Sun, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type ThemeToggleProps = {
@@ -33,9 +33,9 @@ export function ThemeToggle({ showLabel = false }: ThemeToggleProps) {
         >
             <div className="flex items-center justify-center w-8 h-8 shrink-0">
                 {isDark ? (
-                    <MoonIcon className="w-5 h-5 flex-shrink-0" />
+                    <Moon className="w-5 h-5 flex-shrink-0" />
                 ) : (
-                    <SunIcon className="w-5 h-5 flex-shrink-0" />
+                    <Sun className="w-5 h-5 flex-shrink-0" />
                 )}
             </div>
             <span
