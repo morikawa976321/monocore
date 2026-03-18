@@ -274,8 +274,8 @@ export default function SchedulesPage() {
                             ref={isToday ? todaySectionRef : null}
                             className={`rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden ${
                                 isToday
-                                    ? 'border-2 border-amber-500 dark:border-amber-400'
-                                    : 'border border-neutral-200 dark:border-neutral-800'
+                                    ? 'border-2 border-amber-500 dark:border-amber-500'
+                                    : 'border border-neutral-400 dark:border-neutral-600'
                             }`}
                         >
                             <header className="px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 text-neutral-700 dark:text-neutral-300 flex items-center">
