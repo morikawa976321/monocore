@@ -75,7 +75,7 @@ export function Sidebar() {
                     onClick={() => setIsOpen((prev) => !prev)}
                     aria-expanded={isOpen}
                     aria-label={isOpen ? "メニューを閉じる" : "メニューを開く"}
-                    className="flex items-center justify-center w-12 h-12 rounded-sm border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
+                    className="flex items-center justify-center w-12 h-12 rounded-sm border-2 border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
                 >
                     <Bars3Icon className="w-6 h-6" />
                 </button>
