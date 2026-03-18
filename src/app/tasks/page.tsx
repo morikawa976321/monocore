@@ -449,7 +449,7 @@ export default function TasksPage() {
                         <div
                             className="absolute inset-0 z-50 flex items-end justify-center p-2"
                             style={{
-                                paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${mobileKeyboardOffset}px)`,
+                                paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${mobileKeyboardOffset}px + 0.5rem)`,
                             }}
                             onClick={() => setIsAdding(false)}
                         >
