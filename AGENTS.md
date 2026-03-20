@@ -80,17 +80,31 @@ Reference: `README.md` (開発ルール), `docs/directory_structure.md` (コー�
 - **Animation:** No decorative `animate-*`. Use `transition-colors duration-150 ease-in-out`; prefer `hover:bg-*`, `active:bg-*`; focus with `focus-visible:ring-1 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-50 focus-visible:outline-none` (or amber for primary actions). No `transition-all`.
 - **DRY:** Set app-wide background, base text color, and base font size (`text-sm`) on the root layout (`src/app/layout.tsx` `<body>`). Pages only override where needed.
 
+### Contrast Constraints (readability first)
+
+- Prioritize legibility over visual subtlety. Ensure sufficient luminance contrast for body text, labels, and form values.
+- **Text hierarchy usage:**
+  - Primary: `text-neutral-900` / dark `text-neutral-50` for headings, body text, and primary action labels.
+  - Secondary: `text-neutral-800` / dark `text-neutral-200` for supportive but still important information.
+  - Tertiary: `text-neutral-700` / dark `text-neutral-300` for metadata only; avoid for long copy and primary actions.
+  - Disabled: `text-neutral-500` only for inactive states and placeholders.
+- **Interactive element visibility:**
+  - Clickable elements (`button`, `a`, menu items) must be visually identifiable even at rest (via text/background/border contrast).
+  - Ghost buttons should keep clear hover affordance: `hover:bg-neutral-200 dark:hover:bg-neutral-800`.
+  - Active/selected states must raise contrast by at least one step versus default (prefer combining background + text and/or border changes).
+
 ### Palette (always with dark:)
 
 - **Background:** App `bg-neutral-100` / dark `bg-neutral-950`. Surface `bg-neutral-50` / dark `bg-neutral-900`. Sub surface `bg-neutral-200` / dark `bg-neutral-800`.
 - **Border:** `border-neutral-200` / dark `border-neutral-800`; focus `border-neutral-400` / dark `border-neutral-600`.
-- **Text:** Primary `text-neutral-900` / dark `text-neutral-50`; secondary `text-neutral-700` / dark `text-neutral-300`; disabled `text-neutral-500`.
+- **Text:** Primary `text-neutral-900` / dark `text-neutral-50`; secondary `text-neutral-800` / dark `text-neutral-200`; tertiary(meta) `text-neutral-700` / dark `text-neutral-300`; disabled `text-neutral-500`.
 - **Accent (Amber):** Primary actions only, small area. Button: `bg-amber-500` hover `bg-amber-600` / dark `bg-amber-500` hover `dark:bg-amber-400`; text/icon `text-amber-600` / dark `text-amber-400`; ring/border `ring-amber-500` / dark `ring-amber-400`.
 
 ### Component templates
 
 - **Primary button:** `bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400`.
-- **Secondary / ghost:** `bg-transparent text-neutral-900 hover:bg-neutral-100 dark:bg-transparent dark:text-neutral-50 dark:hover:bg-neutral-800` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400`.
+- **Secondary button:** `bg-neutral-200 border border-neutral-300 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-50 dark:hover:bg-neutral-700` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`.
+- **Ghost button:** `bg-transparent text-neutral-800 hover:bg-neutral-200 hover:text-neutral-900 dark:bg-transparent dark:text-neutral-200 dark:hover:bg-neutral-800 dark:hover:text-neutral-50` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`.
 - **Surface / card / dialog:** `bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800` + `rounded p-4` or `p-6`.
 - **Input / textarea:** `bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400` + dark variants (`dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600`) + `px-3 py-2 text-sm rounded-sm outline-none transition-colors`.
 

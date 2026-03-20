@@ -15,6 +15,18 @@ AIコーディングエージェントは、本ガイドラインに記載され
 5. **過度なアニメーションの禁止**: 装飾目的のアニメーション（`animate-bounce`など）は禁止。ボタンのHoverやFocus、操作のフィードバックといった実用目的のみに限定する。
 6. **スタイルの共通化（DRY原則）**: アプリ全体の背景色、基本テキスト色、および基本フォントサイズ（`text-sm`）などは各ページに重複して記述せず、必ず親のルートレイアウト (`src/app/layout.tsx` の `<body>`) で一括指定し継承させること。各ページでは上書きが必要な要素にのみクラスを指定する。
 
+### 2.1 コントラスト制約（可読性最優先）
+- **基本原則**: 装飾やトーン統一より、まず可読性を優先する。本文・操作ラベル・フォーム値は背景に対して十分な明度差を確保すること。
+- **テキストの使い分け制約**:
+  - `text-neutral-900` / `dark:text-neutral-50`: 見出し、本文、ボタン主要ラベルなど常時読ませる情報。
+  - `text-neutral-800` / `dark:text-neutral-200`: 補助テキストだが読解が必要な情報（説明文、サブ情報、非主ボタンラベル）。
+  - `text-neutral-700` / `dark:text-neutral-300`: 補足情報やメタ情報に限定し、長文・主要操作ラベルには使わない。
+  - `text-neutral-500` は無効状態やプレースホルダーなど、非アクティブ情報に限定する。
+- **操作要素の制約**:
+  - クリック可能要素（`button`, `a`, メニュー項目）は、未操作時でも背景または境界と識別できること。
+  - Ghostボタンでも `hover:bg-neutral-200 dark:hover:bg-neutral-800` を基本とし、視覚的な操作可能性を担保すること。
+  - Active/Selected状態は、通常状態より明確に1段以上コントラストを上げること（背景・文字・枠線のいずれか、推奨は複合）。
+
 ## 3. カラーパレット（Light / Dark）
 使用できる色は以下の**ニュートラル（Neutral）系、アクセントのアンバー（Amber）、および透明（transparent）のみ**とする。現時点での独自色の追加は禁止。
 常に `dark:` バリアントを併記し、ダークモードに対応させること。
@@ -30,7 +42,8 @@ AIコーディングエージェントは、本ガイドラインに記載され
 
 - **テキスト (Text)**
   - Primary: `text-neutral-900` / Dark: `text-neutral-50`
-  - Secondary: `text-neutral-700` / Dark: `text-neutral-300`
+  - Secondary: `text-neutral-800` / Dark: `text-neutral-200`
+  - Tertiary (Meta only): `text-neutral-700` / Dark: `text-neutral-300`
   - Disabled: `text-neutral-500` / Dark: `text-neutral-500`
 
 - **アクセント (Accent: Amber)**
@@ -83,10 +96,14 @@ AIエージェントは、以下のクラスの組み合わせルールにのみ
   - Light: `bg-amber-500 text-neutral-50 hover:bg-amber-600`
   - Dark: `dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400`
   - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400`
-- **Secondary / Ghost Button**
-  - Light: `bg-transparent text-neutral-900 hover:bg-neutral-100`
-  - Dark: `dark:bg-transparent dark:text-neutral-50 dark:hover:bg-neutral-800`
-  - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400`
+- **Secondary Button**
+  - Light: `bg-neutral-200 border border-neutral-300 text-neutral-900 hover:bg-neutral-300`
+  - Dark: `dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-50 dark:hover:bg-neutral-700`
+  - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`
+- **Ghost Button**
+  - Light: `bg-transparent text-neutral-800 hover:bg-neutral-200 hover:text-neutral-900`
+  - Dark: `dark:bg-transparent dark:text-neutral-200 dark:hover:bg-neutral-800 dark:hover:text-neutral-50`
+  - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`
 - **Surface / Card / Dialog**
   - Light: `bg-neutral-50 border border-neutral-200`
   - Dark: `dark:bg-neutral-900 dark:border-neutral-800`
