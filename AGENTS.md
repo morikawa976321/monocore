@@ -108,6 +108,15 @@ Reference: `README.md` (開発ルール), `docs/directory_structure.md` (コー�
 - **Surface / card / dialog:** `bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800` + `rounded p-4` or `p-6`.
 - **Input / textarea:** `bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400` + dark variants (`dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600`) + `px-3 py-2 text-sm rounded-sm outline-none transition-colors`.
 
+### Button Component Usage Rules
+
+- Use `src/components/ui/Button.tsx` for all standard buttons. Prefer props (`color`, `size`) over direct visual class overrides.
+- Keep `className` for layout-only concerns (e.g. `w-full`, `ml-auto`, `sm:hidden`, `fixed`, `z-10`).
+- Do not override visual tokens via `className` (`bg-*`, `text-*`, `px-*`, `py-*`, `rounded-*`, `focus-visible:ring-*`) unless there is an explicit approved exception.
+- If the same visual exception appears 3+ times, add a new `color`/`size` variant in `Button` instead of repeating local overrides.
+- Keep semantic emphasis consistent: one `primary` action per view; use `secondary`/`ghost` for the rest.
+- Required variants: `color` = `primary | secondary | ghost`, `size` = `sm | md`.
+
 ### Self-check before submitting
 
 1. No `shadow*` classes.
