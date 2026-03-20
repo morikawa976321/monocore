@@ -12,7 +12,7 @@ $$ language 'plpgsql';
 -- -------------------------------------------------------
 -- スケジュールテーブル
 -- -------------------------------------------------------
-CREATE TABLE schedules (
+CREATE TABLE IF NOT EXISTS schedules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
     activity TEXT NOT NULL,

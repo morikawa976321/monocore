@@ -1,7 +1,7 @@
 -- -------------------------------------------------------
 -- タスクテーブル
 -- -------------------------------------------------------
-CREATE TABLE tasks (
+CREATE TABLE IF NOT EXISTS tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id),
     task TEXT NOT NULL,
