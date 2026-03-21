@@ -12,6 +12,7 @@ import {
 import type { Database } from '@/src/types/database.types';
 import { AddTaskForm } from '@/src/components/tasks/AddTaskForm';
 import { TaskCard } from '@/src/components/tasks/TaskCard';
+import { Button } from '@/src/components/ui/Button';
 import { parseDueInput } from '@/src/lib/tasks/due-date';
 
 // ---------------------------------------------------------------------------
@@ -234,19 +235,20 @@ export default function TasksPage() {
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             {/* Header */}
-            <header className="flex items-center justify-between px-2 sm:px-6 py-2 sm:py-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
+            <header className="flex items-center justify-between px-2 sm:px-6 py-2 sm:py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
                 <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
                     Tasks
                 </h1>
                 <div className="hidden sm:flex h-9 w-20 items-center justify-end">
                     {activeTab === 'waiting' ? (
-                        <button
+                        <Button
+                            color="primary"
                             onClick={() => setIsAdding((v) => !v)}
-                            className="flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400"
+                            className="h-9"
                         >
                             <Plus className="w-4 h-4" />
                             Add
-                        </button>
+                        </Button>
                     ) : (
                         <span aria-hidden="true" className="block h-9 w-20" />
                     )}
@@ -351,13 +353,14 @@ export default function TasksPage() {
 
             {activeTab === 'waiting' && (
                 // モバイルの追加ボタン（固定表示）。
-                <button
+                <Button
+                    color="primary"
                     onClick={() => setIsAdding((v) => !v)}
-                    className="sm:hidden fixed right-4 bottom-4 z-10 flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400"
+                    className="sm:hidden fixed right-4 bottom-4 z-10"
                 >
                     <Plus className="w-4 h-4" />
                     Add
-                </button>
+                </Button>
             )}
 
             {/* ArchiveDialog */}
@@ -378,18 +381,18 @@ export default function TasksPage() {
                             className="w-full mb-4 sm:mb-6 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
                         />
                         <div className="flex items-center justify-end gap-2">
-                            <button
+                            <Button
+                                color="ghost"
                                 onClick={() => setArchiveTargetId(null)}
-                                className="px-4 py-2 text-sm font-medium rounded-sm transition-colors bg-transparent text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
                             >
                                 キャンセル
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                color="primary"
                                 onClick={() => void confirmArchive()}
-                                className="px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400"
                             >
                                 確定
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
