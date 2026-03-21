@@ -57,6 +57,8 @@ export default function SchedulesPage() {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const scrollHeightBeforePrependRef = useRef<number>(0);
     const pendingScrollFixRef = useRef(false);
+    // 初回 DB マージで過去日の高さが伸びたあと、今日を再スクロールする
+    const scrollTodayAfterInitialMergeRef = useRef(false);
 
     const topSentinelRef = useRef<HTMLDivElement>(null);
     const bottomSentinelRef = useRef<HTMLDivElement>(null);
@@ -86,6 +88,7 @@ export default function SchedulesPage() {
             const draft = readDraftFromStorage();
             if (draft) clearDraftFromStorage();
             setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz, draft));
+            scrollTodayAfterInitialMergeRef.current = true;
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -126,6 +129,13 @@ export default function SchedulesPage() {
         const diff = container.scrollHeight - scrollHeightBeforePrependRef.current;
         if (diff > 0) container.scrollTop += diff;
     });
+
+    // --- 初回 fetch マージ後: 過去日のテキストで上段が伸びても今日が先頭に留まるよう再スクロール ---
+    useLayoutEffect(() => {
+        if (!scrollTodayAfterInitialMergeRef.current || !todayStr) return;
+        scrollTodayAfterInitialMergeRef.current = false;
+        todaySectionRef.current?.scrollIntoView({ block: 'start' });
+    }, [entries, todayStr]);
 
     // --- debounce timer utils ---
     const clearDebounceTimer = useCallback(() => {

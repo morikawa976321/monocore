@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 
 /** 内容に応じて高さが自動調整される textarea。 */
 export function AutoHeightTextarea({
@@ -9,7 +9,8 @@ export function AutoHeightTextarea({
 }: React.ComponentPropsWithoutRef<'textarea'>) {
     const ref = useRef<HTMLTextAreaElement>(null);
 
-    useEffect(() => {
+    // useLayoutEffect: 親のスクロール補正より前に高さを確定させる（useEffect だと1フレーム遅れて伸びる）。
+    useLayoutEffect(() => {
         const ta = ref.current;
         if (!ta) return;
         ta.style.height = 'auto';
