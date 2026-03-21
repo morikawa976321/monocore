@@ -100,11 +100,11 @@ export function TaskCard({
                                 <Copy className="w-4 h-4" />
                             )}
                         </ActionButton>
-                        <ActionButton title="完了" onClick={() => onComplete(task.id)}>
-                            <Check className="w-4 h-4" />
-                        </ActionButton>
                         <ActionButton title="アーカイブ" onClick={() => onArchive(task.id)}>
                             <Archive className="w-4 h-4" />
+                        </ActionButton>
+                        <ActionButton title="完了" onClick={() => onComplete(task.id)}>
+                            <Check className="w-4 h-4" />
                         </ActionButton>
                         <ActionButton title="削除" onClick={() => onDelete(task.id)}>
                             <Trash2 className="w-4 h-4" />
