@@ -106,7 +106,7 @@ export function InboxPanel({ content, onContentChange, onClose }: InboxPanelProp
                         <textarea
                             value={content}
                             onChange={(e) => onContentChange(e.target.value)}
-                            className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm sm:text-base leading-6 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
+                            className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
                             spellCheck={false}
                             autoComplete="off"
                             autoCorrect="off"
