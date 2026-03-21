@@ -188,18 +188,20 @@ export default function TasksPage() {
         void updateStatusAndRemoveFromList(id, 'completed');
     }
 
-    // タスク本文をクリップボードへコピーする。
-    async function copyTask(id: string) {
+    // タスク本文をクリップボードへコピーする。成功時のみ true。
+    async function copyTask(id: string): Promise<boolean> {
         const sourceTask = tasks.find((task) => task.id === id);
         if (!sourceTask) {
             setCrudError('コピー元タスクが見つかりません');
-            return;
+            return false;
         }
         try {
             await navigator.clipboard.writeText(sourceTask.task);
             setCrudError('');
+            return true;
         } catch {
             setCrudError('クリップボードへのコピーに失敗しました');
+            return false;
         }
     }
 
@@ -340,7 +342,7 @@ export default function TasksPage() {
                             <TaskCard
                                 key={task.id}
                                 task={task}
-                                onCopy={(id) => void copyTask(id)}
+                                onCopy={(id) => copyTask(id)}
                                 onComplete={completeTask}
                                 onArchive={openArchiveDialog}
                                 onDelete={deleteTask}
