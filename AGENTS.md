@@ -2,7 +2,7 @@
 
 AI coding agents: follow this file for build commands, architecture, code style, and design rules. This project is a minimalist Personal OS (tasks, schedules, projects, knowledge, items).
 
-**詳細は以下を参照:** `README.md` · `README-design.md` · `docs/directory_structure.md` · `docs/screen_layout.md` · `docs/specification_draft.md`
+**See also:** `README.md` · `README-design.md` · `docs/directory_structure.md` · `docs/screen_layout.md` · `docs/specification_draft.md`
 
 ---
 
@@ -64,7 +64,7 @@ Reference: `docs/screen_layout.md`
 - **Icons:** Use `lucide-react` only. Do not import icons from other packages.
 - **Commits:** Use prefixes — `feat:`, `fix:`, `refactor:`, `docs:`, `chore:` (e.g. `feat: add search to inventory list`).
 
-Reference: `README.md` (開発ルール), `docs/directory_structure.md` (コーディングスタイル)
+Reference: `README.md` (development rules), `docs/directory_structure.md` (coding style)
 
 ---
 
@@ -156,8 +156,8 @@ Reference: `README-design.md`
 
 | Path | Content |
 |------|--------|
-| `README.md` | 技術スタック、開発哲学、DB運用、テスト構成、UI/UX要件、コミットルール |
-| `README-design.md` | デザインシステム詳細（テーマ・制約・パレット・タイポグラフィ・余白・角丸・コンポーネントテンプレート・禁止事項チェックリスト） |
-| `docs/directory_structure.md` | ディレクトリ構成図、フォルダ役割表、開発フロー、運用上の鉄則、コーディングスタイル（関数宣言） |
-| `docs/screen_layout.md` | レイアウト仕様（サイドバー・センターモーダル）、UIパターン比較と採用根拠、適用画面一覧 |
-| `docs/specification_draft.md` | 仕様検討メモ（類似サービス分析、メモの関係性、必要機能の整理、優先度・LLM案など） |
+| `README.md` | Tech stack, development philosophy, DB workflow, test setup, UI/UX requirements, commit rules |
+| `README-design.md` | Design system detail (theme, constraints, palette, typography, spacing, radius, component templates, checklist) |
+| `docs/directory_structure.md` | Directory map, folder roles, dev flow, operational rules, coding style (function declarations) |
+| `docs/screen_layout.md` | Layout spec (sidebar, center modal), UI pattern comparison and rationale, applicable screens |
+| `docs/specification_draft.md` | Spec notes (similar products, note relationships, feature backlog, priorities, LLM ideas) |
