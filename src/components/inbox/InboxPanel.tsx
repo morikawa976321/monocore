@@ -44,6 +44,41 @@ export function InboxPanel({ content, onContentChange, onClose }: InboxPanelProp
         };
     }, [updateOverlayBox]);
 
+    // モバイルで背面が動かないようにする：html/body の overflow ロック + iOS 向け fixed body（スクロール位置は復元）。
+    useLayoutEffect(() => {
+        const scrollY = window.scrollY;
+        const html = document.documentElement;
+        const body = document.body;
+        const prevHtmlOverflow = html.style.overflow;
+        const prev = {
+            overflow: body.style.overflow,
+            position: body.style.position,
+            top: body.style.top,
+            width: body.style.width,
+            left: body.style.left,
+            right: body.style.right,
+        };
+
+        html.style.overflow = 'hidden';
+        body.style.overflow = 'hidden';
+        body.style.position = 'fixed';
+        body.style.top = `-${scrollY}px`;
+        body.style.width = '100%';
+        body.style.left = '0';
+        body.style.right = '0';
+
+        return () => {
+            html.style.overflow = prevHtmlOverflow;
+            body.style.overflow = prev.overflow;
+            body.style.position = prev.position;
+            body.style.top = prev.top;
+            body.style.width = prev.width;
+            body.style.left = prev.left;
+            body.style.right = prev.right;
+            window.scrollTo(0, scrollY);
+        };
+    }, []);
+
     return (
         <>
             {/* 背面を暗くしてタップで閉じる（モーダルと同じレイヤー規則: z-40 / z-50） */}
