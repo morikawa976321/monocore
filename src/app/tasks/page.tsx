@@ -49,9 +49,9 @@ function toTaskOrNull(row: TaskRow): Task | null {
 // ---------------------------------------------------------------------------
 const TABS: { status: TaskStatus; label: string }[] = [
     { status: 'waiting', label: '未完了' },
+    { status: 'archived', label: 'アーカイブ中' },
     { status: 'completed', label: '完了済み' },
     { status: 'deleted', label: '削除済み' },
-    { status: 'archived', label: 'アーカイブ中' },
 ];
 
 // ---------------------------------------------------------------------------
