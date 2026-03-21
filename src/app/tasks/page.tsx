@@ -67,12 +67,15 @@ export default function TasksPage() {
     const [newDueInputError, setNewDueInputError] = useState('');
     const [archiveTargetId, setArchiveTargetId] = useState<string | null>(null);
     const [unarchiveAt, setUnarchiveAt] = useState('');
+    const [unarchiveInput, setUnarchiveInput] = useState('');
+    const [unarchiveInputError, setUnarchiveInputError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [crudError, setCrudError] = useState('');
 
     const supabase = useMemo(createClient, []);
     const visibleTasks = tasks;
     const isDueInputValid = newDueInput.trim() === '' || parseDueInput(newDueInput.trim()) !== null;
+    const isUnarchiveInputValid = unarchiveInput.trim() === '' || parseDueInput(unarchiveInput.trim()) !== null;
 
     // 選択中タブのタスクを取得して一覧に反映する。
     useEffect(() => {
@@ -213,12 +216,23 @@ export default function TasksPage() {
     function openArchiveDialog(id: string) {
         setArchiveTargetId(id);
         setUnarchiveAt('');
+        setUnarchiveInput('');
+        setUnarchiveInputError('');
     }
 
     // アーカイブ確定時にステータスと解除日時を更新する。
     async function confirmArchive() {
         if (!archiveTargetId) return;
-        const nextUnarchiveAt = unarchiveAt ? new Date(unarchiveAt).toISOString() : null;
+        
+        // 入力値を検証
+        if (unarchiveInput.trim() && !isUnarchiveInputValid) {
+            setUnarchiveInputError('無効な日時です');
+            return;
+        }
+        
+        const parsedDate = unarchiveInput.trim() ? parseDueInput(unarchiveInput.trim()) : null;
+        const nextUnarchiveAt = parsedDate ? parsedDate.toISOString() : null;
+        
         const isUpdated = await updateStatusAndRemoveFromList(
             archiveTargetId,
             'archived',
@@ -377,11 +391,21 @@ export default function TasksPage() {
                             いつまでアーカイブしますか？（空欄の場合は無期限）
                         </p>
                         <input
-                            type="datetime-local"
-                            value={unarchiveAt}
-                            onChange={(e) => setUnarchiveAt(e.target.value)}
-                            className="w-full mb-4 sm:mb-6 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
+                            type="text"
+                            value={unarchiveInput}
+                            onChange={(e) => {
+                                setUnarchiveInput(e.target.value);
+                                if (unarchiveInputError) setUnarchiveInputError('');
+                            }}
+                            inputMode="numeric"
+                            placeholder="締切"
+                            className="w-full mb-2 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
                         />
+                        {unarchiveInputError && (
+                            <p className="mb-4 text-sm leading-6 text-amber-600 dark:text-amber-400">
+                                {unarchiveInputError}
+                            </p>
+                        )}
                         <div className="flex items-center justify-end gap-2">
                             <Button
                                 color="ghost"
@@ -392,6 +416,7 @@ export default function TasksPage() {
                             <Button
                                 color="primary"
                                 onClick={() => void confirmArchive()}
+                                disabled={!isUnarchiveInputValid}
                             >
                                 確定
                             </Button>
