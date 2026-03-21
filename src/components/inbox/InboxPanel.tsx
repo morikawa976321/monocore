@@ -1,3 +1,6 @@
+'use client';
+
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/src/components/ui/Button';
 
 type InboxPanelProps = {
@@ -6,7 +9,41 @@ type InboxPanelProps = {
     onClose: () => void;
 };
 
+function overlayBoxInParent(parent: HTMLElement): { top: number; height: number } {
+    const r = parent.getBoundingClientRect();
+    const vv = window.visualViewport;
+    if (!vv) return { top: 0, height: parent.clientHeight };
+    const vt = Math.max(r.top, vv.offsetTop);
+    const vb = Math.min(r.bottom, vv.offsetTop + vv.height);
+    return { top: vt - r.top, height: Math.max(0, vb - vt) };
+}
+
 export function InboxPanel({ content, onContentChange, onClose }: InboxPanelProps) {
+    const overlayHostRef = useRef<HTMLDivElement>(null);
+    const [overlayBox, setOverlayBox] = useState<{ top: number; height: number } | null>(null);
+
+    const updateOverlayBox = useCallback(() => {
+        const parent = overlayHostRef.current?.parentElement;
+        if (parent) setOverlayBox(overlayBoxInParent(parent));
+    }, []);
+
+    useLayoutEffect(() => {
+        updateOverlayBox();
+        const vv = window.visualViewport;
+        vv?.addEventListener('resize', updateOverlayBox);
+        vv?.addEventListener('scroll', updateOverlayBox);
+        window.addEventListener('resize', updateOverlayBox);
+        const parent = overlayHostRef.current?.parentElement;
+        const ro = parent ? new ResizeObserver(updateOverlayBox) : null;
+        if (parent && ro) ro.observe(parent);
+        return () => {
+            vv?.removeEventListener('resize', updateOverlayBox);
+            vv?.removeEventListener('scroll', updateOverlayBox);
+            window.removeEventListener('resize', updateOverlayBox);
+            ro?.disconnect();
+        };
+    }, [updateOverlayBox]);
+
     return (
         <>
             {/* 背面を暗くしてタップで閉じる（モーダルと同じレイヤー規則: z-40 / z-50） */}
@@ -15,18 +52,26 @@ export function InboxPanel({ content, onContentChange, onClose }: InboxPanelProp
                 onClick={onClose}
                 aria-hidden="true"
             />
-            <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+            <div
+                ref={overlayHostRef}
+                className="pointer-events-none absolute left-0 right-0 z-50 flex flex-col items-center p-4 sm:p-6"
+                style={
+                    overlayBox
+                        ? { top: overlayBox.top, height: overlayBox.height, bottom: 'auto' }
+                        : { top: 0, bottom: 0 }
+                }
+            >
                 <aside
                     role="dialog"
                     aria-modal="true"
                     aria-label="Inbox"
-                    className="pointer-events-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded border-2 border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900"
+                    className="pointer-events-auto flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded border-2 border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900"
                 >
                     <div className="flex min-h-0 flex-1 flex-col p-4">
                         <textarea
                             value={content}
                             onChange={(e) => onContentChange(e.target.value)}
-                            className="min-h-0 w-full flex-1 resize-none bg-transparent text-sm sm:text-base leading-6 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
+                            className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm sm:text-base leading-6 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
                             spellCheck={false}
                             autoComplete="off"
                             autoCorrect="off"

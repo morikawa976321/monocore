@@ -17,7 +17,7 @@ const colorClassNames: Record<ButtonColor, string> = {
     secondary:
         'border-2 border-neutral-600 bg-neutral-50 text-neutral-900 hover:border-neutral-700 hover:bg-neutral-200 dark:border-neutral-500 dark:bg-neutral-900 dark:text-neutral-50 dark:hover:border-neutral-400 dark:hover:bg-neutral-800 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500',
     ghost:
-        'border-2 border-neutral-400 bg-transparent text-neutral-900 hover:border-neutral-600 hover:bg-neutral-200 dark:border-neutral-600 dark:bg-transparent dark:text-neutral-200 dark:hover:border-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500',
+        'border-2 border-neutral-400 bg-neutral-50 text-neutral-900 hover:border-neutral-600 hover:bg-neutral-200 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500',
 };
 
 const sizeClassNames: Record<ButtonSize, string> = {
