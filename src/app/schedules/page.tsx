@@ -17,11 +17,6 @@ import {
     mergeSchedulesIntoEntries,
     type DayEntry,
 } from '@/src/lib/schedules/text-format';
-import {
-    clearDraftFromStorage,
-    readDraftFromStorage,
-    writeDraftToStorage,
-} from '@/src/lib/schedules/draft-storage';
 import { Inbox } from 'lucide-react';
 
 /** スケジュール一覧・編集ページ。双方向無限スクロール対応。 */
@@ -44,11 +39,11 @@ export default function SchedulesPage() {
     const supabase = useMemo(createClient, []);
     // schedules保存のデバウンス制御用タイマー。
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // 「10秒ルール」の前回保存時刻。
-    const lastSaveTimeRef = useRef<number>(0);
     // 非同期イベント（visibilitychange/pagehide）でも現在フォーカス中の日付を参照する。
     const focusedDateLabelRef = useRef<string | null>(null);
     focusedDateLabelRef.current = focusedDateLabel;
+    // フォーカスが外れても debounce 中の保存対象日付を参照する。
+    const pendingSaveDateLabelRef = useRef<string | null>(null);
     // beforeunload時に最新entriesへアクセスするためのref。
     const entriesRef = useRef<DayEntry[]>(entries);
     entriesRef.current = entries;
@@ -84,10 +79,7 @@ export default function SchedulesPage() {
         const endUtc = localTimeToUtc(format(addDays(end, 1), 'yyyy-MM-dd'), '0000', tz);
         getSchedules(supabase, startUtc, endUtc).then(({ data, error }) => {
             if (error || !data) return;
-            // 離脱時に残した下書きがあれば優先して反映する。
-            const draft = readDraftFromStorage();
-            if (draft) clearDraftFromStorage();
-            setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz, draft));
+            setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz));
             scrollTodayAfterInitialMergeRef.current = true;
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,25 +92,6 @@ export default function SchedulesPage() {
         // todayStr が確定した直後の1回のみ実行
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [todayStr]);
-
-    // --- beforeunload: 未保存の変更がある場合のみ下書き保存 ---
-    useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            // schedule下書きとInbox未保存をまとめて判定し、離脱時に最小限だけ保存する。
-            const hasUnsaved = debounceTimerRef.current != null || hasPendingChanges;
-            if (!hasUnsaved) return;
-            if (debounceTimerRef.current != null) writeDraftToStorage(entriesRef.current);
-            if (hasPendingChanges) saveInboxNow();
-            e.preventDefault();
-            e.returnValue = '';
-        };
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-            if (debounceTimerRef.current != null) writeDraftToStorage(entriesRef.current);
-            if (hasPendingChanges) saveInboxNow();
-        };
-    }, [hasPendingChanges, saveInboxNow]);
 
     // --- prepend 後のスクロール位置補正 ---
     useLayoutEffect(() => {
@@ -157,12 +130,7 @@ export default function SchedulesPage() {
             const nextDateStr = format(addDays(parseISO(dateStr), 1), 'yyyy-MM-dd');
             const day_end_utc = localTimeToUtc(nextDateStr, '0000', tz);
             const items = dayContentToScheduleItems(dateStr, entry.content, tz);
-            void replaceSchedulesForDay(supabase, day_start_utc, day_end_utc, items).catch(
-                () => {
-                    // 通信失敗時は内容を失わないようローカル下書きへ退避する。
-                    writeDraftToStorage(entriesRef.current);
-                }
-            );
+            void replaceSchedulesForDay(supabase, day_start_utc, day_end_utc, items);
         },
         [supabase, tz]
     );
@@ -170,14 +138,29 @@ export default function SchedulesPage() {
     const flushPendingScheduleSave = useCallback(() => {
         if (debounceTimerRef.current == null) return;
         clearDebounceTimer();
-        const dateLabel = focusedDateLabelRef.current;
-        if (!dateLabel) {
-            writeDraftToStorage(entriesRef.current);
-            return;
-        }
-        lastSaveTimeRef.current = Date.now();
+        const dateLabel = pendingSaveDateLabelRef.current ?? focusedDateLabelRef.current;
+        pendingSaveDateLabelRef.current = null;
+        if (!dateLabel) return;
         saveDay(dateLabel);
     }, [clearDebounceTimer, saveDay]);
+
+    // --- beforeunload: 未保存スケジュールは flush（saveDay）、Inbox は同期保存 ---
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            const hadScheduleDebounce = debounceTimerRef.current != null;
+            flushPendingScheduleSave();
+            if (hasPendingChanges) saveInboxNow();
+            if (!hadScheduleDebounce && !hasPendingChanges) return;
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            flushPendingScheduleSave();
+            if (hasPendingChanges) saveInboxNow();
+        };
+    }, [flushPendingScheduleSave, hasPendingChanges, saveInboxNow]);
 
     // --- updateDayContent ---
     const updateDayContent = (dateLabel: string, value: string) => {
@@ -192,25 +175,15 @@ export default function SchedulesPage() {
         // フォーカス中のテキストエリアだけ自動保存対象にする。
         if (focusedDateLabel !== dateLabel) return;
         clearDebounceTimer();
-        const now = Date.now();
-        // 10秒以上空いていれば即保存、短ければ1秒待ってまとめて保存。
-        if (now - lastSaveTimeRef.current >= 10000) {
-            lastSaveTimeRef.current = now;
-            // ref も即時同期
-            entriesRef.current = entriesRef.current.map((e) =>
-                e.dateLabel === dateLabel ? { ...e, content: value } : e
-            );
+        pendingSaveDateLabelRef.current = dateLabel;
+        debounceTimerRef.current = setTimeout(() => {
+            debounceTimerRef.current = null;
+            pendingSaveDateLabelRef.current = null;
             saveDay(dateLabel);
-        } else {
-            debounceTimerRef.current = setTimeout(() => {
-                debounceTimerRef.current = null;
-                lastSaveTimeRef.current = Date.now();
-                saveDay(dateLabel);
-            }, 500);
-        }
+        }, 500);
     };
 
-    // --- hidden/pagehide: debounce待ちを即時フラッシュ ---
+    // --- hidden / pagehide / freeze / アンマウント: debounce 待ちを即時フラッシュ（SPA 遷移はアンマウントで拾う） ---
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState !== 'hidden') return;
@@ -221,11 +194,19 @@ export default function SchedulesPage() {
             flushPendingScheduleSave();
             if (hasPendingChanges) saveInboxNow();
         };
+        const handleFreeze = () => {
+            flushPendingScheduleSave();
+            if (hasPendingChanges) saveInboxNow();
+        };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('pagehide', handlePageHide);
+        window.addEventListener('freeze', handleFreeze);
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('pagehide', handlePageHide);
+            window.removeEventListener('freeze', handleFreeze);
+            flushPendingScheduleSave();
+            if (hasPendingChanges) saveInboxNow();
         };
     }, [flushPendingScheduleSave, hasPendingChanges, saveInboxNow]);
 
@@ -243,7 +224,7 @@ export default function SchedulesPage() {
         );
         const endUtc = localTimeToUtc(format(addDays(newEnd, 1), 'yyyy-MM-dd'), '0000', tz);
         const { data } = await getSchedules(supabase, startUtc, endUtc);
-        const merged = mergeSchedulesIntoEntries(newEntries, data ?? [], tz, null);
+        const merged = mergeSchedulesIntoEntries(newEntries, data ?? [], tz);
         // 未来側は末尾に追加する。
         setEntries((prev) => [...prev, ...merged]);
         setRangeEnd(newEnd);
@@ -265,7 +246,7 @@ export default function SchedulesPage() {
             setLoadingTop(false);
             return;
         }
-        const merged = mergeSchedulesIntoEntries(newEntries, data, tz, null);
+        const merged = mergeSchedulesIntoEntries(newEntries, data, tz);
         // scroll 位置補正のため prepend 前の scrollHeight を記録
         if (scrollContainerRef.current) {
             scrollHeightBeforePrependRef.current = scrollContainerRef.current.scrollHeight;
@@ -377,7 +358,7 @@ export default function SchedulesPage() {
                             onBlur={() => {
                                 setFocusedDateLabel(null);
                                 clearDebounceTimer();
-                                lastSaveTimeRef.current = Date.now();
+                                pendingSaveDateLabelRef.current = null;
                                 saveDay(entry.dateLabel);
                             }}
                         />
