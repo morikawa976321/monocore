@@ -112,8 +112,8 @@ export function InboxPanel({ content, onContentChange, onClose }: InboxPanelProp
                             autoCorrect="off"
                         />
                     </div>
-                    {/* モバイルのみ：親指圏の右下で閉じる。デスクトップはヘッダーの Inbox を使用。 */}
-                    <div className="flex shrink-0 justify-end border-t border-neutral-200 px-2 py-2 dark:border-neutral-800 sm:hidden">
+                    {/* モバイル・デスクトップ：右下で閉じる */}
+                    <div className="flex shrink-0 justify-end border-t border-neutral-200 px-2 py-2 dark:border-neutral-800">
                         <Button type="button" color="secondary" size="md" onClick={onClose} aria-label="Inboxを閉じる">
                             閉じる
                         </Button>
