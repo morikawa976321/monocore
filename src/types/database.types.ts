@@ -55,6 +55,66 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge: {
+        Row: {
+          body: string
+          created_at: string | null
+          deleted_at: string | null
+          id: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          body: string
+          created_at: string | null
+          deleted_at: string | null
+          id: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       schedules: {
         Row: {
           activity: string
