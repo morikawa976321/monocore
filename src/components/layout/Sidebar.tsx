@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
+    BookOpen,
     Clock,
+    Folders,
     ListTodo,
     Menu,
     LogOut,
@@ -13,7 +15,9 @@ import { createClient } from "@/src/lib/supabase/client";
 
 const MENU_ITEMS = [
     { href: "/schedules", icon: Clock, label: "Schedule" },
-    { href: "/tasks", icon: ListTodo, label: "Task" }
+    { href: "/tasks", icon: ListTodo, label: "Task" },
+    { href: "/projects", icon: Folders, label: "Project" },
+    { href: "/knowledge", icon: BookOpen, label: "Knowledge" },
 ] as const;
 
 export function Sidebar() {
