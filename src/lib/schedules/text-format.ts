@@ -122,13 +122,11 @@ export function hasOrphanLines(content: string): boolean {
 
 /**
  * DB から取得したスケジュール行を DayEntry[] にマージして返す。
- * draft がある場合は DB の内容より draft を優先する。
  */
 export function mergeSchedulesIntoEntries(
     entries: DayEntry[],
     rows: ScheduleRow[],
-    tz: string,
-    draft: Record<string, string> | null
+    tz: string
 ): DayEntry[] {
     const byDate = new Map<string, ScheduleRow[]>();
     for (const row of rows) {
@@ -138,8 +136,6 @@ export function mergeSchedulesIntoEntries(
     }
     return entries.map((e) => {
         const dateStr = dateLabelToDateStr(e.dateLabel);
-        const draftContent = dateStr ? draft?.[dateStr] : undefined;
-        if (draftContent !== undefined) return { ...e, content: draftContent };
         const dbRows = byDate.get(dateStr) ?? [];
         const content = scheduleRowsToDayContent(dbRows, dateStr, tz);
         return { ...e, content };
