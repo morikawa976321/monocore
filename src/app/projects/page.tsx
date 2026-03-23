@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
+import { PageHeader } from '@/src/components/layout/PageHeader';
 import { createClient } from '@/src/lib/supabase/client';
 import { useAddProjectDraftAutosave, useProjects } from '@/src/hooks/useProjects';
 
@@ -36,6 +37,7 @@ export default function ProjectsPage() {
         saveProjectBodyForId,
         deleteProjectItem,
         hasPendingChanges: detailHasPendingChanges,
+        fetchList,
     } = useProjects(supabase);
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -241,20 +243,17 @@ export default function ProjectsPage() {
 
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
-            <header className="flex items-center justify-between px-2 sm:px-6 py-2 sm:py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
-                <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
-                    Projects
-                </h1>
-                <div className="hidden sm:flex h-9 w-20 items-center justify-end">
+            <PageHeader title="Projects" onRefresh={() => void fetchList()}>
+                <div className="hidden sm:inline-flex">
                     <Button color="primary" onClick={() => toggleAddModal()} className="h-9">
                         <Plus className="w-4 h-4" />
                         Add
                     </Button>
                 </div>
-            </header>
+            </PageHeader>
 
             <div className="relative flex-1 overflow-hidden">
-                <div className="h-full overflow-y-auto px-2 sm:px-6 pt-4 sm:pt-6 pb-12 sm:pb-6">
+                <div className="h-full overflow-y-auto px-2 sm:px-2 pt-4 sm:pt-2 pb-12 sm:pb-6">
                     {listError && (
                         <p className="mb-4 text-sm text-neutral-800 dark:text-neutral-200" role="alert">
                             {listError.message}
@@ -317,7 +316,8 @@ export default function ProjectsPage() {
                                             </p>
                                         )}
                                         <textarea
-                                            value={newProjectBody}
+                                            key={`add-${isAddModalOpen ? 'open' : 'closed'}`}
+                                            defaultValue={DEFAULT_NEW_PROJECT_BODY}
                                             onChange={(e) => setNewProjectBody(e.target.value)}
                                             onBlur={onAddDraftBlur}
                                             className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
@@ -357,7 +357,8 @@ export default function ProjectsPage() {
                                             <p className="text-sm text-neutral-700 dark:text-neutral-300">読み込み中…</p>
                                         ) : detail ? (
                                             <textarea
-                                                value={detail.body}
+                                                key={detail.id}
+                                                defaultValue={detail.body}
                                                 onChange={(e) => updateProjectBody(e.target.value)}
                                                 className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
                                                 spellCheck={false}

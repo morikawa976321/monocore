@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { PageHeader } from '@/src/components/layout/PageHeader';
 import { createClient } from '@/src/lib/supabase/client';
 import {
     createTask,
@@ -77,8 +78,7 @@ export default function TasksPage() {
     const isDueInputValid = newDueInput.trim() === '' || parseDueInput(newDueInput.trim()) !== null;
     const isUnarchiveInputValid = unarchiveInput.trim() === '' || parseDueInput(unarchiveInput.trim()) !== null;
 
-    // 選択中タブのタスクを取得して一覧に反映する。
-    useEffect(() => {
+    const fetchTasksList = useCallback(() => {
         let isSubscribed = true;
         setIsLoading(true);
         setCrudError('');
@@ -102,6 +102,12 @@ export default function TasksPage() {
             isSubscribed = false;
         };
     }, [activeTab, supabase]);
+
+    // 選択中タブのタスクを取得して一覧に反映する。
+    useEffect(() => {
+        const cleanup = fetchTasksList();
+        return cleanup;
+    }, [fetchTasksList]);
 
     // モバイルでキーボードが開いた分だけ入力パネル位置を持ち上げる。
     useEffect(() => {
@@ -223,16 +229,16 @@ export default function TasksPage() {
     // アーカイブ確定時にステータスと解除日時を更新する。
     async function confirmArchive() {
         if (!archiveTargetId) return;
-        
+
         // 入力値を検証
         if (unarchiveInput.trim() && !isUnarchiveInputValid) {
             setUnarchiveInputError('無効な日時です');
             return;
         }
-        
+
         const parsedDate = unarchiveInput.trim() ? parseDueInput(unarchiveInput.trim()) : null;
         const nextUnarchiveAt = parsedDate ? parsedDate.toISOString() : null;
-        
+
         const isUpdated = await updateStatusAndRemoveFromList(
             archiveTargetId,
             'archived',
@@ -251,11 +257,8 @@ export default function TasksPage() {
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             {/* Header */}
-            <header className="flex items-center justify-between px-2 sm:px-6 py-2 sm:py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
-                <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
-                    Tasks
-                </h1>
-                <div className="hidden sm:flex h-9 w-20 items-center justify-end">
+            <PageHeader title="Tasks" onRefresh={() => void fetchTasksList()}>
+                <div className="hidden sm:inline-flex justify-end">
                     {activeTab === 'waiting' ? (
                         <Button
                             color="primary"
@@ -266,10 +269,10 @@ export default function TasksPage() {
                             Add
                         </Button>
                     ) : (
-                        <span aria-hidden="true" className="block h-9 w-20" />
+                        <span aria-hidden="true" className="block h-9 w-21.5" />
                     )}
                 </div>
-            </header>
+            </PageHeader>
 
             {/* TabBar */}
             <div className="grid grid-cols-4 px-2 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">

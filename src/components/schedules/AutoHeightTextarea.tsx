@@ -14,10 +14,7 @@ export function AutoHeightTextarea({
         const ta = ref.current;
         if (!ta) return;
         ta.style.height = 'auto';
-        const str = typeof value === 'string' ? value : '';
-        if (str.trim().length > 0) {
-            ta.style.height = ta.scrollHeight + 'px';
-        }
+        ta.style.height = ta.scrollHeight + 'px';
     }, [value]);
 
     return (

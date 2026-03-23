@@ -18,6 +18,7 @@ import {
     type DayEntry,
 } from '@/src/lib/schedules/text-format';
 import { Inbox } from 'lucide-react';
+import { PageHeader } from '@/src/components/layout/PageHeader';
 
 /** スケジュール一覧・編集ページ。双方向無限スクロール対応。 */
 export default function SchedulesPage() {
@@ -84,6 +85,20 @@ export default function SchedulesPage() {
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const reloadSchedules = useCallback(async () => {
+        if (!rangeStart || !rangeEnd) return;
+        setLoadingTop(true);
+        setLoadingBottom(true);
+        const startUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
+        const endUtc = localTimeToUtc(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), '0000', tz);
+        const { data, error } = await getSchedules(supabase, startUtc, endUtc);
+        if (!error && data) {
+            setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz));
+        }
+        setLoadingTop(false);
+        setLoadingBottom(false);
+    }, [rangeStart, rangeEnd, tz, supabase]);
 
     // entries 初期生成後に今日のセクションへスクロール
     useEffect(() => {
@@ -298,95 +313,93 @@ export default function SchedulesPage() {
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             {/* Header */}
-            <header className="flex items-center px-2 sm:px-6 py-2 sm:py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
-                <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
-                    Schedules
-                </h1>
-                <div className="ml-auto hidden sm:inline-flex">
+            <PageHeader title="Schedules" onRefresh={() => void reloadSchedules()}>
+                <div className="hidden sm:inline-flex">
+                    <Button
+                        onClick={handleInboxToggle}
+                        color={inboxOpen ? 'secondary' : 'ghost'}
+                        size="md"
+                        aria-label={inboxOpen ? 'Inboxを閉じる' : 'Inboxを開く'}
+                        className="h-9"
+                    >
+                        <Inbox className="w-4 h-4" />
+                        Inbox
+                    </Button>
+                </div>
+            </PageHeader>
+
+            <div className="flex-1 overflow-hidden relative">
                 <Button
                     onClick={handleInboxToggle}
                     color={inboxOpen ? 'secondary' : 'ghost'}
                     size="md"
+                    className="sm:hidden fixed right-4 bottom-4 p-0 rounded"
                     aria-label={inboxOpen ? 'Inboxを閉じる' : 'Inboxを開く'}
                 >
-                    <Inbox className="w-5 h-5" />
+                    <Inbox className="w-4 h-4" />
                     <span>Inbox</span>
                 </Button>
+                {/* Scroll container */}
+                <div
+                    ref={scrollContainerRef}
+                    className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4"
+                    style={{ overflowAnchor: 'none' }}
+                >
+                    {/* 上端 sentinel */}
+                    <div ref={topSentinelRef} />
+
+                    {/* 過去方向ローディング */}
+                    {loadingTop && (
+                        <div className="flex justify-center py-2">
+                            <span className="text-sm leading-6 text-neutral-500">Loading...</span>
+                        </div>
+                    )}
+
+                    {/* Day sections */}
+                    {entries.map((entry) => {
+                        const entryDateStr = dateLabelToDateStr(entry.dateLabel);
+                        const isToday = entryDateStr === todayStr;
+                        return (
+                            // 1日分の表示/編集は DaySection に委譲する。
+                            <DaySection
+                                key={entry.dateLabel}
+                                entry={entry}
+                                isToday={isToday}
+                                todayRef={todaySectionRef}
+                                onContentChange={(value) => updateDayContent(entry.dateLabel, value)}
+                                onFocus={() => setFocusedDateLabel(entry.dateLabel)}
+                                onBlur={() => {
+                                    setFocusedDateLabel(null);
+                                    clearDebounceTimer();
+                                    pendingSaveDateLabelRef.current = null;
+                                    saveDay(entry.dateLabel);
+                                }}
+                            />
+                        );
+                    })}
+
+                    {/* 未来方向ローディング */}
+                    {loadingBottom && (
+                        <div className="flex justify-center py-2">
+                            <span className="text-sm leading-6 text-neutral-500">Loading...</span>
+                        </div>
+                    )}
+
+                    {/* 下端 sentinel */}
+                    <div ref={bottomSentinelRef} />
                 </div>
-            </header>
 
-            <div className="flex-1 overflow-hidden relative">
-            <Button
-                onClick={handleInboxToggle}
-                color={inboxOpen ? 'secondary' : 'ghost'}
-                size="md"
-                className="sm:hidden fixed right-4 bottom-4 p-0 rounded"
-                aria-label={inboxOpen ? 'Inboxを閉じる' : 'Inboxを開く'}
-            >
-                <Inbox className="w-6 h-6" />
-                <span>Inbox</span>
-            </Button>
-            {/* Scroll container */}
-            <div
-                ref={scrollContainerRef}
-                className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4"
-                style={{ overflowAnchor: 'none' }}
-            >
-                {/* 上端 sentinel */}
-                <div ref={topSentinelRef} />
-
-                {/* 過去方向ローディング */}
-                {loadingTop && (
-                    <div className="flex justify-center py-2">
-                        <span className="text-sm leading-6 text-neutral-500">Loading...</span>
-                    </div>
+                {/* Inbox panel */}
+                {inboxOpen && (
+                    <InboxPanel
+                        content={inboxContent}
+                        onContentChange={updateInboxContent}
+                        onClose={() => {
+                            saveInboxNow();
+                            setInboxOpen(false);
+                        }}
+                    />
                 )}
-
-                {/* Day sections */}
-                {entries.map((entry) => {
-                    const entryDateStr = dateLabelToDateStr(entry.dateLabel);
-                    const isToday = entryDateStr === todayStr;
-                    return (
-                        // 1日分の表示/編集は DaySection に委譲する。
-                        <DaySection
-                            key={entry.dateLabel}
-                            entry={entry}
-                            isToday={isToday}
-                            todayRef={todaySectionRef}
-                            onContentChange={(value) => updateDayContent(entry.dateLabel, value)}
-                            onFocus={() => setFocusedDateLabel(entry.dateLabel)}
-                            onBlur={() => {
-                                setFocusedDateLabel(null);
-                                clearDebounceTimer();
-                                pendingSaveDateLabelRef.current = null;
-                                saveDay(entry.dateLabel);
-                            }}
-                        />
-                    );
-                })}
-
-                {/* 未来方向ローディング */}
-                {loadingBottom && (
-                    <div className="flex justify-center py-2">
-                        <span className="text-sm leading-6 text-neutral-500">Loading...</span>
-                    </div>
-                )}
-
-                {/* 下端 sentinel */}
-                <div ref={bottomSentinelRef} />
-            </div>
-
-            {/* Inbox panel */}
-            {inboxOpen && (
-                <InboxPanel
-                    content={inboxContent}
-                    onContentChange={updateInboxContent}
-                    onClose={() => {
-                        saveInboxNow();
-                        setInboxOpen(false);
-                    }}
-                />
-            )}
             </div>
         </div>
     );

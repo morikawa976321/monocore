@@ -31,6 +31,7 @@ type UseProjectsReturn = {
     /** 自動保存で作った行を破棄するときに論理削除し一覧から外す。 */
     deleteProjectItem: (id: string) => Promise<boolean>;
     hasPendingChanges: boolean;
+    fetchList: () => Promise<void>;
 };
 
 /** 連続入力時の DB 更新間隔（ms）。 */
@@ -77,16 +78,20 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
                 prev.map((row) =>
                     row.id === data.id
                         ? {
-                              ...row,
-                              title: data.title,
-                              updated_at: data.updated_at,
-                          }
+                            ...row,
+                            title: data.title,
+                            updated_at: data.updated_at,
+                        }
                         : row
                 )
             );
             if (selectedIdRef.current === data.id) {
-                setDetail(data);
-                bodyRef.current = data.body;
+                // body は上書きしない: setDetail(data) で value が変わると
+                // controlled textarea がカーソル位置を末尾にリセットしてしまうため。
+                // DB トリガーで変わる title / updated_at だけ差し替える。
+                setDetail((prev) =>
+                    prev ? { ...prev, title: data.title, updated_at: data.updated_at } : null
+                );
                 if (saveDebounceRef.current == null) {
                     setHasPendingChanges(false);
                 }
@@ -103,25 +108,29 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
         void persistProject(id, bodyRef.current);
     }, [clearSaveDebounce, persistProject, selectedId]);
 
-    useEffect(() => {
-        let cancelled = false;
+    const fetchList = useCallback(async () => {
         setListLoading(true);
         setListError(null);
         // body は取らず、更新日時の新しい順（クエリ側の仕様）
-        void listProjects(supabase).then(({ data, error }) => {
-            if (cancelled) return;
-            if (error) {
-                setListError(error);
-                setList([]);
-            } else {
-                setList(data ?? []);
-            }
-            setListLoading(false);
+        const { data, error } = await listProjects(supabase);
+        if (error) {
+            setListError(error);
+            setList([]);
+        } else {
+            setList(data ?? []);
+        }
+        setListLoading(false);
+    }, [supabase]);
+
+    useEffect(() => {
+        let isCancelled = false;
+        void fetchList().then(() => {
+            if (isCancelled) return;
         });
         return () => {
-            cancelled = true;
+            isCancelled = true;
         };
-    }, [supabase]);
+    }, [fetchList]);
 
     // 選択 ID に応じて詳細を読み込む。別行へ移動時はクリーンアップで未デバウンス分を保存。閉じるは closeDetail が await 保存済みのためクリーンアップでは二重保存されない。
     useEffect(() => {
@@ -285,6 +294,7 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
         saveProjectBodyForId,
         deleteProjectItem,
         hasPendingChanges,
+        fetchList,
     };
 }
 
