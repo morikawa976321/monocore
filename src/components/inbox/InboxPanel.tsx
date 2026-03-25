@@ -7,6 +7,7 @@ type InboxPanelProps = {
     content: string;
     onContentChange: (value: string) => void;
     onClose: () => void;
+    isReadOnly?: boolean;
 };
 
 function overlayBoxInParent(parent: HTMLElement): { top: number; height: number } {
@@ -18,7 +19,7 @@ function overlayBoxInParent(parent: HTMLElement): { top: number; height: number 
     return { top: vt - r.top, height: Math.max(0, vb - vt) };
 }
 
-export function InboxPanel({ content, onContentChange, onClose }: InboxPanelProps) {
+export function InboxPanel({ content, onContentChange, onClose, isReadOnly = false }: InboxPanelProps) {
     const overlayHostRef = useRef<HTMLDivElement>(null);
     const [overlayBox, setOverlayBox] = useState<{ top: number; height: number } | null>(null);
 
@@ -28,7 +29,7 @@ export function InboxPanel({ content, onContentChange, onClose }: InboxPanelProp
     }, []);
 
     useLayoutEffect(() => {
-        updateOverlayBox();
+        const rafId = window.requestAnimationFrame(updateOverlayBox);
         const vv = window.visualViewport;
         vv?.addEventListener('resize', updateOverlayBox);
         vv?.addEventListener('scroll', updateOverlayBox);
@@ -37,6 +38,7 @@ export function InboxPanel({ content, onContentChange, onClose }: InboxPanelProp
         const ro = parent ? new ResizeObserver(updateOverlayBox) : null;
         if (parent && ro) ro.observe(parent);
         return () => {
+            window.cancelAnimationFrame(rafId);
             vv?.removeEventListener('resize', updateOverlayBox);
             vv?.removeEventListener('scroll', updateOverlayBox);
             window.removeEventListener('resize', updateOverlayBox);
@@ -106,6 +108,7 @@ export function InboxPanel({ content, onContentChange, onClose }: InboxPanelProp
                         <textarea
                             value={content}
                             onChange={(e) => onContentChange(e.target.value)}
+                            readOnly={isReadOnly}
                             className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
                             spellCheck={false}
                             autoComplete="off"

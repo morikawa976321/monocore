@@ -49,6 +49,8 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState<Error | null>(null);
     const [hasPendingChanges, setHasPendingChanges] = useState(false);
+    const hasPendingChangesRef = useRef(hasPendingChanges);
+    hasPendingChangesRef.current = hasPendingChanges;
 
     /** 保存・effect cleanup 用の最新本文（state より先に確実に読む）。 */
     const bodyRef = useRef('');
@@ -186,6 +188,7 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     }, [clearSaveDebounce]);
 
     // タブ非表示・離脱時にデバウンス待ちを即保存（未送信のままにしない）
+    // PCタブ切り替え・スマホ最小化からの復帰時（visible）に、未保存変更がなければ最新データを自動取得する
     useEffect(() => {
         const flushPendingSave = () => {
             if (saveDebounceRef.current == null) return;
@@ -193,8 +196,37 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
         };
 
         const handleVisibilityChange = () => {
-            if (document.visibilityState !== 'hidden') return;
-            flushPendingSave();
+            if (document.visibilityState === 'hidden') {
+                flushPendingSave();
+            } else if (document.visibilityState === 'visible') {
+                // 入力途中で未保存の変更がある場合は、上書きを防ぐためリロードしない
+                if (hasPendingChangesRef.current) return;
+
+                void fetchList();
+
+                const currentSelectedId = selectedIdRef.current;
+                if (currentSelectedId) {
+                    setDetailLoading(true);
+                    setDetailError(null);
+                    void getKnowledgeById(supabase, currentSelectedId).then(({ data, error }) => {
+                        // ロード中に選択行が変わっていたら無視
+                        if (selectedIdRef.current !== currentSelectedId) return;
+                        if (hasPendingChangesRef.current) return;
+
+                        if (error) {
+                            setDetailError(error);
+                            setDetail(null);
+                            setHasPendingChanges(false);
+                        } else if (data) {
+                            setDetail(data);
+                            bodyRef.current = data.body;
+                            lastLoadedIdRef.current = data.id;
+                            setHasPendingChanges(false);
+                        }
+                        setDetailLoading(false);
+                    });
+                }
+            }
         };
         const handlePageHide = () => {
             flushPendingSave();
@@ -210,7 +242,7 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
             window.removeEventListener('pagehide', handlePageHide);
             window.removeEventListener('freeze', handleFreeze);
         };
-    }, [saveKnowledgeNow]);
+    }, [saveKnowledgeNow, fetchList, supabase]);
 
     const updateKnowledgeBody = useCallback(
         (value: string) => {

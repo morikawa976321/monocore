@@ -79,6 +79,13 @@ export function useInbox(supabase: SupabaseClient<Database>): UseInboxReturn {
         [clearInboxDebounce, persistInbox]
     );
 
+    const hasPendingChangesRef = useRef(hasPendingChanges);
+    const resumeFetchSeqRef = useRef(0);
+
+    useEffect(() => {
+        hasPendingChangesRef.current = hasPendingChanges;
+    }, [hasPendingChanges]);
+
     useEffect(() => {
         const flushPendingInboxSave = () => {
             if (inboxDebounceRef.current == null) return;
@@ -86,19 +93,37 @@ export function useInbox(supabase: SupabaseClient<Database>): UseInboxReturn {
         };
 
         const handleVisibilityChange = () => {
-            if (document.visibilityState !== 'hidden') return;
-            flushPendingInboxSave();
+            if (document.visibilityState === 'hidden') {
+                flushPendingInboxSave();
+            } else if (document.visibilityState === 'visible') {
+                if (hasPendingChangesRef.current) return;
+                const fetchSeq = ++resumeFetchSeqRef.current;
+                // フォーカス復帰時に未保存のものがなければ最新のInbox内容を同期
+                void getInbox(supabase).then(({ data }) => {
+                    if (resumeFetchSeqRef.current !== fetchSeq) return;
+                    if (hasPendingChangesRef.current) return;
+                    if (!data) return;
+                    setInboxContent(data.content);
+                    inboxContentRef.current = data.content;
+                    setHasPendingChanges(false);
+                });
+            }
         };
         const handlePageHide = () => {
             flushPendingInboxSave();
         };
+        const handleFreeze = () => {
+            flushPendingInboxSave();
+        };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('pagehide', handlePageHide);
+        window.addEventListener('freeze', handleFreeze);
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('pagehide', handlePageHide);
+            window.removeEventListener('freeze', handleFreeze);
         };
-    }, [saveInboxNow]);
+    }, [saveInboxNow, supabase]);
 
     return {
         inboxOpen,

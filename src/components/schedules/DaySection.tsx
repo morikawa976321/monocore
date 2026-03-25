@@ -14,6 +14,8 @@ type DaySectionProps = {
     // フォーカス開始/終了時の通知（保存制御に使う）。
     onFocus: () => void;
     onBlur: () => void;
+    // DB同期中は編集を無効化する。
+    isReadOnly?: boolean;
 };
 
 export function DaySection({
@@ -23,6 +25,7 @@ export function DaySection({
     onContentChange,
     onFocus,
     onBlur,
+    isReadOnly = false,
 }: DaySectionProps) {
     return (
         <section
@@ -51,11 +54,13 @@ export function DaySection({
                     onChange={(e) => onContentChange(e.target.value)}
                     onFocus={onFocus}
                     onBlur={onBlur}
+                    readOnly={isReadOnly}
                     className={[
                         'w-full min-h-[4rem] resize-none bg-transparent border-none outline-none',
                         'text-sm leading-6 sm:text-base sm:leading-7',
                         'text-neutral-900 dark:text-neutral-100',
                         'placeholder:text-neutral-400 dark:placeholder:text-neutral-600',
+                        isReadOnly ? 'cursor-not-allowed' : '',
                     ].join(' ')}
                     spellCheck={false}
                     autoComplete="off"

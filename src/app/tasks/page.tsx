@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { PageHeader } from '@/src/components/layout/PageHeader';
 import { createClient } from '@/src/lib/supabase/client';
@@ -72,6 +72,7 @@ export default function TasksPage() {
     const [unarchiveInputError, setUnarchiveInputError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [crudError, setCrudError] = useState('');
+    const fetchSeqRef = useRef(0);
 
     const supabase = useMemo(createClient, []);
     const visibleTasks = tasks;
@@ -79,12 +80,14 @@ export default function TasksPage() {
     const isUnarchiveInputValid = unarchiveInput.trim() === '' || parseDueInput(unarchiveInput.trim()) !== null;
 
     const fetchTasksList = useCallback(() => {
+        const fetchSeq = ++fetchSeqRef.current;
         let isSubscribed = true;
         setIsLoading(true);
         setCrudError('');
 
         void getTasksByStatus(supabase, activeTab).then(({ data, error }) => {
             if (!isSubscribed) return;
+            if (fetchSeqRef.current !== fetchSeq) return;
             if (error) {
                 setCrudError('タスクの取得に失敗しました');
                 setTasks([]);
@@ -103,10 +106,21 @@ export default function TasksPage() {
         };
     }, [activeTab, supabase]);
 
-    // 選択中タブのタスクを取得して一覧に反映する。
+    // 選択中タブのタスクを取得して一覧に反映する。さらにタブ復帰時（visible）にも自動最新化。
     useEffect(() => {
         const cleanup = fetchTasksList();
-        return cleanup;
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                void fetchTasksList();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            cleanup();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [fetchTasksList]);
 
     // モバイルでキーボードが開いた分だけ入力パネル位置を持ち上げる。

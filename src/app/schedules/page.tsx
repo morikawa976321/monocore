@@ -35,6 +35,8 @@ export default function SchedulesPage() {
     const [loadingTop, setLoadingTop] = useState(false);
     const [loadingBottom, setLoadingBottom] = useState(false);
     const [hasMorePast, setHasMorePast] = useState(true);
+    const [isInitialSyncing, setIsInitialSyncing] = useState(true);
+    const [isResumeSyncing, setIsResumeSyncing] = useState(false);
 
     // Supabaseクライアントは1回作って使い回す。
     const supabase = useMemo(createClient, []);
@@ -48,6 +50,8 @@ export default function SchedulesPage() {
     // beforeunload時に最新entriesへアクセスするためのref。
     const entriesRef = useRef<DayEntry[]>(entries);
     entriesRef.current = entries;
+    const isResumeSyncingRef = useRef(false);
+    isResumeSyncingRef.current = isResumeSyncing;
 
     // prepend 時のスクロール位置補正に使う
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -61,6 +65,7 @@ export default function SchedulesPage() {
     const todaySectionRef = useRef<HTMLElement>(null);
     const { inboxOpen, setInboxOpen, inboxContent, updateInboxContent, saveInboxNow, hasPendingChanges } =
         useInbox(supabase);
+    const isEditLocked = isInitialSyncing || isResumeSyncing;
 
     // --- 初回（クライアントのみ）: 日付確定 → entries 生成 → DB fetch → 今日へスクロール ---
     useEffect(() => {
@@ -78,11 +83,15 @@ export default function SchedulesPage() {
         // 次にDBから実データを取得し、空の骨組みに上書きして完成形にする。
         const startUtc = localTimeToUtc(format(start, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(end, 1), 'yyyy-MM-dd'), '0000', tz);
-        getSchedules(supabase, startUtc, endUtc).then(({ data, error }) => {
-            if (error || !data) return;
-            setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz));
-            scrollTodayAfterInitialMergeRef.current = true;
-        });
+        void getSchedules(supabase, startUtc, endUtc)
+            .then(({ data, error }) => {
+                if (error || !data) return;
+                setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz));
+                scrollTodayAfterInitialMergeRef.current = true;
+            })
+            .finally(() => {
+                setIsInitialSyncing(false);
+            });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -179,6 +188,7 @@ export default function SchedulesPage() {
 
     // --- updateDayContent ---
     const updateDayContent = (dateLabel: string, value: string) => {
+        if (isEditLocked) return;
         // まず画面上の該当日の本文を更新する。
         setEntries((prev) => {
             const next = [...prev];
@@ -199,11 +209,26 @@ export default function SchedulesPage() {
     };
 
     // --- hidden / pagehide / freeze / アンマウント: debounce 待ちを即時フラッシュ（SPA 遷移はアンマウントで拾う） ---
+    // PCタブ切り替え・スマホ最小化復帰時（visible）に未保存変更がなければ自動最新化 ---
     useEffect(() => {
         const handleVisibilityChange = () => {
-            if (document.visibilityState !== 'hidden') return;
-            flushPendingScheduleSave();
-            if (hasPendingChanges) saveInboxNow();
+            if (document.visibilityState === 'hidden') {
+                flushPendingScheduleSave();
+                if (hasPendingChanges) saveInboxNow();
+                setFocusedDateLabel(null);
+                pendingSaveDateLabelRef.current = null;
+            } else if (document.visibilityState === 'visible') {
+                if (pendingSaveDateLabelRef.current != null || focusedDateLabelRef.current != null || hasPendingChanges) {
+                    return;
+                }
+                if (isResumeSyncingRef.current) return;
+                isResumeSyncingRef.current = true;
+                setIsResumeSyncing(true);
+                void reloadSchedules().finally(() => {
+                    isResumeSyncingRef.current = false;
+                    setIsResumeSyncing(false);
+                });
+            }
         };
         const handlePageHide = () => {
             flushPendingScheduleSave();
@@ -223,7 +248,7 @@ export default function SchedulesPage() {
             flushPendingScheduleSave();
             if (hasPendingChanges) saveInboxNow();
         };
-    }, [flushPendingScheduleSave, hasPendingChanges, saveInboxNow]);
+    }, [flushPendingScheduleSave, hasPendingChanges, saveInboxNow, reloadSchedules]);
 
     // --- 未来方向: loadMoreFuture ---
     const loadMoreFuture = useCallback(async () => {
@@ -319,6 +344,7 @@ export default function SchedulesPage() {
                         onClick={handleInboxToggle}
                         color={inboxOpen ? 'secondary' : 'ghost'}
                         size="md"
+                        disabled={isEditLocked}
                         aria-label={inboxOpen ? 'Inboxを閉じる' : 'Inboxを開く'}
                         className="h-9"
                     >
@@ -333,6 +359,7 @@ export default function SchedulesPage() {
                     onClick={handleInboxToggle}
                     color={inboxOpen ? 'secondary' : 'ghost'}
                     size="md"
+                    disabled={isEditLocked}
                     className="sm:hidden fixed right-4 bottom-4 p-0 rounded"
                     aria-label={inboxOpen ? 'Inboxを閉じる' : 'Inboxを開く'}
                 >
@@ -366,10 +393,15 @@ export default function SchedulesPage() {
                                 entry={entry}
                                 isToday={isToday}
                                 todayRef={todaySectionRef}
+                                isReadOnly={isEditLocked}
                                 onContentChange={(value) => updateDayContent(entry.dateLabel, value)}
-                                onFocus={() => setFocusedDateLabel(entry.dateLabel)}
+                                onFocus={() => {
+                                    if (isEditLocked) return;
+                                    setFocusedDateLabel(entry.dateLabel);
+                                }}
                                 onBlur={() => {
                                     setFocusedDateLabel(null);
+                                    if (isEditLocked) return;
                                     clearDebounceTimer();
                                     pendingSaveDateLabelRef.current = null;
                                     saveDay(entry.dateLabel);
@@ -394,11 +426,19 @@ export default function SchedulesPage() {
                     <InboxPanel
                         content={inboxContent}
                         onContentChange={updateInboxContent}
+                        isReadOnly={isEditLocked}
                         onClose={() => {
                             saveInboxNow();
                             setInboxOpen(false);
                         }}
                     />
+                )}
+                {isEditLocked && (
+                    <div className="absolute inset-0 z-20 bg-neutral-200 dark:bg-neutral-900 opacity-80 flex items-center justify-center">
+                        <p className="text-sm text-neutral-900 dark:text-neutral-50 font-medium">
+                            同期中...
+                        </p>
+                    </div>
                 )}
             </div>
         </div>
