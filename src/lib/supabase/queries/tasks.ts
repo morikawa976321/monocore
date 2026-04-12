@@ -8,6 +8,16 @@ type TaskUpdate = Database['public']['Tables']['tasks']['Update']
 export type TaskStatus = 'waiting' | 'completed' | 'archived' | 'deleted'
 
 /**
+ * 解除予定日時を過ぎたアーカイブタスクを未完了へ戻す（一覧取得前に呼ぶ）。
+ */
+export async function applyDueTaskUnarchives(
+    supabase: SupabaseClient<Database>
+): Promise<{ error: Error | null }> {
+    const { error } = await supabase.rpc('apply_due_task_unarchives')
+    return { error }
+}
+
+/**
  * 指定ステータスのタスク一覧を取得する。
  */
 export async function getTasksByStatus(

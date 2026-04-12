@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import { PageHeader } from '@/src/components/layout/PageHeader';
 import { createClient } from '@/src/lib/supabase/client';
 import {
+    applyDueTaskUnarchives,
     createTask,
     getTasksByStatus,
     type TaskStatus,
@@ -85,7 +86,15 @@ export default function TasksPage() {
         setIsLoading(true);
         setCrudError('');
 
-        void getTasksByStatus(supabase, activeTab).then(({ data, error }) => {
+        void (async () => {
+            const { error: unarchiveError } = await applyDueTaskUnarchives(supabase);
+            if (!isSubscribed) return;
+            if (fetchSeqRef.current !== fetchSeq) return;
+            if (unarchiveError) {
+                setCrudError('期限付きアーカイブの自動解除に失敗しました');
+            }
+
+            const { data, error } = await getTasksByStatus(supabase, activeTab);
             if (!isSubscribed) return;
             if (fetchSeqRef.current !== fetchSeq) return;
             if (error) {
@@ -99,7 +108,7 @@ export default function TasksPage() {
                 .filter((task): task is Task => task !== null);
             setTasks(normalizedTasks);
             setIsLoading(false);
-        });
+        })();
 
         return () => {
             isSubscribed = false;
