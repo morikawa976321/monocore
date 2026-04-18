@@ -4,6 +4,11 @@ set -Eeuo pipefail
 
 # One-time setup helper for Raspberry Pi (Debian/Raspberry Pi OS).
 #
+# If ./raspi_setup.sh fails with "Permission denied", run:
+#   bash scripts/backup/raspi_setup.sh
+# or:
+#   chmod +x scripts/backup/raspi_setup.sh && ./scripts/backup/raspi_setup.sh
+#
 # Optional:
 #   BACKUP_DIR   Backup root directory (default: /srv/backups/supabase)
 
@@ -34,6 +39,7 @@ sudo mkdir -p "${BACKUP_DIR}"
 sudo chown -R "${USER}:${USER}" "${BACKUP_DIR}"
 
 log "Set executable permission for backup scripts"
+chmod +x "${REPO_ROOT}/scripts/backup/raspi_setup.sh"
 chmod +x "${REPO_ROOT}/scripts/backup/supabase_backup.sh"
 chmod +x "${REPO_ROOT}/scripts/backup/supabase_restore_local.sh"
 chmod +x "${REPO_ROOT}/scripts/backup/raspi_preflight.sh"
