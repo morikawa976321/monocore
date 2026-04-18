@@ -71,6 +71,11 @@ npx supabase db push
 npx supabase db reset
 ```
 
+### 本番バックアップ（Linux最小運用）
+本番DBを毎日バックアップし、必要時にローカルへ復元する最小構成の手順は以下を参照してください。
+
+- `docs/supabase-backup.md`
+
 ---
 
 ## 🧪 Testing
