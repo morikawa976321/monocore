@@ -164,7 +164,7 @@ chmod +x scripts/backup/raspi_setup.sh
 メインPCのターミナル（PowerShell / WSL / Git Bash）で、**メインPC側に保存先ディレクトリを用意してから**実行します。
 
 ```bash
-scp -r tm976@192.168.1.10:/srv/backups/supabase/20260418-141837 /mnt/c/Users/tm976/backups/supabase/
+scp -r tm976@192.168.11.36:/srv/backups/supabase/20260418-141837 /mnt/c/Users/tm976/backups/supabase/
 ```
 
 - `tm976` … Pi のログインユーザー
