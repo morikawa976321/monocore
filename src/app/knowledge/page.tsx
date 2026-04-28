@@ -10,6 +10,14 @@ import { useAddKnowledgeDraftAutosave, useKnowledge } from '@/src/hooks/useKnowl
 /** 新規モーダル初期表示。未編集で閉じた場合は作成しない（initialAddBodyRef と比較）。 */
 const DEFAULT_NEW_KNOWLEDGE_BODY = '# ';
 
+/** タブ設定 */
+const TABS = [
+    { key: 'active', label: '利用中' },
+    { key: 'deleted', label: '削除済み' },
+] as const;
+
+type TabKey = typeof TABS[number]['key'];
+
 /** 親スクロール領域内で「今見えている帯」に合わせる。モバイルの visualViewport（キーボード）対応。 */
 function overlayBoxInParent(parent: HTMLElement): { top: number; height: number } {
     const rect = parent.getBoundingClientRect();
@@ -22,6 +30,7 @@ function overlayBoxInParent(parent: HTMLElement): { top: number; height: number 
 
 export default function KnowledgePage() {
     const supabase = useMemo(createClient, []);
+    const [activeTab, setActiveTab] = useState<TabKey>('active');
     const {
         list,
         listLoading,
@@ -163,6 +172,20 @@ export default function KnowledgePage() {
         })();
     }, [closeDetail, finalizeAddModal, isAddModalOpen]);
 
+    const fetchListWithTab = useCallback(() => {
+        return fetchList(activeTab === 'deleted');
+    }, [fetchList, activeTab]);
+
+    useEffect(() => {
+        let isCancelled = false;
+        void fetchListWithTab().then(() => {
+            if (isCancelled) return;
+        });
+        return () => {
+            isCancelled = true;
+        };
+    }, [fetchListWithTab]);
+
     const updateOverlayBox = useCallback(() => {
         if (!overlayOpen) return;
         const parent = overlayHostRef.current?.parentElement;
@@ -243,14 +266,39 @@ export default function KnowledgePage() {
 
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
-            <PageHeader title="Knowledge" onRefresh={() => void fetchList()}>
+            <PageHeader title="Knowledge" onRefresh={() => void fetchListWithTab()}>
                 <div className="hidden sm:inline-flex">
-                    <Button color="primary" onClick={() => toggleAddModal()} className="h-9">
-                        <Plus className="w-4 h-4" />
-                        Add
-                    </Button>
+                    {activeTab === 'active' ? (
+                        <Button color="primary" onClick={() => toggleAddModal()} className="h-9">
+                            <Plus className="w-4 h-4" />
+                            Add
+                        </Button>
+                    ) : (
+                        <span aria-hidden="true" className="block h-9 w-21.5" />
+                    )}
                 </div>
             </PageHeader>
+
+            {/* TabBar */}
+            <div className="grid grid-cols-2 px-2 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
+                {TABS.map((tab) => (
+                    <button
+                        key={tab.key}
+                        onClick={() => {
+                            setActiveTab(tab.key);
+                            setIsAddModalOpen(false);
+                        }}
+                        className={[
+                            'w-full py-2 sm:py-4 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none',
+                            activeTab === tab.key
+                                ? 'border-amber-500 text-neutral-900 dark:text-neutral-50'
+                                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300',
+                        ].join(' ')}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
 
             <div className="relative flex-1 overflow-hidden">
                 <div className="h-full overflow-y-auto px-2 sm:px-2 pt-4 sm:pt-2 pb-12 sm:pb-6">
@@ -397,10 +445,12 @@ export default function KnowledgePage() {
                 )}
             </div>
 
-            <Button color="primary" onClick={() => toggleAddModal()} className="sm:hidden fixed right-4 bottom-4 z-10">
-                <Plus className="w-4 h-4" />
-                Add
-            </Button>
+            {activeTab === 'active' && (
+                <Button color="primary" onClick={() => toggleAddModal()} className="sm:hidden fixed right-4 bottom-4 z-10">
+                    <Plus className="w-4 h-4" />
+                    Add
+                </Button>
+            )}
         </div>
     );
 }

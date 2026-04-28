@@ -10,13 +10,21 @@ export type ProjectListRow = Pick<ProjectRow, 'id' | 'title' | 'created_at' | 'u
  * 一覧（body は取得しない）。更新日時の新しい順。
  */
 export async function listProjects(
-    supabase: SupabaseClient<Database>
+    supabase: SupabaseClient<Database>,
+    includeDeleted: boolean = false
 ): Promise<{ data: ProjectListRow[] | null; error: Error | null }> {
-    const { data, error } = await supabase
+    const query = supabase
         .from('projects')
         .select('id, title, created_at, updated_at')
-        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
+
+    if (!includeDeleted) {
+        query.is('deleted_at', null)
+    } else {
+        query.not('deleted_at', 'is', null)
+    }
+
+    const { data, error } = await query
 
     return { data, error }
 }

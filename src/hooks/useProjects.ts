@@ -31,7 +31,7 @@ type UseProjectsReturn = {
     /** 自動保存で作った行を破棄するときに論理削除し一覧から外す。 */
     deleteProjectItem: (id: string) => Promise<boolean>;
     hasPendingChanges: boolean;
-    fetchList: () => Promise<void>;
+    fetchList: (includeDeleted?: boolean) => Promise<void>;
 };
 
 /** 連続入力時の DB 更新間隔（ms）。 */
@@ -110,11 +110,11 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
         void persistProject(id, bodyRef.current);
     }, [clearSaveDebounce, persistProject, selectedId]);
 
-    const fetchList = useCallback(async () => {
+    const fetchList = useCallback(async (includeDeleted: boolean = false) => {
         setListLoading(true);
         setListError(null);
         // body は取らず、更新日時の新しい順（クエリ側の仕様）
-        const { data, error } = await listProjects(supabase);
+        const { data, error } = await listProjects(supabase, includeDeleted);
         if (error) {
             setListError(error);
             setList([]);

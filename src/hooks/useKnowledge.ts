@@ -33,7 +33,7 @@ type UseKnowledgeReturn = {
     saveKnowledgeBodyForId: (id: string, body: string) => Promise<boolean>;
     deleteKnowledgeItem: (id: string) => Promise<boolean>;
     hasPendingChanges: boolean;
-    fetchList: () => Promise<void>;
+    fetchList: (includeDeleted?: boolean) => Promise<void>;
 };
 
 /** 連続入力時の DB 更新間隔（ms）。 */
@@ -112,11 +112,11 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
         void persistKnowledge(id, bodyRef.current);
     }, [clearSaveDebounce, persistKnowledge, selectedId]);
 
-    const fetchList = useCallback(async () => {
+    const fetchList = useCallback(async (includeDeleted: boolean = false) => {
         setListLoading(true);
         setListError(null);
         // body は取らず、更新日時の新しい順（クエリ側の仕様）
-        const { data, error } = await listKnowledge(supabase);
+        const { data, error } = await listKnowledge(supabase, includeDeleted);
         if (error) {
             setListError(error);
             setList([]);
