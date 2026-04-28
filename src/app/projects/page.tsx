@@ -367,7 +367,19 @@ export default function ProjectsPage() {
                                             />
                                         ) : null}
                                     </div>
-                                    <div className="flex shrink-0 justify-end border-t border-neutral-200 px-2 py-2 dark:border-neutral-800">
+                                    <div className="flex shrink-0 justify-between border-t border-neutral-200 px-2 py-2 dark:border-neutral-800">
+                                        <Button
+                                            type="button"
+                                            color="ghost"
+                                            size="md"
+                                            onClick={() => {
+                                                if (selectedId) void deleteProjectItem(selectedId);
+                                                closeDetail();
+                                            }}
+                                            aria-label="Projectを削除"
+                                        >
+                                            削除
+                                        </Button>
                                         <Button
                                             type="button"
                                             color="secondary"
