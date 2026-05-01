@@ -416,18 +416,22 @@ export default function KnowledgePage() {
                                         ) : null}
                                     </div>
                                     <div className="flex shrink-0 justify-between border-t border-neutral-200 px-2 py-2 dark:border-neutral-800">
-                                        <Button
-                                            type="button"
-                                            color="ghost"
-                                            size="md"
-                                            onClick={() => {
-                                                if (selectedId) void deleteKnowledgeItem(selectedId);
-                                                closeDetail();
-                                            }}
-                                            aria-label="Knowledgeを削除"
-                                        >
-                                            削除
-                                        </Button>
+                                        {activeTab === 'active' ? (
+                                            <Button
+                                                type="button"
+                                                color="ghost"
+                                                size="md"
+                                                onClick={() => {
+                                                    if (selectedId) void deleteKnowledgeItem(selectedId);
+                                                    closeDetail();
+                                                }}
+                                                aria-label="Knowledgeを削除"
+                                            >
+                                                削除
+                                            </Button>
+                                        ) : (
+                                            <div />
+                                        )}
                                         <Button
                                             type="button"
                                             color="secondary"
