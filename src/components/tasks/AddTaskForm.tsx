@@ -28,8 +28,8 @@ export function AddTaskForm({
     onSubmit,
     onClose,
 }: AddTaskFormProps) {
-    // テキスト入力中のショートカット（送信/閉じる）を処理する。
-    const handleTextKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // テキスト・締切入力中のショートカット（送信/閉じる）を処理する。
+    const handleFormKeyDown = (event: React.KeyboardEvent) => {
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
             event.preventDefault();
             onSubmit();
@@ -48,7 +48,7 @@ export function AddTaskForm({
                         <AutoHeightTextarea
                             value={text}
                             onChange={(event) => onTextChange(event.target.value)}
-                            onKeyDown={handleTextKeyDown}
+                            onKeyDown={handleFormKeyDown}
                             placeholder="タスクの内容"
                             autoFocus
                             rows={1}
@@ -61,6 +61,7 @@ export function AddTaskForm({
                             inputMode="numeric"
                             placeholder="締切"
                             className="w-36 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
+                            onKeyDown={handleFormKeyDown}
                         />
                         <button
                             onClick={onSubmit}
@@ -110,7 +111,7 @@ export function AddTaskForm({
                         <AutoHeightTextarea
                             value={text}
                             onChange={(event) => onTextChange(event.target.value)}
-                            onKeyDown={handleTextKeyDown}
+                            onKeyDown={handleFormKeyDown}
                             placeholder="タスクの内容"
                             autoFocus
                             rows={1}
@@ -122,9 +123,7 @@ export function AddTaskForm({
                             type="text"
                             value={dueInput}
                             onChange={(event) => onDueInputChange(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Escape') onClose();
-                            }}
+                            onKeyDown={handleFormKeyDown}
                             inputMode="numeric"
                             placeholder="締切"
                             className="w-full px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"

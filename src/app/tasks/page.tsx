@@ -353,7 +353,12 @@ export default function TasksPage() {
                             if (newDueInputError) setNewDueInputError('');
                         }}
                         onSubmit={() => void addTask()}
-                        onClose={() => setIsAdding(false)}
+                        onClose={() => {
+                            setNewTaskText('');
+                            setNewDueInput('');
+                            setNewDueInputError('');
+                            setIsAdding(false);
+                        }}
                     />
                 )}
                 {activeTab === 'waiting' && isAdding && (
@@ -371,7 +376,12 @@ export default function TasksPage() {
                             if (newDueInputError) setNewDueInputError('');
                         }}
                         onSubmit={() => void addTask()}
-                        onClose={() => setIsAdding(false)}
+                        onClose={() => {
+                            setNewTaskText('');
+                            setNewDueInput('');
+                            setNewDueInputError('');
+                            setIsAdding(false);
+                        }}
                     />
                 )}
 
