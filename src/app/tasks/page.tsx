@@ -9,6 +9,7 @@ import {
     createTask,
     getTasksByStatus,
     type TaskStatus,
+    updateTaskContent,
     updateTaskStatus as updateTaskStatusQuery,
 } from '@/src/lib/supabase/queries/tasks';
 import type { Database } from '@/src/types/database.types';
@@ -277,6 +278,23 @@ export default function TasksPage() {
         void updateStatusAndRemoveFromList(id, 'waiting', null);
     }
 
+    // タスクの内容と締め切りを更新する。
+    async function editTask(id: string, text: string, dueAt: string | null): Promise<boolean> {
+        const { data, error } = await updateTaskContent(supabase, id, text, dueAt);
+        if (error || !data) {
+            setCrudError('タスクの更新に失敗しました');
+            return false;
+        }
+        const updated = toTaskOrNull(data);
+        if (!updated) {
+            setCrudError('更新後のタスク形式が不正です');
+            return false;
+        }
+        setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+        setCrudError('');
+        return true;
+    }
+
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             {/* Header */}
@@ -387,6 +405,7 @@ export default function TasksPage() {
                                 onArchive={openArchiveDialog}
                                 onDelete={deleteTask}
                                 onMoveToWaiting={moveTaskToWaiting}
+                                onEdit={editTask}
                             />
                         ))}
                     </ul>

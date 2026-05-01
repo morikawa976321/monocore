@@ -102,3 +102,17 @@ export function parseDueInput(raw: string): Date | null {
 
     return null;
 }
+
+// ISO日時文字列を締切入力欄の初期値（YYYYMMDDHHMM 形式）に変換する。
+export function toDueInputString(iso: string | null): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const yyyy = String(d.getFullYear());
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    if (hh === '23' && min === '59') return `${yyyy}${mm}${dd}`;
+    return `${yyyy}${mm}${dd}${hh}${min}`;
+}

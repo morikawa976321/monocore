@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { parseDueInput } from './due-date';
+import { parseDueInput, toDueInputString } from './due-date';
 
 function expectDateParts(
     date: Date | null,
@@ -66,5 +66,30 @@ describe('parseDueInput', () => {
         expect(parseDueInput('202602302359')).toBeNull();
         expect(parseDueInput('20260230')).toBeNull();
         expect(parseDueInput('0231')).toBeNull();
+    });
+});
+
+describe('toDueInputString', () => {
+    it('returns empty string for null', () => {
+        expect(toDueInputString(null)).toBe('');
+    });
+
+    it('returns empty string for invalid ISO string', () => {
+        expect(toDueInputString('not-a-date')).toBe('');
+    });
+
+    it('returns YYYYMMDDHHMM for non-2359 time', () => {
+        const iso = new Date(2026, 2, 18, 14, 30).toISOString();
+        expect(toDueInputString(iso)).toBe('202603181430');
+    });
+
+    it('omits HHMM when time is 23:59', () => {
+        const iso = new Date(2026, 2, 18, 23, 59).toISOString();
+        expect(toDueInputString(iso)).toBe('20260318');
+    });
+
+    it('returns YYYYMMDDHHMM for midnight (00:00)', () => {
+        const iso = new Date(2026, 0, 1, 0, 0).toISOString();
+        expect(toDueInputString(iso)).toBe('202601010000');
     });
 });

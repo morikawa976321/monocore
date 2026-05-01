@@ -87,3 +87,28 @@ export async function updateTaskStatus(
 
     return { data, error }
 }
+
+/** 
+ * タスク内容と締め切りを更新する。
+ * ステータスは変更しない。
+ */
+export async function updateTaskContent(
+    supabase: SupabaseClient<Database>,
+    id: string,
+    task: string,
+    due_at?: string | null
+): Promise<{ data: TaskRow | null; error: Error | null }> {
+    const payload: TaskUpdate = {
+        task,
+        due_at: due_at ?? null,
+    }
+
+    const { data, error } = await supabase
+        .from('tasks')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .single()
+
+    return { data, error }
+}
