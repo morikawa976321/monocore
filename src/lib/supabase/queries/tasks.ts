@@ -24,12 +24,15 @@ export async function getTasksByStatus(
     supabase: SupabaseClient<Database>,
     status: TaskStatus
 ): Promise<{ data: TaskRow[] | null; error: Error | null }> {
-    const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('status', status)
-        .order('created_at', { ascending: false })
+    let query = supabase.from('tasks').select('*').eq('status', status)
 
+    if (status === 'waiting') {
+        query = query.order('due_at', { ascending: true, nullsFirst: false })
+    } else {
+        query = query.order('created_at', { ascending: false })
+    }
+
+    const { data, error } = await query
     return { data, error }
 }
 

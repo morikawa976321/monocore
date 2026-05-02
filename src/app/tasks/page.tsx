@@ -192,7 +192,16 @@ export default function TasksPage() {
         }
 
         if (activeTab === 'waiting') {
-            setTasks((prev) => [createdTask, ...prev]);
+            setTasks((prev) => {
+                const newDue = createdTask.due_at;
+                const insertIndex = prev.findIndex((t) => {
+                    if (t.due_at === null) return true;
+                    if (newDue === null) return false;
+                    return t.due_at >= newDue;
+                });
+                const index = insertIndex === -1 ? prev.length : insertIndex;
+                return [...prev.slice(0, index), createdTask, ...prev.slice(index)];
+            });
         }
         setNewTaskText('');
         setNewDueInput('');
