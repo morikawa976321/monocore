@@ -421,9 +421,9 @@ export default function KnowledgePage() {
                                                 type="button"
                                                 color="ghost"
                                                 size="md"
-                                                onClick={() => {
-                                                    if (selectedId) void deleteKnowledgeItem(selectedId);
-                                                    closeDetail();
+                                                onClick={async () => {
+                                                    await closeDetail();
+                                                    if (selectedId) await deleteKnowledgeItem(selectedId);
                                                 }}
                                                 aria-label="Knowledgeを削除"
                                             >

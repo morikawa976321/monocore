@@ -421,9 +421,9 @@ export default function ProjectsPage() {
                                                 type="button"
                                                 color="ghost"
                                                 size="md"
-                                                onClick={() => {
-                                                    if (selectedId) void deleteProjectItem(selectedId);
-                                                    closeDetail();
+                                                onClick={async () => {
+                                                    await closeDetail();
+                                                    if (selectedId) await deleteProjectItem(selectedId);
                                                 }}
                                                 aria-label="Projectを削除"
                                             >
