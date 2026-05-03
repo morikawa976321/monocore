@@ -472,7 +472,7 @@ export default function TasksPage() {
                         )}
                         <div className="flex items-center justify-end gap-2">
                             <Button
-                                color="ghost"
+                                color="secondary"
                                 onClick={() => setArchiveTargetId(null)}
                             >
                                 キャンセル

@@ -24,7 +24,6 @@ AIコーディングエージェントは、本ガイドラインに記載され
   - `text-neutral-500` は無効状態やプレースホルダーなど、非アクティブ情報に限定する。
 - **操作要素の制約**:
   - クリック可能要素（`button`, `a`, メニュー項目）は、未操作時でも背景または境界と識別できること。
-  - Ghostボタンでも `hover:bg-neutral-200 dark:hover:bg-neutral-800` を基本とし、視覚的な操作可能性を担保すること。
   - Active/Selected状態は、通常状態より明確に1段以上コントラストを上げること（背景・文字・枠線のいずれか、推奨は複合）。
 
 ## 3. カラーパレット（Light / Dark）
@@ -99,10 +98,6 @@ AIエージェントは、以下のクラスの組み合わせルールにのみ
 - **Secondary Button**
   - Light: `bg-neutral-200 border border-neutral-300 text-neutral-900 hover:bg-neutral-300`
   - Dark: `dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-50 dark:hover:bg-neutral-700`
-  - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`
-- **Ghost Button**
-  - Light: `bg-transparent text-neutral-800 hover:bg-neutral-200 hover:text-neutral-900`
-  - Dark: `dark:bg-transparent dark:text-neutral-200 dark:hover:bg-neutral-800 dark:hover:text-neutral-50`
   - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`
 - **Surface / Card / Dialog**
   - Light: `bg-neutral-50 border border-neutral-200`

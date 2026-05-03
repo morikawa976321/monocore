@@ -90,7 +90,6 @@ Reference: `README.md` (development rules), `docs/directory_structure.md` (codin
   - Disabled: `text-neutral-500` only for inactive states and placeholders.
 - **Interactive element visibility:**
   - Clickable elements (`button`, `a`, menu items) must be visually identifiable even at rest (via text/background/border contrast).
-  - Ghost buttons should keep clear hover affordance: `hover:bg-neutral-200 dark:hover:bg-neutral-800`.
   - Active/selected states must raise contrast by at least one step versus default (prefer combining background + text and/or border changes).
 
 ### Palette (always with dark:)
@@ -104,7 +103,6 @@ Reference: `README.md` (development rules), `docs/directory_structure.md` (codin
 
 - **Primary button:** `bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400`.
 - **Secondary button:** `bg-neutral-200 border border-neutral-300 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-50 dark:hover:bg-neutral-700` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`.
-- **Ghost button:** `bg-transparent text-neutral-800 hover:bg-neutral-200 hover:text-neutral-900 dark:bg-transparent dark:text-neutral-200 dark:hover:bg-neutral-800 dark:hover:text-neutral-50` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`.
 - **Surface / card / dialog:** `bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800` + `rounded p-4` or `p-6`.
 - **Input / textarea:** `bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400` + dark variants (`dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600`) + `px-3 py-2 text-sm rounded-sm outline-none transition-colors`.
 
@@ -114,8 +112,8 @@ Reference: `README.md` (development rules), `docs/directory_structure.md` (codin
 - Keep `className` for layout-only concerns (e.g. `w-full`, `ml-auto`, `sm:hidden`, `fixed`, `z-10`).
 - Do not override visual tokens via `className` (`bg-*`, `text-*`, `px-*`, `py-*`, `rounded-*`, `focus-visible:ring-*`) unless there is an explicit approved exception.
 - If the same visual exception appears 3+ times, add a new `color`/`size` variant in `Button` instead of repeating local overrides.
-- Keep semantic emphasis consistent: one `primary` action per view; use `secondary`/`ghost` for the rest.
-- Required variants: `color` = `primary | secondary | ghost`, `size` = `sm | md`.
+- Keep semantic emphasis consistent: one `primary` action per view; use `secondary` for the rest.
+- Required variants: `color` = `primary | secondary`, `size` = `sm | md`.
 
 ### Self-check before submitting
 

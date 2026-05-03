@@ -419,7 +419,7 @@ export default function KnowledgePage() {
                                         {activeTab === 'active' ? (
                                             <Button
                                                 type="button"
-                                                color="ghost"
+                                                color="secondary"
                                                 size="md"
                                                 onClick={async () => {
                                                     await closeDetail();

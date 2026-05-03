@@ -342,7 +342,7 @@ export default function SchedulesPage() {
                 <div className="hidden sm:inline-flex">
                     <Button
                         onClick={handleInboxToggle}
-                        color={inboxOpen ? 'secondary' : 'ghost'}
+                        color='secondary'
                         size="md"
                         disabled={isEditLocked}
                         aria-label={inboxOpen ? 'Inboxを閉じる' : 'Inboxを開く'}
@@ -357,7 +357,7 @@ export default function SchedulesPage() {
             <div className="flex-1 overflow-hidden relative">
                 <Button
                     onClick={handleInboxToggle}
-                    color={inboxOpen ? 'secondary' : 'ghost'}
+                    color='secondary'
                     size="md"
                     disabled={isEditLocked}
                     className="sm:hidden fixed right-4 bottom-4 p-0 rounded"

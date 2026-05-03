@@ -19,7 +19,7 @@ export function PageHeader({ title, onRefresh, children }: PageHeaderProps) {
             <div className="flex h-9 items-center justify-end gap-2">
                 {onRefresh && (
                     <Button
-                        color="ghost"
+                        color="secondary"
                         onClick={() => void onRefresh()}
                         aria-label="再読み込み"
                         title="最新の状態に更新"
