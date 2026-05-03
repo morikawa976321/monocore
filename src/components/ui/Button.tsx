@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes } from 'react';
 
-type ButtonColor = 'primary' | 'secondary';
+type ButtonColor = 'primary' | 'secondary' | 'danger';
 type ButtonSize = 'sm' | 'md';
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -16,6 +16,8 @@ const colorClassNames: Record<ButtonColor, string> = {
         'border-2 border-amber-700 bg-amber-500 text-neutral-50 hover:border-amber-800 hover:bg-amber-600 dark:border-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:border-amber-500 dark:hover:bg-amber-400 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400',
     secondary:
         'border-2 border-neutral-600 bg-neutral-50 text-neutral-900 hover:border-neutral-700 hover:bg-neutral-200 dark:border-neutral-500 dark:bg-neutral-900 dark:text-neutral-50 dark:hover:border-neutral-400 dark:hover:bg-neutral-800 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500',
+    danger:
+        'border-2 border-red-700 bg-neutral-50 text-red-700 hover:bg-neutral-100 hover:border-red-900 hover:text-red-900 dark:border-red-700 dark:bg-neutral-900 dark:text-red-500 dark:hover:bg-neutral-800 dark:hover:border-red-600 dark:hover:text-red-00 focus-visible:ring-red-700 dark:focus-visible:ring-red-500',
 };
 
 const sizeClassNames: Record<ButtonSize, string> = {

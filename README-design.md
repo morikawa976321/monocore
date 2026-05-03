@@ -27,7 +27,7 @@ AIコーディングエージェントは、本ガイドラインに記載され
   - Active/Selected状態は、通常状態より明確に1段以上コントラストを上げること（背景・文字・枠線のいずれか、推奨は複合）。
 
 ## 3. カラーパレット（Light / Dark）
-使用できる色は以下の**ニュートラル（Neutral）系、アクセントのアンバー（Amber）、および透明（transparent）のみ**とする。現時点での独自色の追加は禁止。
+使用できる色は以下の**ニュートラル（Neutral）系、アクセントのアンバー（Amber）、破壊操作のアクセントのレッド（Red）、および透明（transparent）のみ**とする。現時点での独自色の追加は禁止。
 常に `dark:` バリアントを併記し、ダークモードに対応させること。
 
 - **背景 (Background / Surface)**
@@ -99,6 +99,10 @@ AIエージェントは、以下のクラスの組み合わせルールにのみ
   - Light: `bg-neutral-200 border border-neutral-300 text-neutral-900 hover:bg-neutral-300`
   - Dark: `dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-50 dark:hover:bg-neutral-700`
   - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`
+- **Danger Button**
+  - Light: `bg-neutral-50 border border-red-800 text-red-800 hover:bg-neutral-100 hover:border-red-900 hover:text-red-900`
+  - Dark: `dark:bg-neutral-900 dark:border-red-700 dark:text-red-400 dark:hover:bg-neutral-800 dark:hover:border-red-600 dark:hover:text-red-300`
+  - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-700 dark:focus-visible:ring-red-500`
 - **Surface / Card / Dialog**
   - Light: `bg-neutral-50 border border-neutral-200`
   - Dark: `dark:bg-neutral-900 dark:border-neutral-800`
@@ -130,6 +134,6 @@ AIエージェントは、以下のクラスの組み合わせルールにのみ
 1. `shadow` で始まるクラスが一つもないか？
 2. `[ ]` を使った任意値の Tailwind クラス指定がないか？
 3. `rounded-md` 以上の大きな角丸が使用されていないか？
-4. 色指定に **`neutral`, `amber`, `transparent` 以外が含まれていないか？（`white`, `black`, `slate` 等はすべて禁止）**
+4. 色指定に **`neutral`, `amber`, `red`, `transparent` 以外が含まれていないか？（`white`, `black`, `slate` 等はすべて禁止）**
 5. `dark:` の指定が漏れていないか？
 6. アニメーションに `animate-*` などの装飾的クラスが使われていないか？

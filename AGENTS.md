@@ -103,6 +103,7 @@ Reference: `README.md` (development rules), `docs/directory_structure.md` (codin
 
 - **Primary button:** `bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400`.
 - **Secondary button:** `bg-neutral-200 border border-neutral-300 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-50 dark:hover:bg-neutral-700` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`.
+- **Danger button:** `bg-neutral-50 border border-red-800 text-red-800 hover:bg-neutral-100 hover:border-red-900 hover:text-red-900 dark:bg-neutral-900 dark:border-red-700 dark:text-red-400 dark:hover:bg-neutral-800 dark:hover:border-red-600 dark:hover:text-red-300` + `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-700 dark:focus-visible:ring-red-500`.
 - **Surface / card / dialog:** `bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800` + `rounded p-4` or `p-6`.
 - **Input / textarea:** `bg-neutral-50 border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400` + dark variants (`dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600`) + `px-3 py-2 text-sm rounded-sm outline-none transition-colors`.
 
@@ -113,14 +114,14 @@ Reference: `README.md` (development rules), `docs/directory_structure.md` (codin
 - Do not override visual tokens via `className` (`bg-*`, `text-*`, `px-*`, `py-*`, `rounded-*`, `focus-visible:ring-*`) unless there is an explicit approved exception.
 - If the same visual exception appears 3+ times, add a new `color`/`size` variant in `Button` instead of repeating local overrides.
 - Keep semantic emphasis consistent: one `primary` action per view; use `secondary` for the rest.
-- Required variants: `color` = `primary | secondary`, `size` = `sm | md`.
+- Required variants: `color` = `primary | secondary | danger`, `size` = `sm | md`.
 
 ### Self-check before submitting
 
 1. No `shadow*` classes.
 2. No `[ ]` arbitrary Tailwind values.
 3. No `rounded-md` or larger (except `rounded-full` where needed).
-4. Only `neutral`, `amber`, `transparent` for color; no `white`, `black`, `slate`, etc.
+4. Only `neutral`, `amber`, `red`, `transparent` for color; no `white`, `black`, `slate`, etc.
 5. Every color/layout has `dark:` where applicable.
 6. No decorative `animate-*` classes.
 

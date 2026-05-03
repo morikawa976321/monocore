@@ -419,7 +419,7 @@ export default function ProjectsPage() {
                                         {activeTab === 'active' ? (
                                             <Button
                                                 type="button"
-                                                color="secondary"
+                                                color="danger"
                                                 size="md"
                                                 onClick={async () => {
                                                     await closeDetail();
