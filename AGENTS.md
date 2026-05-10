@@ -121,7 +121,7 @@ Reference: `README.md` (development rules), `docs/directory_structure.md` (codin
 1. No `shadow*` classes.
 2. No `[ ]` arbitrary Tailwind values.
 3. No `rounded-md` or larger (except `rounded-full` where needed).
-4. Only `neutral`, `amber`, `red`, `transparent` for color; no `white`, `black`, `slate`, etc.
+4. Only `neutral`, `amber`, `red`, `transparent` for color (red is ONLY for cancellation confirmation or fatal errors); no `white`, `black`, `slate`, etc.
 5. Every color/layout has `dark:` where applicable.
 6. No decorative `animate-*` classes.
 
