@@ -18,6 +18,7 @@ import {
     type DayEntry,
 } from '@/src/lib/schedules/text-format';
 import { Inbox } from 'lucide-react';
+import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { PageHeader } from '@/src/components/layout/PageHeader';
 
 /** スケジュール一覧・編集ページ。双方向無限スクロール対応。 */
@@ -65,7 +66,7 @@ export default function SchedulesPage() {
     const todaySectionRef = useRef<HTMLElement>(null);
     const { inboxOpen, setInboxOpen, inboxContent, updateInboxContent, saveInboxNow, hasPendingChanges } =
         useInbox(supabase);
-    const isEditLocked = isInitialSyncing || isResumeSyncing;
+    const isEditLocked = isInitialSyncing;
 
     // --- 初回（クライアントのみ）: 日付確定 → entries 生成 → DB fetch → 今日へスクロール ---
     useEffect(() => {
@@ -338,7 +339,14 @@ export default function SchedulesPage() {
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             {/* Header */}
-            <PageHeader title="Schedules" onRefresh={() => void reloadSchedules()}>
+            <PageHeader
+                title="Schedules"
+                onRefresh={() => void reloadSchedules()}
+                isRefreshing={isResumeSyncing}
+            >
+                {isInitialSyncing && (
+                    <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
+                )}
                 <div className="hidden sm:inline-flex">
                     <Button
                         onClick={handleInboxToggle}
@@ -378,7 +386,7 @@ export default function SchedulesPage() {
                     {/* 過去方向ローディング */}
                     {loadingTop && (
                         <div className="flex justify-center py-2">
-                            <span className="text-sm leading-6 text-neutral-500">Loading...</span>
+                            <LoadingIndicator />
                         </div>
                     )}
 
@@ -413,7 +421,7 @@ export default function SchedulesPage() {
                     {/* 未来方向ローディング */}
                     {loadingBottom && (
                         <div className="flex justify-center py-2">
-                            <span className="text-sm leading-6 text-neutral-500">Loading...</span>
+                            <LoadingIndicator />
                         </div>
                     )}
 
@@ -426,19 +434,12 @@ export default function SchedulesPage() {
                     <InboxPanel
                         content={inboxContent}
                         onContentChange={updateInboxContent}
-                        isReadOnly={isEditLocked}
+                        isReadOnly={isInitialSyncing}
                         onClose={() => {
                             saveInboxNow();
                             setInboxOpen(false);
                         }}
                     />
-                )}
-                {isEditLocked && (
-                    <div className="absolute inset-0 z-20 bg-neutral-200 dark:bg-neutral-900 opacity-80 flex items-center justify-center">
-                        <p className="text-sm text-neutral-900 dark:text-neutral-50 font-medium">
-                            同期中...
-                        </p>
-                    </div>
                 )}
             </div>
         </div>

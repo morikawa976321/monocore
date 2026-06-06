@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { PageHeader } from '@/src/components/layout/PageHeader';
+import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { createClient } from '@/src/lib/supabase/client';
 import {
     applyDueTaskUnarchives,
@@ -61,7 +62,7 @@ const TABS: { status: TaskStatus; label: string }[] = [
 // メインページ
 // ---------------------------------------------------------------------------
 export default function TasksPage() {
-    const [tasks, setTasks] = useState<Task[]>([]);
+    const [tasksByTab, setTasksByTab] = useState<Partial<Record<TaskStatus, Task[]>>>({});
     const [activeTab, setActiveTab] = useState<TaskStatus>('waiting');
     const [isAdding, setIsAdding] = useState(false);
     const [mobileKeyboardOffset, setMobileKeyboardOffset] = useState(0);
@@ -72,27 +73,46 @@ export default function TasksPage() {
     const [unarchiveAt, setUnarchiveAt] = useState('');
     const [unarchiveInput, setUnarchiveInput] = useState('');
     const [unarchiveInputError, setUnarchiveInputError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [crudError, setCrudError] = useState('');
     const fetchSeqRef = useRef(0);
+    const loadedTabsRef = useRef<Partial<Record<TaskStatus, boolean>>>({});
 
     const supabase = useMemo(createClient, []);
-    const visibleTasks = tasks;
+    const visibleTasks = tasksByTab[activeTab] ?? [];
     const isDueInputValid = newDueInput.trim() === '' || parseDueInput(newDueInput.trim()) !== null;
     const isUnarchiveInputValid = unarchiveInput.trim() === '' || parseDueInput(unarchiveInput.trim()) !== null;
+
+    const updateTasksForTab = useCallback(
+        (tab: TaskStatus, updater: (prev: Task[]) => Task[]) => {
+            setTasksByTab((prev) => ({
+                ...prev,
+                [tab]: updater(prev[tab] ?? []),
+            }));
+        },
+        []
+    );
 
     const fetchTasksList = useCallback(() => {
         const fetchSeq = ++fetchSeqRef.current;
         let isSubscribed = true;
-        setIsLoading(true);
+        const isInitial = !loadedTabsRef.current[activeTab];
+        if (isInitial) {
+            setIsInitialLoading(true);
+        } else {
+            setIsRefreshing(true);
+        }
         setCrudError('');
 
         void (async () => {
-            const { error: unarchiveError } = await applyDueTaskUnarchives(supabase);
-            if (!isSubscribed) return;
-            if (fetchSeqRef.current !== fetchSeq) return;
-            if (unarchiveError) {
-                setCrudError('期限付きアーカイブの自動解除に失敗しました');
+            if (activeTab === 'waiting') {
+                const { error: unarchiveError } = await applyDueTaskUnarchives(supabase);
+                if (!isSubscribed) return;
+                if (fetchSeqRef.current !== fetchSeq) return;
+                if (unarchiveError) {
+                    setCrudError('期限付きアーカイブの自動解除に失敗しました');
+                }
             }
 
             const { data, error } = await getTasksByStatus(supabase, activeTab);
@@ -100,15 +120,21 @@ export default function TasksPage() {
             if (fetchSeqRef.current !== fetchSeq) return;
             if (error) {
                 setCrudError('タスクの取得に失敗しました');
-                setTasks([]);
-                setIsLoading(false);
+                if (isInitial) {
+                    setTasksByTab((prev) => ({ ...prev, [activeTab]: [] }));
+                }
+                loadedTabsRef.current[activeTab] = true;
+                setIsInitialLoading(false);
+                setIsRefreshing(false);
                 return;
             }
             const normalizedTasks = (data ?? [])
                 .map(toTaskOrNull)
                 .filter((task): task is Task => task !== null);
-            setTasks(normalizedTasks);
-            setIsLoading(false);
+            loadedTabsRef.current[activeTab] = true;
+            setTasksByTab((prev) => ({ ...prev, [activeTab]: normalizedTasks }));
+            setIsInitialLoading(false);
+            setIsRefreshing(false);
         })();
 
         return () => {
@@ -192,7 +218,7 @@ export default function TasksPage() {
         }
 
         if (activeTab === 'waiting') {
-            setTasks((prev) => {
+            updateTasksForTab('waiting', (prev) => {
                 const newDue = createdTask.due_at;
                 const insertIndex = prev.findIndex((t) => {
                     if (t.due_at === null) return true;
@@ -221,7 +247,10 @@ export default function TasksPage() {
             setCrudError('タスクの更新に失敗しました');
             return false;
         }
-        setTasks((prev) => prev.filter((t) => t.id !== id));
+        setTasksByTab((prev) => ({
+            ...prev,
+            [activeTab]: (prev[activeTab] ?? []).filter((t) => t.id !== id),
+        }));
         setCrudError('');
         return true;
     }
@@ -232,7 +261,7 @@ export default function TasksPage() {
 
     // タスク本文をクリップボードへコピーする。成功時のみ true。
     async function copyTask(id: string): Promise<boolean> {
-        const sourceTask = tasks.find((task) => task.id === id);
+        const sourceTask = visibleTasks.find((task) => task.id === id);
         if (!sourceTask) {
             setCrudError('コピー元タスクが見つかりません');
             return false;
@@ -299,7 +328,7 @@ export default function TasksPage() {
             setCrudError('更新後のタスク形式が不正です');
             return false;
         }
-        setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+        updateTasksForTab(activeTab, (prev) => prev.map((t) => (t.id === id ? updated : t)));
         setCrudError('');
         return true;
     }
@@ -307,7 +336,11 @@ export default function TasksPage() {
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             {/* Header */}
-            <PageHeader title="Tasks" onRefresh={() => void fetchTasksList()}>
+            <PageHeader
+                title="Tasks"
+                onRefresh={() => void fetchTasksList()}
+                isRefreshing={isRefreshing}
+            >
                 <div className="hidden sm:inline-flex justify-end">
                     {activeTab === 'waiting' ? (
                         <Button
@@ -400,16 +433,20 @@ export default function TasksPage() {
                         {crudError}
                     </div>
                 )}
-                {isLoading ? (
-                    <div className="flex items-center justify-center h-32 text-neutral-500 dark:text-neutral-500 text-sm">
-                        読み込み中...
+                {isInitialLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                        <LoadingIndicator size="md" />
                     </div>
                 ) : visibleTasks.length === 0 ? (
                     <div className="flex items-center justify-center h-32 text-neutral-500 dark:text-neutral-500 text-sm">
                         タスクはありません
                     </div>
                 ) : (
-                    <ul
+                    <>
+                        {isRefreshing && (
+                            <p className="px-2 sm:px-6 py-2 text-sm text-neutral-700 dark:text-neutral-300">更新中…</p>
+                        )}
+                        <ul
                         className={[
                             'px-2 sm:px-2 pb-2 sm:pb-2 space-y-2 sm:space-y-2',
                             isAdding ? 'pt-2 sm:pt-0' : 'pt-2 sm:pt-2',
@@ -428,6 +465,7 @@ export default function TasksPage() {
                             />
                         ))}
                     </ul>
+                    </>
                 )}
             </div>
 

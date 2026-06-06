@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { createClient } from '@/src/lib/supabase/client'
+import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 
 const ERROR_MESSAGES: Record<string, string> = {
     invalid_or_expired_link:
@@ -94,7 +95,7 @@ export function LoginClient({ initialErrorCode }: LoginClientProps) {
                             disabled={loading || !email.trim()}
                             className="w-full px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400 disabled:opacity-40"
                         >
-                            {loading ? '送信中...' : 'ログインリンクを送信'}
+                            {loading ? <LoadingIndicator label="送信中" /> : 'ログインリンクを送信'}
                         </button>
                     </form>
                 )}

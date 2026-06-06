@@ -2,12 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
 type KnowledgeRow = Database['public']['Tables']['knowledge']['Row']
-type KnowledgeInsert = Database['public']['Tables']['knowledge']['Insert']
 
-export type KnowledgeListRow = Pick<KnowledgeRow, 'id' | 'title' | 'created_at' | 'updated_at'>
+export type KnowledgeListRow = Pick<
+    KnowledgeRow,
+    'id' | 'title' | 'created_at' | 'updated_at' | 'sort_order'
+>
 
 /**
- * 一覧（body は取得しない）。更新日時の新しい順。
+ * 一覧（body は取得しない）。sort_order 昇順（ユーザー定義順）。
  */
 export async function listKnowledge(
     supabase: SupabaseClient<Database>,
@@ -15,8 +17,8 @@ export async function listKnowledge(
 ): Promise<{ data: KnowledgeListRow[] | null; error: Error | null }> {
     const query = supabase
         .from('knowledge')
-        .select('id, title, created_at, updated_at')
-        .order('updated_at', { ascending: false })
+        .select('id, title, created_at, updated_at, sort_order')
+        .order('sort_order', { ascending: true })
 
     if (!includeDeleted) {
         query.is('deleted_at', null)
@@ -40,14 +42,13 @@ export async function getKnowledgeById(
         .from('knowledge')
         .select('*')
         .eq('id', id)
-        .is('deleted_at', null)
         .maybeSingle()
 
     return { data, error }
 }
 
 /**
- * 新規作成。title は DB トリガーが body から設定する。
+ * 新規作成。title / sort_order は DB トリガーが設定する。
  */
 export async function createKnowledge(
     supabase: SupabaseClient<Database>,
@@ -98,4 +99,24 @@ export async function deleteKnowledge(
         .maybeSingle()
 
     return { data, error }
+}
+
+/**
+ * 一覧順を更新。orderedIds の index が新しい sort_order。
+ */
+export async function reorderKnowledge(
+    supabase: SupabaseClient<Database>,
+    orderedIds: string[]
+): Promise<{ error: Error | null }> {
+    const updates = orderedIds.map((id, index) =>
+        supabase
+            .from('knowledge')
+            .update({ sort_order: index })
+            .eq('id', id)
+            .is('deleted_at', null)
+    )
+
+    const results = await Promise.all(updates)
+    const failed = results.find((r) => r.error)
+    return { error: failed?.error ?? null }
 }

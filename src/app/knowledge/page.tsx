@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
+import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { PageHeader } from '@/src/components/layout/PageHeader';
+import { SortableResourceGrid } from '@/src/components/resource/SortableResourceGrid';
 import { createClient } from '@/src/lib/supabase/client';
 import { useAddKnowledgeDraftAutosave, useKnowledge } from '@/src/hooks/useKnowledge';
 
@@ -33,7 +35,8 @@ export default function KnowledgePage() {
     const [activeTab, setActiveTab] = useState<TabKey>('active');
     const {
         list,
-        listLoading,
+        listInitialLoading,
+        isRefreshing,
         listError,
         selectedId,
         setSelectedId,
@@ -47,6 +50,7 @@ export default function KnowledgePage() {
         deleteKnowledgeItem,
         hasPendingChanges: detailHasPendingChanges,
         fetchList,
+        reorderList,
     } = useKnowledge(supabase);
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -155,6 +159,24 @@ export default function KnowledgePage() {
             saveDraftNow,
             shouldDiscardNewKnowledgeDraft,
         ]
+    );
+
+    const handleSelectItem = useCallback(
+        (id: string) => {
+            if (isAddModalOpen) {
+                void finalizeAddModal({ afterCloseSelectId: id });
+            } else {
+                setSelectedId(id);
+            }
+        },
+        [finalizeAddModal, isAddModalOpen, setSelectedId]
+    );
+
+    const handleReorder = useCallback(
+        (orderedIds: string[]) => {
+            void reorderList(orderedIds);
+        },
+        [reorderList]
     );
 
     /** 開くときは詳細を保存して閉じてから初期本文を入れる。閉じるときは finalizeAddModal（保存または破棄）。 */
@@ -266,7 +288,11 @@ export default function KnowledgePage() {
 
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
-            <PageHeader title="Knowledge" onRefresh={() => void fetchListWithTab()}>
+            <PageHeader
+                title="Knowledge"
+                onRefresh={() => void fetchListWithTab()}
+                isRefreshing={isRefreshing}
+            >
                 <div className="hidden sm:inline-flex">
                     {activeTab === 'active' ? (
                         <Button color="primary" onClick={() => toggleAddModal()} className="h-9">
@@ -307,30 +333,20 @@ export default function KnowledgePage() {
                             {listError.message}
                         </p>
                     )}
-                    {listLoading ? (
-                        <p className="text-sm text-neutral-700 dark:text-neutral-300">読み込み中…</p>
+                    {listInitialLoading ? (
+                        <LoadingIndicator className="inline-flex items-center justify-center py-2" />
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-2">
-                            {list.map((item) => (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    title={item.title}
-                                    onClick={() => {
-                                        if (isAddModalOpen) {
-                                            void finalizeAddModal({ afterCloseSelectId: item.id });
-                                        } else {
-                                            setSelectedId(item.id);
-                                        }
-                                    }}
-                                    className="min-w-0 w-full rounded border border-neutral-400 bg-neutral-50 p-1 text-left transition-colors duration-150 ease-in-out hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-900 dark:border-neutral-600 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:focus-visible:ring-neutral-50 sm:p-2"
-                                >
-                                    <p className="truncate text-sm leading-6 text-neutral-900 dark:text-neutral-50 sm:text-base sm:leading-7">
-                                        {item.title}
-                                    </p>
-                                </button>
-                            ))}
-                        </div>
+                        <>
+                            {isRefreshing && (
+                                <p className="mb-2 text-sm text-neutral-700 dark:text-neutral-300">更新中…</p>
+                            )}
+                            <SortableResourceGrid
+                                items={list}
+                                onSelect={handleSelectItem}
+                                onReorder={handleReorder}
+                                disabled={activeTab !== 'active' || overlayOpen}
+                            />
+                        </>
                     )}
                 </div>
 
@@ -401,18 +417,33 @@ export default function KnowledgePage() {
                                                 {detailError.message}
                                             </p>
                                         )}
-                                        {detailLoading ? (
-                                            <p className="text-sm text-neutral-700 dark:text-neutral-300">読み込み中…</p>
-                                        ) : detail ? (
-                                            <textarea
-                                                key={detail.id}
-                                                defaultValue={detail.body}
-                                                onChange={(e) => updateKnowledgeBody(e.target.value)}
-                                                className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
-                                                spellCheck={false}
-                                                autoComplete="off"
-                                                autoCorrect="off"
-                                            />
+                                        {detail ? (
+                                            <>
+                                                <p className="mb-2 truncate text-base font-medium text-neutral-900 dark:text-neutral-50">
+                                                    {detail.title}
+                                                </p>
+                                                {detail.deleted_at != null && (
+                                                    <p className="mb-2 text-sm text-neutral-700 dark:text-neutral-300">
+                                                        削除済み
+                                                    </p>
+                                                )}
+                                                {detailLoading ? (
+                                                    <LoadingIndicator className="inline-flex items-center justify-center py-2" />
+                                                ) : (
+                                                    <textarea
+                                                        key={detail.id}
+                                                        defaultValue={detail.body}
+                                                        onChange={(e) => updateKnowledgeBody(e.target.value)}
+                                                        readOnly={detail.deleted_at != null}
+                                                        className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
+                                                        spellCheck={false}
+                                                        autoComplete="off"
+                                                        autoCorrect="off"
+                                                    />
+                                                )}
+                                            </>
+                                        ) : detailLoading ? (
+                                            <LoadingIndicator className="inline-flex items-center justify-center py-2" />
                                         ) : null}
                                     </div>
                                     <div className="flex shrink-0 justify-between border-t border-neutral-200 px-2 py-2 dark:border-neutral-800">
