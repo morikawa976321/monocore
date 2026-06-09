@@ -419,9 +419,6 @@ export default function ProjectsPage() {
                                         )}
                                         {detail ? (
                                             <>
-                                                <p className="mb-2 truncate text-base font-medium text-neutral-900 dark:text-neutral-50">
-                                                    {detail.title}
-                                                </p>
                                                 {detail.deleted_at != null && (
                                                     <p className="mb-2 text-sm text-neutral-700 dark:text-neutral-300">
                                                         削除済み
