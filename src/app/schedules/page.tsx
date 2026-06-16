@@ -345,7 +345,10 @@ export default function SchedulesPage() {
                 isRefreshing={isResumeSyncing}
             >
                 {isInitialSyncing && (
-                    <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
+                    <div className="inline-flex items-center gap-2">
+                        <LoadingIndicator />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
+                    </div>
                 )}
                 <div className="hidden sm:inline-flex">
                     <Button
@@ -428,6 +431,15 @@ export default function SchedulesPage() {
                     {/* 下端 sentinel */}
                     <div ref={bottomSentinelRef} />
                 </div>
+
+                {isInitialSyncing && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-100/80 dark:bg-neutral-950/80">
+                        <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 rounded p-4">
+                            <LoadingIndicator />
+                            <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
+                        </div>
+                    </div>
+                )}
 
                 {/* Inbox panel */}
                 {inboxOpen && (
