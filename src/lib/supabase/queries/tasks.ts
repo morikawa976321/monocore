@@ -115,3 +115,19 @@ export async function updateTaskContent(
 
     return { data, error }
 }
+
+/** 期限が指定時刻より前の未完了タスクを取得する(期限切れ+今日期限)。 */
+export async function getDueTasks(
+    supabase: SupabaseClient<Database>,
+    dueBeforeUtc: string
+): Promise<{ data: TaskRow[] | null; error: Error | null }> {
+    const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('status', 'waiting')
+        .not('due_at', 'is', null)
+        .lt('due_at', dueBeforeUtc)
+        .order('due_at', { ascending: true })
+
+    return { data, error }
+}
