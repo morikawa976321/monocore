@@ -7,12 +7,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/src/types/database.types';
 import {
     createKnowledge as insertKnowledge,
-    deleteKnowledge,
     getKnowledgeById,
     listKnowledge,
     reorderKnowledge,
     updateKnowledge,
+    updateKnowledgeStatus,
     type KnowledgeListRow,
+    type KnowledgeStatus,
 } from '@/src/lib/supabase/queries/knowledge';
 import { applyReorderToList } from '@/src/lib/resource/reorder';
 
@@ -36,16 +37,16 @@ type UseKnowledgeReturn = {
     saveKnowledgeNow: () => void;
     addKnowledge: (body: string) => Promise<{ data: KnowledgeRow | null; error: Error | null }>;
     saveKnowledgeBodyForId: (id: string, body: string) => Promise<boolean>;
-    deleteKnowledgeItem: (id: string) => Promise<boolean>;
+    updateKnowledgeStatusItem: (id: string, status: KnowledgeStatus) => Promise<boolean>;
     hasPendingChanges: boolean;
-    fetchList: (includeDeleted?: boolean) => Promise<void>;
+    fetchList: (status: KnowledgeStatus) => Promise<void>;
     reorderList: (orderedIds: string[]) => Promise<boolean>;
 };
 
 /** 連続入力時の DB 更新間隔（ms）。 */
 const SAVE_DEBOUNCE_MS = 500;
 
-function listRowToDetailPlaceholder(row: KnowledgeListRow, isDeletedList: boolean): KnowledgeRow {
+function listRowToDetailPlaceholder(row: KnowledgeListRow): KnowledgeRow {
     return {
         id: row.id,
         title: row.title,
@@ -53,7 +54,9 @@ function listRowToDetailPlaceholder(row: KnowledgeListRow, isDeletedList: boolea
         created_at: row.created_at,
         updated_at: row.updated_at,
         sort_order: row.sort_order,
-        deleted_at: isDeletedList ? row.updated_at : null,
+        status: row.status,
+        status_changed_at: row.status_changed_at,
+        updated_by: 'user',
         user_id: '',
     };
 }
@@ -65,7 +68,7 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     const [listError, setListError] = useState<Error | null>(null);
     const listRef = useRef(list);
     listRef.current = list;
-    const lastIncludeDeletedRef = useRef(false);
+    const lastStatusRef = useRef<KnowledgeStatus>('active');
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [detail, setDetail] = useState<KnowledgeRow | null>(null);
@@ -79,8 +82,8 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     const bodyRef = useRef('');
     /** getKnowledgeById が完了し、編集してよい行か判定する。 */
     const lastLoadedIdRef = useRef<string | null>(null);
-    /** 詳細が論理削除済みなら保存・編集をスキップする。 */
-    const isDetailDeletedRef = useRef(false);
+    /** 詳細が利用中でなければ保存・編集をスキップする。 */
+    const isDetailReadOnlyRef = useRef(false);
     /** 非同期 update 完了時、もう別行を見ていれば detail を上書きしない。 */
     const selectedIdRef = useRef<string | null>(null);
     const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,12 +136,12 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     const saveKnowledgeNow = useCallback(() => {
         clearSaveDebounce();
         const id = selectedId;
-        if (!id || lastLoadedIdRef.current !== id || isDetailDeletedRef.current) return;
+        if (!id || lastLoadedIdRef.current !== id || isDetailReadOnlyRef.current) return;
         void persistKnowledge(id, bodyRef.current);
     }, [clearSaveDebounce, persistKnowledge, selectedId]);
 
-    const fetchList = useCallback(async (includeDeleted: boolean = false) => {
-        lastIncludeDeletedRef.current = includeDeleted;
+    const fetchList = useCallback(async (status: KnowledgeStatus) => {
+        lastStatusRef.current = status;
         const isInitial = listRef.current.length === 0;
         if (isInitial) {
             setListInitialLoading(true);
@@ -147,7 +150,7 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
         }
         setListError(null);
         // body は取らず、sort_order 昇順（クエリ側の仕様）
-        const { data, error } = await listKnowledge(supabase, includeDeleted);
+        const { data, error } = await listKnowledge(supabase, status);
         if (error) {
             setListError(error);
             if (isInitial) setList([]);
@@ -162,7 +165,7 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     useEffect(() => {
         if (!selectedId) {
             lastLoadedIdRef.current = null;
-            isDetailDeletedRef.current = false;
+            isDetailReadOnlyRef.current = false;
             setDetail(null);
             setDetailLoading(false);
             setDetailError(null);
@@ -175,12 +178,12 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
         setDetailLoading(true);
         setDetailError(null);
         lastLoadedIdRef.current = null;
-        isDetailDeletedRef.current = false;
+        isDetailReadOnlyRef.current = false;
         bodyRef.current = '';
 
         const listRow = listRef.current.find((row) => row.id === selectedId);
         if (listRow) {
-            setDetail(listRowToDetailPlaceholder(listRow, lastIncludeDeletedRef.current));
+            setDetail(listRowToDetailPlaceholder(listRow));
         } else {
             setDetail(null);
         }
@@ -190,13 +193,13 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
             if (error) {
                 setDetailError(error);
                 setDetail(null);
-                isDetailDeletedRef.current = false;
+                isDetailReadOnlyRef.current = false;
                 setHasPendingChanges(false);
             } else if (data) {
                 setDetail(data);
                 bodyRef.current = data.body;
                 lastLoadedIdRef.current = data.id;
-                isDetailDeletedRef.current = data.deleted_at != null;
+                isDetailReadOnlyRef.current = data.status !== 'active';
                 setHasPendingChanges(false);
             }
             setDetailLoading(false);
@@ -206,11 +209,11 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
             cancelled = true;
             clearSaveDebounce();
             const idToFlush = selectedId;
-            if (lastLoadedIdRef.current === idToFlush && !isDetailDeletedRef.current) {
+            if (lastLoadedIdRef.current === idToFlush && !isDetailReadOnlyRef.current) {
                 void persistKnowledge(idToFlush, bodyRef.current);
             }
             lastLoadedIdRef.current = null;
-            isDetailDeletedRef.current = false;
+            isDetailReadOnlyRef.current = false;
         };
     }, [clearSaveDebounce, persistKnowledge, selectedId, supabase]);
 
@@ -235,7 +238,7 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
                 // 入力途中で未保存の変更がある場合は、上書きを防ぐためリロードしない
                 if (hasPendingChangesRef.current) return;
 
-                void fetchList();
+                void fetchList(lastStatusRef.current);
 
                 const currentSelectedId = selectedIdRef.current;
                 if (currentSelectedId) {
@@ -243,7 +246,7 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
                     setDetailError(null);
                     const listRow = listRef.current.find((row) => row.id === currentSelectedId);
                     if (listRow) {
-                        setDetail(listRowToDetailPlaceholder(listRow, lastIncludeDeletedRef.current));
+                        setDetail(listRowToDetailPlaceholder(listRow));
                     }
                     void getKnowledgeById(supabase, currentSelectedId).then(({ data, error }) => {
                         // ロード中に選択行が変わっていたら無視
@@ -253,13 +256,13 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
                         if (error) {
                             setDetailError(error);
                             setDetail(null);
-                            isDetailDeletedRef.current = false;
+                            isDetailReadOnlyRef.current = false;
                             setHasPendingChanges(false);
                         } else if (data) {
                             setDetail(data);
                             bodyRef.current = data.body;
                             lastLoadedIdRef.current = data.id;
-                            isDetailDeletedRef.current = data.deleted_at != null;
+                            isDetailReadOnlyRef.current = data.status !== 'active';
                             setHasPendingChanges(false);
                         }
                         setDetailLoading(false);
@@ -286,8 +289,8 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     const updateKnowledgeBody = useCallback(
         (value: string) => {
             const id = selectedId;
-            // 取得完了前・削除済みの入力は無視
-            if (!id || lastLoadedIdRef.current !== id || isDetailDeletedRef.current) return;
+            // 取得完了前・利用中以外の入力は無視
+            if (!id || lastLoadedIdRef.current !== id || isDetailReadOnlyRef.current) return;
             setDetail((prev) => (prev ? { ...prev, body: value } : null));
             bodyRef.current = value;
             setHasPendingChanges(true);
@@ -308,12 +311,12 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     const closeDetail = useCallback(async () => {
         clearSaveDebounce();
         const id = selectedId;
-        if (id && lastLoadedIdRef.current === id && !isDetailDeletedRef.current) {
+        if (id && lastLoadedIdRef.current === id && !isDetailReadOnlyRef.current) {
             const ok = await persistKnowledge(id, bodyRef.current);
             if (!ok) return;
         }
         lastLoadedIdRef.current = null;
-        isDetailDeletedRef.current = false;
+        isDetailReadOnlyRef.current = false;
         setHasPendingChanges(false);
         setSelectedId(null);
     }, [clearSaveDebounce, persistKnowledge, selectedId]);
@@ -331,6 +334,8 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
                 created_at: data.created_at,
                 updated_at: data.updated_at,
                 sort_order: data.sort_order,
+                status: data.status,
+                status_changed_at: data.status_changed_at,
             };
             setList((prev) => [listRow, ...prev]);
             return { data, error: null };
@@ -343,9 +348,9 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
         [persistKnowledge]
     );
 
-    const deleteKnowledgeItem = useCallback(
-        async (id: string) => {
-            const { error } = await deleteKnowledge(supabase, id);
+    const updateKnowledgeStatusItem = useCallback(
+        async (id: string, status: KnowledgeStatus) => {
+            const { error } = await updateKnowledgeStatus(supabase, id, status);
             if (error) return false;
             setList((prev) => prev.filter((row) => row.id !== id));
             return true;
@@ -385,7 +390,7 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
         saveKnowledgeNow,
         addKnowledge,
         saveKnowledgeBodyForId,
-        deleteKnowledgeItem,
+        updateKnowledgeStatusItem,
         hasPendingChanges,
         fetchList,
         reorderList,

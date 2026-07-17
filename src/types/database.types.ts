@@ -59,31 +59,37 @@ export type Database = {
         Row: {
           body: string
           created_at: string | null
-          deleted_at: string | null
           id: string
           sort_order: number
+          status: string
+          status_changed_at: string | null
           title: string
           updated_at: string | null
+          updated_by: string
           user_id: string
         }
         Insert: {
           body: string
           created_at?: string | null
-          deleted_at?: string | null
           id?: string
           sort_order?: number
+          status?: string
+          status_changed_at?: string | null
           title?: string
           updated_at?: string | null
+          updated_by?: string
           user_id?: string
         }
         Update: {
           body?: string
           created_at?: string | null
-          deleted_at?: string | null
           id?: string
           sort_order?: number
+          status?: string
+          status_changed_at?: string | null
           title?: string
           updated_at?: string | null
+          updated_by?: string
           user_id?: string
         }
         Relationships: []
@@ -92,31 +98,37 @@ export type Database = {
         Row: {
           body: string
           created_at: string | null
-          deleted_at: string | null
           id: string
           sort_order: number
+          status: string
+          status_changed_at: string | null
           title: string
           updated_at: string | null
+          updated_by: string
           user_id: string
         }
         Insert: {
           body: string
           created_at?: string | null
-          deleted_at?: string | null
           id?: string
           sort_order?: number
+          status?: string
+          status_changed_at?: string | null
           title?: string
           updated_at?: string | null
+          updated_by?: string
           user_id?: string
         }
         Update: {
           body?: string
           created_at?: string | null
-          deleted_at?: string | null
           id?: string
           sort_order?: number
+          status?: string
+          status_changed_at?: string | null
           title?: string
           updated_at?: string | null
+          updated_by?: string
           user_id?: string
         }
         Relationships: []
@@ -129,6 +141,7 @@ export type Database = {
           id: string
           start_at: string
           updated_at: string | null
+          updated_by: string
           user_id: string
         }
         Insert: {
@@ -138,6 +151,7 @@ export type Database = {
           id?: string
           start_at: string
           updated_at?: string | null
+          updated_by?: string
           user_id?: string
         }
         Update: {
@@ -147,6 +161,7 @@ export type Database = {
           id?: string
           start_at?: string
           updated_at?: string | null
+          updated_by?: string
           user_id?: string
         }
         Relationships: []
@@ -159,8 +174,8 @@ export type Database = {
           status: string
           status_changed_at: string | null
           task: string
-          unarchive_at: string | null
           updated_at: string | null
+          updated_by: string
           user_id: string
         }
         Insert: {
@@ -170,8 +185,8 @@ export type Database = {
           status?: string
           status_changed_at?: string | null
           task: string
-          unarchive_at?: string | null
           updated_at?: string | null
+          updated_by?: string
           user_id?: string
         }
         Update: {
@@ -181,8 +196,8 @@ export type Database = {
           status?: string
           status_changed_at?: string | null
           task?: string
-          unarchive_at?: string | null
           updated_at?: string | null
+          updated_by?: string
           user_id?: string
         }
         Relationships: []
@@ -192,9 +207,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      apply_due_task_unarchives: { Args: never; Returns: number }
       replace_schedules_for_day: {
         Args: { p_day_end_utc: string; p_day_start_utc: string; p_items: Json }
+        Returns: undefined
+      }
+      replace_schedules_for_day_as: {
+        Args: {
+          p_day_end_utc: string
+          p_day_start_utc: string
+          p_items: Json
+          p_user_id: string
+        }
         Returns: undefined
       }
     }

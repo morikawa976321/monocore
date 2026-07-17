@@ -2,10 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
 type ProjectRow = Database['public']['Tables']['projects']['Row']
+type ProjectUpdate = Database['public']['Tables']['projects']['Update']
+
+export type ProjectStatus = 'active' | 'completed' | 'deleted'
 
 export type ProjectListRow = Pick<
     ProjectRow,
-    'id' | 'title' | 'created_at' | 'updated_at' | 'sort_order'
+    'id' | 'title' | 'created_at' | 'updated_at' | 'sort_order' | 'status' | 'status_changed_at'
 >
 
 /**
@@ -13,20 +16,13 @@ export type ProjectListRow = Pick<
  */
 export async function listProjects(
     supabase: SupabaseClient<Database>,
-    includeDeleted: boolean = false
+    status: ProjectStatus
 ): Promise<{ data: ProjectListRow[] | null; error: Error | null }> {
-    const query = supabase
+    const { data, error } = await supabase
         .from('projects')
-        .select('id, title, created_at, updated_at, sort_order')
+        .select('id, title, created_at, updated_at, sort_order, status, status_changed_at')
+        .eq('status', status)
         .order('sort_order', { ascending: true })
-
-    if (!includeDeleted) {
-        query.is('deleted_at', null)
-    } else {
-        query.not('deleted_at', 'is', null)
-    }
-
-    const { data, error } = await query
 
     return { data, error }
 }
@@ -75,7 +71,7 @@ export async function updateProject(
         .from('projects')
         .update({ body })
         .eq('id', id)
-        .is('deleted_at', null)
+        .eq('status', 'active')
         .select('*')
         .single()
 
@@ -83,20 +79,20 @@ export async function updateProject(
 }
 
 /**
- * 論理削除（deleted_at を現在時刻に設定）。
+ * 状態を更新する。status_changed_at は DB トリガーが設定する。
  */
-export async function deleteProject(
+export async function updateProjectStatus(
     supabase: SupabaseClient<Database>,
-    id: string
+    id: string,
+    status: ProjectStatus
 ): Promise<{ data: ProjectRow | null; error: Error | null }> {
-    const deletedAt = new Date().toISOString()
+    const payload: ProjectUpdate = { status }
     const { data, error } = await supabase
         .from('projects')
-        .update({ deleted_at: deletedAt })
+        .update(payload)
         .eq('id', id)
-        .is('deleted_at', null)
         .select('*')
-        .maybeSingle()
+        .single()
 
     return { data, error }
 }
@@ -113,7 +109,7 @@ export async function reorderProjects(
             .from('projects')
             .update({ sort_order: index })
             .eq('id', id)
-            .is('deleted_at', null)
+            .eq('status', 'active')
     )
 
     const results = await Promise.all(updates)

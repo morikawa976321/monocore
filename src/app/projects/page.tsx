@@ -15,6 +15,7 @@ const DEFAULT_NEW_PROJECT_BODY = '# ';
 /** タブ設定 */
 const TABS = [
     { key: 'active', label: '進行中' },
+    { key: 'completed', label: '完了' },
     { key: 'deleted', label: '削除済み' },
 ] as const;
 
@@ -47,7 +48,7 @@ export default function ProjectsPage() {
         updateProjectBody,
         addProject,
         saveProjectBodyForId,
-        deleteProjectItem,
+        updateProjectStatusItem,
         hasPendingChanges: detailHasPendingChanges,
         fetchList,
         reorderList,
@@ -106,7 +107,7 @@ export default function ProjectsPage() {
             if (shouldDiscardNewProjectDraft()) {
                 const draftId = draftRemoteIdRef.current;
                 if (draftId) {
-                    const deleted = await deleteProjectItem(draftId);
+                    const deleted = await updateProjectStatusItem(draftId, 'deleted');
                     if (!deleted) {
                         setCreateError('下書きの削除に失敗しました');
                         return;
@@ -152,7 +153,7 @@ export default function ProjectsPage() {
         },
         [
             addProject,
-            deleteProjectItem,
+            updateProjectStatusItem,
             draftRemoteIdRef,
             isAddModalOpen,
             newProjectBody,
@@ -195,7 +196,7 @@ export default function ProjectsPage() {
     }, [closeDetail, finalizeAddModal, isAddModalOpen]);
 
     const fetchListWithTab = useCallback(() => {
-        return fetchList(activeTab === 'deleted');
+        return fetchList(activeTab);
     }, [fetchList, activeTab]);
 
     useEffect(() => {
@@ -306,7 +307,7 @@ export default function ProjectsPage() {
             </PageHeader>
 
             {/* TabBar */}
-            <div className="grid grid-cols-2 px-2 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
+            <div className="grid grid-cols-3 px-2 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
                 {TABS.map((tab) => (
                     <button
                         key={tab.key}
@@ -419,9 +420,9 @@ export default function ProjectsPage() {
                                         )}
                                         {detail ? (
                                             <>
-                                                {detail.deleted_at != null && (
+                                                {detail.status !== 'active' && (
                                                     <p className="mb-2 text-sm text-neutral-700 dark:text-neutral-300">
-                                                        削除済み
+                                                        {detail.status === 'completed' ? '完了' : '削除済み'}
                                                     </p>
                                                 )}
                                                 {detailLoading ? (
@@ -431,7 +432,7 @@ export default function ProjectsPage() {
                                                         key={detail.id}
                                                         defaultValue={detail.body}
                                                         onChange={(e) => updateProjectBody(e.target.value)}
-                                                        readOnly={detail.deleted_at != null}
+                                                        readOnly={detail.status !== 'active'}
                                                         className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
                                                         spellCheck={false}
                                                         autoComplete="off"
@@ -445,20 +446,45 @@ export default function ProjectsPage() {
                                     </div>
                                     <div className="flex shrink-0 justify-between border-t border-neutral-200 px-2 py-2 dark:border-neutral-800">
                                         {activeTab === 'active' ? (
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    type="button"
+                                                    color="secondary"
+                                                    size="md"
+                                                    onClick={async () => {
+                                                        await closeDetail();
+                                                        if (selectedId) await updateProjectStatusItem(selectedId, 'completed');
+                                                    }}
+                                                    aria-label="Projectを完了"
+                                                >
+                                                    完了
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    color="danger"
+                                                    size="md"
+                                                    onClick={async () => {
+                                                        await closeDetail();
+                                                        if (selectedId) await updateProjectStatusItem(selectedId, 'deleted');
+                                                    }}
+                                                    aria-label="Projectを削除"
+                                                >
+                                                    削除
+                                                </Button>
+                                            </div>
+                                        ) : (
                                             <Button
                                                 type="button"
-                                                color="danger"
+                                                color="secondary"
                                                 size="md"
                                                 onClick={async () => {
                                                     await closeDetail();
-                                                    if (selectedId) await deleteProjectItem(selectedId);
+                                                    if (selectedId) await updateProjectStatusItem(selectedId, 'active');
                                                 }}
-                                                aria-label="Projectを削除"
+                                                aria-label="Projectを進行中に戻す"
                                             >
-                                                削除
+                                                進行中に戻す
                                             </Button>
-                                        ) : (
-                                            <div />
                                         )}
                                         <Button
                                             type="button"

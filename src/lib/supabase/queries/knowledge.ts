@@ -2,10 +2,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
 type KnowledgeRow = Database['public']['Tables']['knowledge']['Row']
+type KnowledgeUpdate = Database['public']['Tables']['knowledge']['Update']
+
+export type KnowledgeStatus = 'active' | 'completed' | 'deleted'
 
 export type KnowledgeListRow = Pick<
     KnowledgeRow,
-    'id' | 'title' | 'created_at' | 'updated_at' | 'sort_order'
+    'id' | 'title' | 'created_at' | 'updated_at' | 'sort_order' | 'status' | 'status_changed_at'
 >
 
 /**
@@ -13,20 +16,13 @@ export type KnowledgeListRow = Pick<
  */
 export async function listKnowledge(
     supabase: SupabaseClient<Database>,
-    includeDeleted: boolean = false
+    status: KnowledgeStatus
 ): Promise<{ data: KnowledgeListRow[] | null; error: Error | null }> {
-    const query = supabase
+    const { data, error } = await supabase
         .from('knowledge')
-        .select('id, title, created_at, updated_at, sort_order')
+        .select('id, title, created_at, updated_at, sort_order, status, status_changed_at')
+        .eq('status', status)
         .order('sort_order', { ascending: true })
-
-    if (!includeDeleted) {
-        query.is('deleted_at', null)
-    } else {
-        query.not('deleted_at', 'is', null)
-    }
-
-    const { data, error } = await query
 
     return { data, error }
 }
@@ -75,7 +71,7 @@ export async function updateKnowledge(
         .from('knowledge')
         .update({ body })
         .eq('id', id)
-        .is('deleted_at', null)
+        .eq('status', 'active')
         .select('*')
         .single()
 
@@ -83,20 +79,20 @@ export async function updateKnowledge(
 }
 
 /**
- * 論理削除（deleted_at を現在時刻に設定）。
+ * 状態を更新する。status_changed_at は DB トリガーが設定する。
  */
-export async function deleteKnowledge(
+export async function updateKnowledgeStatus(
     supabase: SupabaseClient<Database>,
-    id: string
+    id: string,
+    status: KnowledgeStatus
 ): Promise<{ data: KnowledgeRow | null; error: Error | null }> {
-    const deletedAt = new Date().toISOString()
+    const payload: KnowledgeUpdate = { status }
     const { data, error } = await supabase
         .from('knowledge')
-        .update({ deleted_at: deletedAt })
+        .update(payload)
         .eq('id', id)
-        .is('deleted_at', null)
         .select('*')
-        .maybeSingle()
+        .single()
 
     return { data, error }
 }
@@ -113,7 +109,7 @@ export async function reorderKnowledge(
             .from('knowledge')
             .update({ sort_order: index })
             .eq('id', id)
-            .is('deleted_at', null)
+            .eq('status', 'active')
     )
 
     const results = await Promise.all(updates)

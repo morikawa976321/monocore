@@ -3,12 +3,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/src/types/database.types';
 import {
     createProject as insertProject,
-    deleteProject,
     getProjectById,
     listProjects,
     reorderProjects,
     updateProject,
+    updateProjectStatus,
     type ProjectListRow,
+    type ProjectStatus,
 } from '@/src/lib/supabase/queries/projects';
 import { applyReorderToList } from '@/src/lib/resource/reorder';
 
@@ -33,17 +34,16 @@ type UseProjectsReturn = {
     addProject: (body: string) => Promise<{ data: ProjectRow | null; error: Error | null }>;
     /** 新規モーダルの自動保存用（選択中の詳細と無関係に id 指定で更新）。 */
     saveProjectBodyForId: (id: string, body: string) => Promise<boolean>;
-    /** 自動保存で作った行を破棄するときに論理削除し一覧から外す。 */
-    deleteProjectItem: (id: string) => Promise<boolean>;
+    updateProjectStatusItem: (id: string, status: ProjectStatus) => Promise<boolean>;
     hasPendingChanges: boolean;
-    fetchList: (includeDeleted?: boolean) => Promise<void>;
+    fetchList: (status: ProjectStatus) => Promise<void>;
     reorderList: (orderedIds: string[]) => Promise<boolean>;
 };
 
 /** 連続入力時の DB 更新間隔（ms）。 */
 const SAVE_DEBOUNCE_MS = 500;
 
-function listRowToDetailPlaceholder(row: ProjectListRow, isDeletedList: boolean): ProjectRow {
+function listRowToDetailPlaceholder(row: ProjectListRow): ProjectRow {
     return {
         id: row.id,
         title: row.title,
@@ -51,7 +51,9 @@ function listRowToDetailPlaceholder(row: ProjectListRow, isDeletedList: boolean)
         created_at: row.created_at,
         updated_at: row.updated_at,
         sort_order: row.sort_order,
-        deleted_at: isDeletedList ? row.updated_at : null,
+        status: row.status,
+        status_changed_at: row.status_changed_at,
+        updated_by: 'user',
         user_id: '',
     };
 }
@@ -63,7 +65,7 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
     const [listError, setListError] = useState<Error | null>(null);
     const listRef = useRef(list);
     listRef.current = list;
-    const lastIncludeDeletedRef = useRef(false);
+    const lastStatusRef = useRef<ProjectStatus>('active');
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [detail, setDetail] = useState<ProjectRow | null>(null);
@@ -77,8 +79,8 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
     const bodyRef = useRef('');
     /** getProjectById が完了し、編集してよい行か判定する。 */
     const lastLoadedIdRef = useRef<string | null>(null);
-    /** 詳細が論理削除済みなら保存・編集をスキップする。 */
-    const isDetailDeletedRef = useRef(false);
+    /** 詳細が進行中でなければ保存・編集をスキップする。 */
+    const isDetailReadOnlyRef = useRef(false);
     /** 非同期 update 完了時、もう別行を見ていれば detail を上書きしない。 */
     const selectedIdRef = useRef<string | null>(null);
     const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,12 +133,12 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
     const saveProjectNow = useCallback(() => {
         clearSaveDebounce();
         const id = selectedId;
-        if (!id || lastLoadedIdRef.current !== id || isDetailDeletedRef.current) return;
+        if (!id || lastLoadedIdRef.current !== id || isDetailReadOnlyRef.current) return;
         void persistProject(id, bodyRef.current);
     }, [clearSaveDebounce, persistProject, selectedId]);
 
-    const fetchList = useCallback(async (includeDeleted: boolean = false) => {
-        lastIncludeDeletedRef.current = includeDeleted;
+    const fetchList = useCallback(async (status: ProjectStatus) => {
+        lastStatusRef.current = status;
         const isInitial = listRef.current.length === 0;
         if (isInitial) {
             setListInitialLoading(true);
@@ -145,7 +147,7 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
         }
         setListError(null);
         // body は取らず、sort_order 昇順（クエリ側の仕様）
-        const { data, error } = await listProjects(supabase, includeDeleted);
+        const { data, error } = await listProjects(supabase, status);
         if (error) {
             setListError(error);
             if (isInitial) setList([]);
@@ -160,7 +162,7 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
     useEffect(() => {
         if (!selectedId) {
             lastLoadedIdRef.current = null;
-            isDetailDeletedRef.current = false;
+            isDetailReadOnlyRef.current = false;
             setDetail(null);
             setDetailLoading(false);
             setDetailError(null);
@@ -173,12 +175,12 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
         setDetailLoading(true);
         setDetailError(null);
         lastLoadedIdRef.current = null;
-        isDetailDeletedRef.current = false;
+        isDetailReadOnlyRef.current = false;
         bodyRef.current = '';
 
         const listRow = listRef.current.find((row) => row.id === selectedId);
         if (listRow) {
-            setDetail(listRowToDetailPlaceholder(listRow, lastIncludeDeletedRef.current));
+            setDetail(listRowToDetailPlaceholder(listRow));
         } else {
             setDetail(null);
         }
@@ -188,13 +190,13 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
             if (error) {
                 setDetailError(error);
                 setDetail(null);
-                isDetailDeletedRef.current = false;
+                isDetailReadOnlyRef.current = false;
                 setHasPendingChanges(false);
             } else if (data) {
                 setDetail(data);
                 bodyRef.current = data.body;
                 lastLoadedIdRef.current = data.id;
-                isDetailDeletedRef.current = data.deleted_at != null;
+                isDetailReadOnlyRef.current = data.status !== 'active';
                 setHasPendingChanges(false);
             }
             setDetailLoading(false);
@@ -204,11 +206,11 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
             cancelled = true;
             clearSaveDebounce();
             const idToFlush = selectedId;
-            if (lastLoadedIdRef.current === idToFlush && !isDetailDeletedRef.current) {
+            if (lastLoadedIdRef.current === idToFlush && !isDetailReadOnlyRef.current) {
                 void persistProject(idToFlush, bodyRef.current);
             }
             lastLoadedIdRef.current = null;
-            isDetailDeletedRef.current = false;
+            isDetailReadOnlyRef.current = false;
         };
     }, [clearSaveDebounce, persistProject, selectedId, supabase]);
 
@@ -233,7 +235,7 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
                 // 入力途中で未保存の変更がある場合は、上書きを防ぐためリロードしない
                 if (hasPendingChangesRef.current) return;
 
-                void fetchList();
+                void fetchList(lastStatusRef.current);
 
                 const currentSelectedId = selectedIdRef.current;
                 if (currentSelectedId) {
@@ -241,7 +243,7 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
                     setDetailError(null);
                     const listRow = listRef.current.find((row) => row.id === currentSelectedId);
                     if (listRow) {
-                        setDetail(listRowToDetailPlaceholder(listRow, lastIncludeDeletedRef.current));
+                        setDetail(listRowToDetailPlaceholder(listRow));
                     }
                     void getProjectById(supabase, currentSelectedId).then(({ data, error }) => {
                         // ロード中に選択行が変わっていたら無視
@@ -251,13 +253,13 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
                         if (error) {
                             setDetailError(error);
                             setDetail(null);
-                            isDetailDeletedRef.current = false;
+                            isDetailReadOnlyRef.current = false;
                             setHasPendingChanges(false);
                         } else if (data) {
                             setDetail(data);
                             bodyRef.current = data.body;
                             lastLoadedIdRef.current = data.id;
-                            isDetailDeletedRef.current = data.deleted_at != null;
+                            isDetailReadOnlyRef.current = data.status !== 'active';
                             setHasPendingChanges(false);
                         }
                         setDetailLoading(false);
@@ -284,8 +286,8 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
     const updateProjectBody = useCallback(
         (value: string) => {
             const id = selectedId;
-            // 取得完了前・削除済みの入力は無視
-            if (!id || lastLoadedIdRef.current !== id || isDetailDeletedRef.current) return;
+            // 取得完了前・進行中以外の入力は無視
+            if (!id || lastLoadedIdRef.current !== id || isDetailReadOnlyRef.current) return;
             setDetail((prev) => (prev ? { ...prev, body: value } : null));
             bodyRef.current = value;
             setHasPendingChanges(true);
@@ -306,12 +308,12 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
     const closeDetail = useCallback(async () => {
         clearSaveDebounce();
         const id = selectedId;
-        if (id && lastLoadedIdRef.current === id && !isDetailDeletedRef.current) {
+        if (id && lastLoadedIdRef.current === id && !isDetailReadOnlyRef.current) {
             const ok = await persistProject(id, bodyRef.current);
             if (!ok) return;
         }
         lastLoadedIdRef.current = null;
-        isDetailDeletedRef.current = false;
+        isDetailReadOnlyRef.current = false;
         setHasPendingChanges(false);
         setSelectedId(null);
     }, [clearSaveDebounce, persistProject, selectedId]);
@@ -329,6 +331,8 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
                 created_at: data.created_at,
                 updated_at: data.updated_at,
                 sort_order: data.sort_order,
+                status: data.status,
+                status_changed_at: data.status_changed_at,
             };
             setList((prev) => [listRow, ...prev]);
             return { data, error: null };
@@ -341,9 +345,9 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
         [persistProject]
     );
 
-    const deleteProjectItem = useCallback(
-        async (id: string) => {
-            const { error } = await deleteProject(supabase, id);
+    const updateProjectStatusItem = useCallback(
+        async (id: string, status: ProjectStatus) => {
+            const { error } = await updateProjectStatus(supabase, id, status);
             if (error) return false;
             setList((prev) => prev.filter((row) => row.id !== id));
             return true;
@@ -383,7 +387,7 @@ export function useProjects(supabase: SupabaseClient<Database>): UseProjectsRetu
         saveProjectNow,
         addProject,
         saveProjectBodyForId,
-        deleteProjectItem,
+        updateProjectStatusItem,
         hasPendingChanges,
         fetchList,
         reorderList,
