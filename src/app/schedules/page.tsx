@@ -5,7 +5,7 @@ import { addDays, addMonths, subMonths, parseISO, format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/src/lib/supabase/client';
 import { getSchedules, replaceSchedulesForDay } from '@/src/lib/supabase/queries/schedules';
-import { getDueTasks, updateTaskStatus, applyDueTaskUnarchives } from '@/src/lib/supabase/queries/tasks';
+import { getDueTasks, updateTaskStatus } from '@/src/lib/supabase/queries/tasks';
 import { getDefaultTimezone, localTimeToUtc } from '@/src/lib/date';
 import { classifyDue } from '@/src/lib/tasks/due-date';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
@@ -74,7 +74,6 @@ export default function SchedulesPage() {
 
     const loadDueTasks = useCallback(
         async (dateStr: string) => {
-            await applyDueTaskUnarchives(supabase);
             const dueBeforeUtc = localTimeToUtc(format(addDays(parseISO(dateStr), 1), 'yyyy-MM-dd'), '0000', tz);
             const { data, error } = await getDueTasks(supabase, dueBeforeUtc);
             if (error || !data) return;

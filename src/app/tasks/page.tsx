@@ -6,7 +6,6 @@ import { PageHeader } from '@/src/components/layout/PageHeader';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { createClient } from '@/src/lib/supabase/client';
 import {
-    applyDueTaskUnarchives,
     createTask,
     getTasksByStatus,
     type TaskStatus,
@@ -30,10 +29,9 @@ type Task = {
     status: TaskStatus;
     due_at: string | null;
     status_changed_at: string | null;
-    unarchive_at: string | null;
 };
 
-const TASK_STATUSES: TaskStatus[] = ['waiting', 'completed', 'deleted', 'archived'];
+const TASK_STATUSES: TaskStatus[] = ['waiting', 'completed', 'deleted'];
 
 // Supabaseの行データを画面用のTask型に正規化する。
 function toTaskOrNull(row: TaskRow): Task | null {
@@ -44,7 +42,6 @@ function toTaskOrNull(row: TaskRow): Task | null {
         status: row.status as TaskStatus,
         due_at: row.due_at,
         status_changed_at: row.status_changed_at,
-        unarchive_at: row.unarchive_at,
     };
 }
 
@@ -53,7 +50,6 @@ function toTaskOrNull(row: TaskRow): Task | null {
 // ---------------------------------------------------------------------------
 const TABS: { status: TaskStatus; label: string }[] = [
     { status: 'waiting', label: '未完了' },
-    { status: 'archived', label: 'アーカイブ中' },
     { status: 'completed', label: '完了済み' },
     { status: 'deleted', label: '削除済み' },
 ];
@@ -69,20 +65,15 @@ export default function TasksPage() {
     const [newTaskText, setNewTaskText] = useState('');
     const [newDueInput, setNewDueInput] = useState('');
     const [newDueInputError, setNewDueInputError] = useState('');
-    const [archiveTargetId, setArchiveTargetId] = useState<string | null>(null);
-    const [unarchiveAt, setUnarchiveAt] = useState('');
-    const [unarchiveInput, setUnarchiveInput] = useState('');
-    const [unarchiveInputError, setUnarchiveInputError] = useState('');
     const [isInitialLoading, setIsInitialLoading] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [crudError, setCrudError] = useState('');
     const fetchSeqRef = useRef(0);
     const loadedTabsRef = useRef<Partial<Record<TaskStatus, boolean>>>({});
 
-    const supabase = useMemo(createClient, []);
+    const supabase = useMemo(() => createClient(), []);
     const visibleTasks = tasksByTab[activeTab] ?? [];
     const isDueInputValid = newDueInput.trim() === '' || parseDueInput(newDueInput.trim()) !== null;
-    const isUnarchiveInputValid = unarchiveInput.trim() === '' || parseDueInput(unarchiveInput.trim()) !== null;
 
     const updateTasksForTab = useCallback(
         (tab: TaskStatus, updater: (prev: Task[]) => Task[]) => {
@@ -106,15 +97,6 @@ export default function TasksPage() {
         setCrudError('');
 
         void (async () => {
-            if (activeTab === 'waiting') {
-                const { error: unarchiveError } = await applyDueTaskUnarchives(supabase);
-                if (!isSubscribed) return;
-                if (fetchSeqRef.current !== fetchSeq) return;
-                if (unarchiveError) {
-                    setCrudError('期限付きアーカイブの自動解除に失敗しました');
-                }
-            }
-
             const { data, error } = await getTasksByStatus(supabase, activeTab);
             if (!isSubscribed) return;
             if (fetchSeqRef.current !== fetchSeq) return;
@@ -144,7 +126,10 @@ export default function TasksPage() {
 
     // 選択中タブのタスクを取得して一覧に反映する。さらにタブ復帰時（visible）にも自動最新化。
     useEffect(() => {
-        const cleanup = fetchTasksList();
+        let cleanup: (() => void) | undefined;
+        const fetchTimer = window.setTimeout(() => {
+            cleanup = fetchTasksList();
+        }, 0);
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
@@ -154,7 +139,8 @@ export default function TasksPage() {
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
-            cleanup();
+            window.clearTimeout(fetchTimer);
+            cleanup?.();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [fetchTasksList]);
@@ -162,7 +148,6 @@ export default function TasksPage() {
     // モバイルでキーボードが開いた分だけ入力パネル位置を持ち上げる。
     useEffect(() => {
         if (!isAdding) {
-            setMobileKeyboardOffset(0);
             return;
         }
         if (typeof window === 'undefined' || !window.visualViewport) return;
@@ -239,10 +224,9 @@ export default function TasksPage() {
     // ステータス更新後に現在一覧から対象タスクを除外する共通処理。
     async function updateStatusAndRemoveFromList(
         id: string,
-        status: TaskStatus,
-        nextUnarchiveAt?: string | null
+        status: TaskStatus
     ): Promise<boolean> {
-        const { error } = await updateTaskStatusQuery(supabase, id, status, nextUnarchiveAt);
+        const { error } = await updateTaskStatusQuery(supabase, id, status);
         if (error) {
             setCrudError('タスクの更新に失敗しました');
             return false;
@@ -280,40 +264,9 @@ export default function TasksPage() {
         void updateStatusAndRemoveFromList(id, 'deleted');
     }
 
-    // アーカイブ設定モーダルを開き、入力値を初期化する。
-    function openArchiveDialog(id: string) {
-        setArchiveTargetId(id);
-        setUnarchiveAt('');
-        setUnarchiveInput('');
-        setUnarchiveInputError('');
-    }
-
-    // アーカイブ確定時にステータスと解除日時を更新する。
-    async function confirmArchive() {
-        if (!archiveTargetId) return;
-
-        // 入力値を検証
-        if (unarchiveInput.trim() && !isUnarchiveInputValid) {
-            setUnarchiveInputError('無効な日時です');
-            return;
-        }
-
-        const parsedDate = unarchiveInput.trim() ? parseDueInput(unarchiveInput.trim()) : null;
-        const nextUnarchiveAt = parsedDate ? parsedDate.toISOString() : null;
-
-        const isUpdated = await updateStatusAndRemoveFromList(
-            archiveTargetId,
-            'archived',
-            nextUnarchiveAt
-        );
-        if (isUpdated) {
-            setArchiveTargetId(null);
-        }
-    }
-
-    // 完了/削除/アーカイブから未完了へ戻す。
+    // 完了/削除から未完了へ戻す。
     function moveTaskToWaiting(id: string) {
-        void updateStatusAndRemoveFromList(id, 'waiting', null);
+        void updateStatusAndRemoveFromList(id, 'waiting');
     }
 
     // タスクの内容と締め切りを更新する。
@@ -358,7 +311,7 @@ export default function TasksPage() {
             </PageHeader>
 
             {/* TabBar */}
-            <div className="grid grid-cols-4 px-2 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
+            <div className="grid grid-cols-3 px-2 sm:px-6 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
                 {TABS.map((tab) => (
                     <button
                         key={tab.status}
@@ -458,7 +411,6 @@ export default function TasksPage() {
                                 task={task}
                                 onCopy={(id) => copyTask(id)}
                                 onComplete={completeTask}
-                                onArchive={openArchiveDialog}
                                 onDelete={deleteTask}
                                 onMoveToWaiting={moveTaskToWaiting}
                                 onEdit={editTask}
@@ -481,51 +433,6 @@ export default function TasksPage() {
                 </Button>
             )}
 
-            {/* ArchiveDialog */}
-            {archiveTargetId && (
-                // アーカイブ解除日時を設定するセンターモーダル。
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/50">
-                    <div className="bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded p-2 sm:p-6 w-full max-w-sm sm:w-96 mx-2">
-                        <h2 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 text-neutral-900 dark:text-neutral-50 mb-4">
-                            アーカイブ
-                        </h2>
-                        <p className="text-sm leading-6 text-neutral-700 dark:text-neutral-300 mb-4">
-                            いつまでアーカイブしますか？（空欄の場合は無期限）
-                        </p>
-                        <input
-                            type="text"
-                            value={unarchiveInput}
-                            onChange={(e) => {
-                                setUnarchiveInput(e.target.value);
-                                if (unarchiveInputError) setUnarchiveInputError('');
-                            }}
-                            inputMode="numeric"
-                            placeholder="締切"
-                            className="w-full mb-2 px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
-                        />
-                        {unarchiveInputError && (
-                            <p className="mb-4 text-sm leading-6 text-amber-600 dark:text-amber-400">
-                                {unarchiveInputError}
-                            </p>
-                        )}
-                        <div className="flex items-center justify-end gap-2">
-                            <Button
-                                color="secondary"
-                                onClick={() => setArchiveTargetId(null)}
-                            >
-                                キャンセル
-                            </Button>
-                            <Button
-                                color="primary"
-                                onClick={() => void confirmArchive()}
-                                disabled={!isUnarchiveInputValid}
-                            >
-                                確定
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

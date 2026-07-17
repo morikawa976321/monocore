@@ -5,17 +5,7 @@ type TaskRow = Database['public']['Tables']['tasks']['Row']
 type TaskInsert = Database['public']['Tables']['tasks']['Insert']
 type TaskUpdate = Database['public']['Tables']['tasks']['Update']
 
-export type TaskStatus = 'waiting' | 'completed' | 'archived' | 'deleted'
-
-/**
- * 解除予定日時を過ぎたアーカイブタスクを未完了へ戻す（一覧取得前に呼ぶ）。
- */
-export async function applyDueTaskUnarchives(
-    supabase: SupabaseClient<Database>
-): Promise<{ error: Error | null }> {
-    const { error } = await supabase.rpc('apply_due_task_unarchives')
-    return { error }
-}
+export type TaskStatus = 'waiting' | 'completed' | 'deleted'
 
 /**
  * 指定ステータスのタスク一覧を取得する。
@@ -62,23 +52,14 @@ export async function createTask(
 
 /**
  * タスクステータスを更新する。
- * unarchive_at:
- * - undefined: 更新しない
- * - null: 明示的にクリアする
- * - string: UTC ISO 文字列として設定する
  */
 export async function updateTaskStatus(
     supabase: SupabaseClient<Database>,
     id: string,
-    status: TaskStatus,
-    unarchive_at?: string | null
+    status: TaskStatus
 ): Promise<{ data: TaskRow | null; error: Error | null }> {
     const payload: TaskUpdate = {
         status,
-    }
-
-    if (unarchive_at !== undefined) {
-        payload.unarchive_at = unarchive_at
     }
 
     const { data, error } = await supabase

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Archive, ArchiveRestore, Check, Copy, RotateCcw, Trash2 } from 'lucide-react';
-import { formatDate, formatDateOnly, parseDueInput, toDueInputString } from '@/src/lib/tasks/due-date';
+import { Check, Copy, RotateCcw, Trash2 } from 'lucide-react';
+import { formatDateOnly, parseDueInput, toDueInputString } from '@/src/lib/tasks/due-date';
 import { AutoHeightTextarea } from '@/src/components/schedules/AutoHeightTextarea';
 import type { TaskStatus } from '@/src/lib/supabase/queries/tasks';
 
@@ -11,7 +11,6 @@ type TaskItem = {
     status: TaskStatus;
     due_at: string | null;
     status_changed_at: string | null;
-    unarchive_at: string | null;
 };
 
 const COPY_FEEDBACK_MS = 2000;
@@ -21,7 +20,6 @@ type TaskCardProps = {
     task: TaskItem;
     onCopy: (id: string) => Promise<boolean>;
     onComplete: (id: string) => void;
-    onArchive: (id: string) => void;
     onDelete: (id: string) => void;
     onMoveToWaiting: (id: string) => void;
     onEdit: (id: string, text: string, dueAt: string | null) => Promise<boolean>;
@@ -32,7 +30,6 @@ export function TaskCard({
     task,
     onCopy,
     onComplete,
-    onArchive,
     onDelete,
     onMoveToWaiting,
     onEdit,
@@ -201,11 +198,6 @@ export function TaskCard({
                             削除日: {formatDateOnly(task.status_changed_at)}
                         </p>
                     )}
-                    {task.status === 'archived' && (
-                        <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-500">
-                            解除予定日: {formatDate(task.unarchive_at)}
-                        </p>
-                    )}
                 </div>
 
                 {/* 未完了タスクはアイコン操作を表示する。 */}
@@ -222,9 +214,6 @@ export function TaskCard({
                             )}
                         </ActionButton>
 
-                        <ActionButton title="アーカイブ" onClick={() => onArchive(task.id)}>
-                            <Archive className="w-4 h-4" />
-                        </ActionButton>
                         <ActionButton title="完了" onClick={() => onComplete(task.id)}>
                             <Check className="w-4 h-4" />
                         </ActionButton>
@@ -234,7 +223,7 @@ export function TaskCard({
                     </div>
                 )}
 
-                {/* 完了・削除・アーカイブは未完了へ戻す導線を出す。 */}
+                {/* 完了・削除は未完了へ戻す導線を出す。 */}
                 {task.status === 'completed' && (
                     <ActionButton title="未完了に移行" onClick={() => onMoveToWaiting(task.id)}>
                         <RotateCcw className="w-4 h-4" />
@@ -244,12 +233,6 @@ export function TaskCard({
                 {task.status === 'deleted' && (
                     <ActionButton title="未完了に移行" onClick={() => onMoveToWaiting(task.id)}>
                         <RotateCcw className="w-4 h-4" />
-                    </ActionButton>
-                )}
-
-                {task.status === 'archived' && (
-                    <ActionButton title="アーカイブ解除" onClick={() => onMoveToWaiting(task.id)}>
-                        <ArchiveRestore className="w-4 h-4" />
                     </ActionButton>
                 )}
             </div>
