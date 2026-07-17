@@ -1,6 +1,6 @@
 /**
  * ナレッジ一覧・詳細編集のクライアント状態。
- * 一覧は body なし、詳細オープン時のみ getKnowledgeById。本文変更はデバウンス保存（useProjects / useInbox と同様）。
+ * 一覧は body なし、詳細オープン時のみ getKnowledgeById。本文変更はデバウンス保存（useInbox と同様）。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -403,7 +403,6 @@ const ADD_MODAL_DEBOUNCE_MS = 500;
 
 /**
  * 新規ナレッジ追加モーダル用: 500ms デバウンス・blur で DB へ反映（初回 insert、以降 update）。
- * projects 側は useAddProjectDraftAutosave に同内容を複製。
  */
 export function useAddKnowledgeDraftAutosave(options: {
     isOpen: boolean;

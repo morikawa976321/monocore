@@ -1,6 +1,6 @@
 # monocore
 
-AI coding agents: follow this file for build commands, architecture, code style, and design rules. This project is a minimalist Personal OS (tasks, schedules, projects, knowledge, items).
+AI coding agents: follow this file for build commands, architecture, code style, and design rules. This project is a minimalist Personal OS (tasks, schedules, knowledge, items).
 
 **See also:** `README.md` · `README-design.md` · `docs/directory_structure.md` · `docs/screen_layout.md` · `docs/specification_draft.md`
 
