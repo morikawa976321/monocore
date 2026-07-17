@@ -2,19 +2,19 @@
 
 import { useTheme } from "next-themes";
 import { Sun, Moon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 type ThemeToggleProps = {
     showLabel?: boolean;
 };
 
+function subscribe() {
+    return () => {};
+}
+
 export function ThemeToggle({ showLabel = false }: ThemeToggleProps) {
     const { resolvedTheme, setTheme } = useTheme();
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    const mounted = useSyncExternalStore(subscribe, () => true, () => false);
 
     if (!mounted) {
         return (

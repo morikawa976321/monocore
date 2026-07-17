@@ -27,7 +27,7 @@ import { PageHeader } from '@/src/components/layout/PageHeader';
 /** スケジュール一覧・編集ページ。双方向無限スクロール対応。 */
 export default function SchedulesPage() {
     // 日付計算の基準となるタイムゾーン。
-    const tz = useMemo(getDefaultTimezone, []);
+    const tz = useMemo(() => getDefaultTimezone(), []);
 
     // new Date() はサーバーとクライアントで値が異なるためハイドレーションエラーを避けるよう
     // SSR では null、useEffect（クライアントのみ）で確定させる。
@@ -44,19 +44,22 @@ export default function SchedulesPage() {
     const [isResumeSyncing, setIsResumeSyncing] = useState(false);
 
     // Supabaseクライアントは1回作って使い回す。
-    const supabase = useMemo(createClient, []);
+    const supabase = useMemo(() => createClient(), []);
     // schedules保存のデバウンス制御用タイマー。
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // 非同期イベント（visibilitychange/pagehide）でも現在フォーカス中の日付を参照する。
     const focusedDateLabelRef = useRef<string | null>(null);
-    focusedDateLabelRef.current = focusedDateLabel;
     // フォーカスが外れても debounce 中の保存対象日付を参照する。
     const pendingSaveDateLabelRef = useRef<string | null>(null);
     // beforeunload時に最新entriesへアクセスするためのref。
     const entriesRef = useRef<DayEntry[]>(entries);
-    entriesRef.current = entries;
     const isResumeSyncingRef = useRef(false);
-    isResumeSyncingRef.current = isResumeSyncing;
+
+    useLayoutEffect(() => {
+        focusedDateLabelRef.current = focusedDateLabel;
+        entriesRef.current = entries;
+        isResumeSyncingRef.current = isResumeSyncing;
+    });
 
     // prepend 時のスクロール位置補正に使う
     const scrollContainerRef = useRef<HTMLDivElement>(null);

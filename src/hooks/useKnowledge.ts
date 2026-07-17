@@ -2,7 +2,7 @@
  * ナレッジ一覧・詳細編集のクライアント状態。
  * 一覧は body なし、詳細オープン時のみ getKnowledgeById。本文変更はデバウンス保存（useProjects / useInbox と同様）。
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/src/types/database.types';
 import {
@@ -67,7 +67,6 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [listError, setListError] = useState<Error | null>(null);
     const listRef = useRef(list);
-    listRef.current = list;
     const lastStatusRef = useRef<KnowledgeStatus>('active');
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -76,7 +75,6 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     const [detailError, setDetailError] = useState<Error | null>(null);
     const [hasPendingChanges, setHasPendingChanges] = useState(false);
     const hasPendingChangesRef = useRef(hasPendingChanges);
-    hasPendingChangesRef.current = hasPendingChanges;
 
     /** 保存・effect cleanup 用の最新本文（state より先に確実に読む）。 */
     const bodyRef = useRef('');
@@ -88,7 +86,11 @@ export function useKnowledge(supabase: SupabaseClient<Database>): UseKnowledgeRe
     const selectedIdRef = useRef<string | null>(null);
     const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    selectedIdRef.current = selectedId;
+    useLayoutEffect(() => {
+        listRef.current = list;
+        hasPendingChangesRef.current = hasPendingChanges;
+        selectedIdRef.current = selectedId;
+    });
 
     const clearSaveDebounce = useCallback(() => {
         if (!saveDebounceRef.current) return;
@@ -414,17 +416,20 @@ export function useAddKnowledgeDraftAutosave(options: {
     const lastPersistedRef = useRef<string | null>(null);
     const [hasPendingChanges, setHasPendingChanges] = useState(false);
     const bodyRef = useRef(options.body);
-    bodyRef.current = options.body;
-
     const addRowRef = useRef(options.addRow);
-    addRowRef.current = options.addRow;
     const updateRowRef = useRef(options.updateRow);
-    updateRowRef.current = options.updateRow;
     const onFailRef = useRef(options.onAutosaveFailed);
-    onFailRef.current = options.onAutosaveFailed;
-
     const isOpenRef = useRef(options.isOpen);
-    isOpenRef.current = options.isOpen;
+    const hasPendingChangesRef = useRef(hasPendingChanges);
+
+    useLayoutEffect(() => {
+        bodyRef.current = options.body;
+        addRowRef.current = options.addRow;
+        updateRowRef.current = options.updateRow;
+        onFailRef.current = options.onAutosaveFailed;
+        isOpenRef.current = options.isOpen;
+        hasPendingChangesRef.current = hasPendingChanges;
+    });
 
     useEffect(() => {
         if (options.isOpen) {
@@ -482,9 +487,6 @@ export function useAddKnowledgeDraftAutosave(options: {
     const onBlur = useCallback(() => {
         void saveDraftNow();
     }, [saveDraftNow]);
-
-    const hasPendingChangesRef = useRef(hasPendingChanges);
-    hasPendingChangesRef.current = hasPendingChanges;
 
     useEffect(() => {
         const flushPendingDraftSave = () => {

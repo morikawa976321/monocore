@@ -13,6 +13,13 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    // 選択ID変更に伴う詳細リセット・モーダル開閉の pending 同期など、
+    // 外部入力に反応して state を揃える effect をこのアプリでは意図的に使う。
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

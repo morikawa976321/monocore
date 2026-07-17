@@ -32,7 +32,7 @@ function overlayBoxInParent(parent: HTMLElement): { top: number; height: number 
 }
 
 export default function KnowledgePage() {
-    const supabase = useMemo(createClient, []);
+    const supabase = useMemo(() => createClient(), []);
     const [activeTab, setActiveTab] = useState<TabKey>('active');
     const {
         list,
@@ -71,7 +71,10 @@ export default function KnowledgePage() {
 
     const hasAnyPendingChanges = detailHasPendingChanges || draftHasPendingChanges;
     const hasAnyPendingChangesRef = useRef(hasAnyPendingChanges);
-    hasAnyPendingChangesRef.current = hasAnyPendingChanges;
+
+    useLayoutEffect(() => {
+        hasAnyPendingChangesRef.current = hasAnyPendingChanges;
+    });
 
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -158,6 +161,7 @@ export default function KnowledgePage() {
             isAddModalOpen,
             newKnowledgeBody,
             saveDraftNow,
+            setSelectedId,
             shouldDiscardNewKnowledgeDraft,
         ]
     );
