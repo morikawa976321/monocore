@@ -5,12 +5,9 @@ import { addDays, addMonths, subMonths, parseISO, format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/src/lib/supabase/client';
 import { getSchedules, replaceSchedulesForDay } from '@/src/lib/supabase/queries/schedules';
-import { getDueTasks } from '@/src/lib/supabase/queries/tasks';
 import { getDefaultTimezone, localTimeToUtc } from '@/src/lib/date';
-import { classifyDue } from '@/src/lib/tasks/due-date';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
 import { DaySection } from '@/src/components/schedules/DaySection';
-import { DueTasksPanel, type DueTask } from '@/src/components/schedules/DueTasksPanel';
 import { Button } from '@/src/components/ui/Button';
 import { useInbox } from '@/src/hooks/useInbox';
 import {
@@ -35,7 +32,6 @@ export default function SchedulesPage() {
     const [rangeStart, setRangeStart] = useState<Date | null>(null);
     const [rangeEnd, setRangeEnd] = useState<Date | null>(null);
     const [entries, setEntries] = useState<DayEntry[]>([]);
-    const [dueTasks, setDueTasks] = useState<DueTask[]>([]);
     const [focusedDateLabel, setFocusedDateLabel] = useState<string | null>(null);
     const [loadingTop, setLoadingTop] = useState(false);
     const [loadingBottom, setLoadingBottom] = useState(false);
@@ -70,27 +66,10 @@ export default function SchedulesPage() {
 
     const topSentinelRef = useRef<HTMLDivElement>(null);
     const bottomSentinelRef = useRef<HTMLDivElement>(null);
-    const todaySectionRef = useRef<HTMLDivElement | null>(null);
+    const todaySectionRef = useRef<HTMLElement | null>(null);
     const { inboxOpen, setInboxOpen, inboxContent, updateInboxContent, saveInboxNow, hasPendingChanges } =
         useInbox(supabase);
     const isEditLocked = isInitialSyncing;
-
-    const loadDueTasks = useCallback(
-        async (dateStr: string) => {
-            const dueBeforeUtc = localTimeToUtc(format(addDays(parseISO(dateStr), 1), 'yyyy-MM-dd'), '0000', tz);
-            const { data, error } = await getDueTasks(supabase, dueBeforeUtc);
-            if (error || !data) return;
-            const filtered = data
-                .map((row) => {
-                    const kind = classifyDue(row.due_at, dateStr, tz);
-                    if (!kind) return null;
-                    return { id: row.id, task: row.task, due_at: row.due_at, kind };
-                })
-                .filter((item): item is DueTask => item !== null);
-            setDueTasks(filtered);
-        },
-        [supabase, tz]
-    );
 
     // --- 初回（クライアントのみ）: 日付確定 → entries 生成 → DB fetch → 今日へスクロール ---
     useEffect(() => {
@@ -100,7 +79,6 @@ export default function SchedulesPage() {
         const start = addDays(today, -7);
         const end = addMonths(today, 2);
         setTodayStr(str);
-        void loadDueTasks(str);
         setRangeStart(start);
         setRangeEnd(end);
         const initial = generateDayEntries(start, end);
@@ -131,12 +109,9 @@ export default function SchedulesPage() {
         if (!error && data) {
             setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz));
         }
-        if (todayStr) {
-            void loadDueTasks(todayStr);
-        }
         setLoadingTop(false);
         setLoadingBottom(false);
-    }, [rangeStart, rangeEnd, tz, supabase, todayStr, loadDueTasks]);
+    }, [rangeStart, rangeEnd, tz, supabase]);
 
     // entries 初期生成後に今日のセクションへスクロール
     useEffect(() => {
@@ -422,37 +397,27 @@ export default function SchedulesPage() {
                     )}
 
                     {/* Day sections */}
-                    {entries.map((entry) => {
-                        const entryDateStr = dateLabelToDateStr(entry.dateLabel);
-                        const isToday = entryDateStr === todayStr;
-                        const daySection = (
-                            <DaySection
-                                key={entry.dateLabel}
-                                entry={entry}
-                                isToday={isToday}
-                                isReadOnly={isEditLocked}
-                                onContentChange={(value) => updateDayContent(entry.dateLabel, value)}
-                                onFocus={() => {
-                                    if (isEditLocked) return;
-                                    setFocusedDateLabel(entry.dateLabel);
-                                }}
-                                onBlur={() => {
-                                    setFocusedDateLabel(null);
-                                    if (isEditLocked) return;
-                                    clearDebounceTimer();
-                                    pendingSaveDateLabelRef.current = null;
-                                    saveDay(entry.dateLabel);
-                                }}
-                            />
-                        );
-                        if (!isToday) return daySection;
-                        return (
-                            <div key={entry.dateLabel} ref={todaySectionRef} className="space-y-2 sm:space-y-4">
-                                <DueTasksPanel tasks={dueTasks} />
-                                {daySection}
-                            </div>
-                        );
-                    })}
+                    {entries.map((entry) => (
+                        <DaySection
+                            key={entry.dateLabel}
+                            entry={entry}
+                            isToday={dateLabelToDateStr(entry.dateLabel) === todayStr}
+                            todayRef={todaySectionRef}
+                            isReadOnly={isEditLocked}
+                            onContentChange={(value) => updateDayContent(entry.dateLabel, value)}
+                            onFocus={() => {
+                                if (isEditLocked) return;
+                                setFocusedDateLabel(entry.dateLabel);
+                            }}
+                            onBlur={() => {
+                                setFocusedDateLabel(null);
+                                if (isEditLocked) return;
+                                clearDebounceTimer();
+                                pendingSaveDateLabelRef.current = null;
+                                saveDay(entry.dateLabel);
+                            }}
+                        />
+                    ))}
 
                     {/* 未来方向ローディング */}
                     {loadingBottom && (

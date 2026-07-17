@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { parseDueInput, toDueInputString, classifyDue } from './due-date';
+import { parseDueInput, toDueInputString } from './due-date';
 
 function expectDateParts(
     date: Date | null,
@@ -91,40 +91,5 @@ describe('toDueInputString', () => {
     it('returns YYYYMMDDHHMM for midnight (00:00)', () => {
         const iso = new Date(2026, 0, 1, 0, 0).toISOString();
         expect(toDueInputString(iso)).toBe('202601010000');
-    });
-});
-
-describe('classifyDue', () => {
-    it('returns null for null dueAtIso', () => {
-        expect(classifyDue(null, '2026-07-17', 'Asia/Tokyo')).toBeNull();
-    });
-
-    it('returns null for invalid ISO string', () => {
-        expect(classifyDue('not-a-date', '2026-07-17', 'Asia/Tokyo')).toBeNull();
-    });
-
-    it('returns "overdue" when due date is before today', () => {
-        const dueAtIso = '2026-07-15T10:00:00Z';
-        expect(classifyDue(dueAtIso, '2026-07-17', 'Asia/Tokyo')).toBe('overdue');
-    });
-
-    it('returns "today" when due date is today', () => {
-        const dueAtIso = '2026-07-17T10:00:00Z';
-        expect(classifyDue(dueAtIso, '2026-07-17', 'Asia/Tokyo')).toBe('today');
-    });
-
-    it('returns null when due date is in the future', () => {
-        const dueAtIso = '2026-07-20T10:00:00Z';
-        expect(classifyDue(dueAtIso, '2026-07-17', 'Asia/Tokyo')).toBeNull();
-    });
-
-    it('handles JST boundary case: UTC 2026-07-16 15:30 (JST 07-17 00:30) is today', () => {
-        const dueAtIso = '2026-07-16T15:30:00Z';
-        expect(classifyDue(dueAtIso, '2026-07-17', 'Asia/Tokyo')).toBe('today');
-    });
-
-    it('handles JST boundary case: UTC 2026-07-16 14:59 (JST 07-16 23:59) is overdue', () => {
-        const dueAtIso = '2026-07-16T14:59:00Z';
-        expect(classifyDue(dueAtIso, '2026-07-17', 'Asia/Tokyo')).toBe('overdue');
     });
 });

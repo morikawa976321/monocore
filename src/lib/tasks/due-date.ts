@@ -1,6 +1,3 @@
-import { format } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
-
 // ISO日時を "YYYY/MM/DD HH:mm" 形式で表示する。
 export function formatDate(iso: string | null): string {
     if (!iso) return '';
@@ -118,22 +115,4 @@ export function toDueInputString(iso: string | null): string {
     const min = String(d.getMinutes()).padStart(2, '0');
     if (hh === '23' && min === '59') return `${yyyy}${mm}${dd}`;
     return `${yyyy}${mm}${dd}${hh}${min}`;
-}
-
-export type DueKind = 'overdue' | 'today';
-
-// due_at のローカル日付を todayStr と比較し、期限切れ・今日・未来を判定する。
-export function classifyDue(dueAtIso: string | null, todayStr: string, tz: string): DueKind | null {
-    if (!dueAtIso) return null;
-    try {
-        const d = new Date(dueAtIso);
-        if (isNaN(d.getTime())) return null;
-        const zonedDate = toZonedTime(d, tz);
-        const dueDateStr = format(zonedDate, 'yyyy-MM-dd');
-        if (dueDateStr < todayStr) return 'overdue';
-        if (dueDateStr === todayStr) return 'today';
-        return null;
-    } catch {
-        return null;
-    }
 }
