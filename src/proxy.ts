@@ -15,33 +15,51 @@ export async function updateSession(request: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
         {
             cookies: {
-                // リクエストから全クッキーを取得
                 getAll() {
                     return request.cookies.getAll()
                 },
-                // 更新されたクッキーをレスポンスにセット
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+                setAll(cookiesToSet, headers) {
+                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
                     supabaseResponse = NextResponse.next({
                         request,
                     })
                     cookiesToSet.forEach(({ name, value, options }) =>
                         supabaseResponse.cookies.set(name, value, options)
                     )
+                    Object.entries(headers).forEach(([key, value]) =>
+                        supabaseResponse.headers.set(key, value)
+                    )
                 },
             },
         }
     )
 
-    // これにより、期限切れが近いセッションを自動的にリフレッシュします（重要）
-    const { data: { user } } = await supabase.auth.getUser()
+    // Do not run code between createServerClient and supabase.auth.getClaims().
+    // A simple mistake could make it very hard to debug issues with users being randomly logged out.
+    const { data } = await supabase.auth.getClaims()
+    const isAuthenticated = Boolean(data?.claims)
+
+    const { pathname } = request.nextUrl
+
+    function redirectWithSessionCookies(pathname: string) {
+        const url = request.nextUrl.clone()
+        url.pathname = pathname
+        const redirectResponse = NextResponse.redirect(url)
+        // リダイレクトでもセッション更新 Cookie を失わない
+        for (const cookie of supabaseResponse.cookies.getAll()) {
+            redirectResponse.cookies.set(cookie)
+        }
+        return redirectResponse
+    }
 
     // 未認証ユーザーを /login にリダイレクトする（/login, /auth/callback は除外）
-    const { pathname } = request.nextUrl
-    if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/auth/callback')) {
-        const loginUrl = request.nextUrl.clone()
-        loginUrl.pathname = '/login'
-        return NextResponse.redirect(loginUrl)
+    if (!isAuthenticated && !pathname.startsWith('/login') && !pathname.startsWith('/auth/callback')) {
+        return redirectWithSessionCookies('/login')
+    }
+
+    // 認証済みで /login にいる場合はアプリへ戻す（誤着地の固定化を防ぐ）
+    if (isAuthenticated && pathname.startsWith('/login')) {
+        return redirectWithSessionCookies('/')
     }
 
     return supabaseResponse
