@@ -5,7 +5,7 @@ import { addDays, addMonths, subMonths, parseISO, format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/src/lib/supabase/client';
 import { getSchedules, replaceSchedulesForDay } from '@/src/lib/supabase/queries/schedules';
-import { getDueTasks, updateTaskStatus } from '@/src/lib/supabase/queries/tasks';
+import { getDueTasks } from '@/src/lib/supabase/queries/tasks';
 import { getDefaultTimezone, localTimeToUtc } from '@/src/lib/date';
 import { classifyDue } from '@/src/lib/tasks/due-date';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
@@ -364,13 +364,6 @@ export default function SchedulesPage() {
         setInboxOpen((prev) => !prev);
     };
 
-    const handleCompleteDueTask = async (id: string) => {
-        const { error } = await updateTaskStatus(supabase, id, 'completed');
-        if (!error) {
-            setDueTasks((prev) => prev.filter((t) => t.id !== id));
-        }
-    };
-
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             {/* Header */}
@@ -455,7 +448,7 @@ export default function SchedulesPage() {
                         if (!isToday) return daySection;
                         return (
                             <div key={entry.dateLabel} ref={todaySectionRef} className="space-y-2 sm:space-y-4">
-                                <DueTasksPanel tasks={dueTasks} onComplete={handleCompleteDueTask} isReadOnly={isEditLocked} />
+                                <DueTasksPanel tasks={dueTasks} />
                                 {daySection}
                             </div>
                         );
