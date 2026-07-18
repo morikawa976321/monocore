@@ -60,45 +60,6 @@ export type Database = {
         }
         Relationships: []
       }
-      knowledge: {
-        Row: {
-          body: string
-          created_at: string | null
-          id: string
-          sort_order: number
-          status: string
-          status_changed_at: string | null
-          title: string
-          updated_at: string | null
-          updated_by: string
-          user_id: string
-        }
-        Insert: {
-          body: string
-          created_at?: string | null
-          id?: string
-          sort_order?: number
-          status?: string
-          status_changed_at?: string | null
-          title?: string
-          updated_at?: string | null
-          updated_by?: string
-          user_id?: string
-        }
-        Update: {
-          body?: string
-          created_at?: string | null
-          id?: string
-          sort_order?: number
-          status?: string
-          status_changed_at?: string | null
-          title?: string
-          updated_at?: string | null
-          updated_by?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       schedules: {
         Row: {
           activity: string
@@ -126,42 +87,6 @@ export type Database = {
           end_at?: string | null
           id?: string
           start_at?: string
-          updated_at?: string | null
-          updated_by?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      tasks: {
-        Row: {
-          created_at: string | null
-          due_at: string | null
-          id: string
-          status: string
-          status_changed_at: string | null
-          task: string
-          updated_at: string | null
-          updated_by: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          due_at?: string | null
-          id?: string
-          status?: string
-          status_changed_at?: string | null
-          task: string
-          updated_at?: string | null
-          updated_by?: string
-          user_id?: string
-        }
-        Update: {
-          created_at?: string | null
-          due_at?: string | null
-          id?: string
-          status?: string
-          status_changed_at?: string | null
-          task?: string
           updated_at?: string | null
           updated_by?: string
           user_id?: string
