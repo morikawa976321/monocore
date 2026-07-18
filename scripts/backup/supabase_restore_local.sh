@@ -25,7 +25,7 @@ set -Eeuo pipefail
 #                        Applied before PG_RESTORE_SKIP_MISSING_TABLES.
 #
 # Example:
-#   export BACKUP_RUN_DIR="/srv/backups/supabase/20260418-125119"
+#   export BACKUP_RUN_DIR="./backups/manual/20260418-125119"
 #   ./scripts/backup/supabase_restore_local.sh
 
 BACKUP_RUN_DIR="${BACKUP_RUN_DIR:-}"
