@@ -2,7 +2,7 @@
 
 AI coding agents: follow this file for build commands, architecture, code style, and design rules. This project is a minimalist Personal OS (schedules, inbox).
 
-**See also:** `README.md` · `README-design.md` · `docs/directory_structure.md` · `docs/screen_layout.md` · `docs/specification_draft.md`
+**See also:** `README.md` · `README-design.md` · `docs/directory_structure.md`
 
 ---
 
@@ -50,9 +50,7 @@ Reference: `README.md` (Technology Stack, Development Philosophy)
 
 - **Navigation:** Left-edge, minimal width; **hover to reveal** sidebar (no always-visible nav). Avoid hamburger (extra click).
 - **Detail / edit:** Prefer **center focus modal** (blurred backdrop, close with `Esc` or click outside). Use when viewing/editing a single item; avoid right-side sheet for long editing sessions.
-- Apply this layout by default; deviate only when standard harms usability.
-
-Reference: `docs/screen_layout.md`
+- Apply this layout by default; deviate only when standard harms usability. Source of truth is the React layout components (`src/components/layout/`).
 
 ---
 
@@ -158,5 +156,3 @@ Reference: `README-design.md`
 | `README.md` | Tech stack, development philosophy, DB workflow, test setup, UI/UX requirements, commit rules |
 | `README-design.md` | Design system detail (theme, constraints, palette, typography, spacing, radius, component templates, checklist) |
 | `docs/directory_structure.md` | Directory map, folder roles, dev flow, operational rules, coding style (function declarations) |
-| `docs/screen_layout.md` | Layout spec (sidebar, center modal), UI pattern comparison and rationale, applicable screens |
-| `docs/specification_draft.md` | Spec notes (similar products, note relationships, feature backlog, priorities, LLM ideas) |
