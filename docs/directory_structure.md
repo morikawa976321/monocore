@@ -8,19 +8,19 @@ monocore
 │   ├── app/                  # 【Routing】URLと画面の定義
 │   │   ├── layout.tsx        # 全ページ共通の枠組み（HTML/Bodyタグ、共通ヘッダー等）
 │   │   ├── page.tsx          # トップページ (/)
-│   │   └── [feature]/        # 各機能（例: tasks, notes）
+│   │   └── [feature]/        # 各機能（例: schedules, inbox）
 │   │       ├── page.tsx      # 機能のメイン画面
 │   │       └── layout.tsx    # (任意) その機能グループ専用のレイアウト
 │   ├── components/           # 【UI Parts】再利用可能な部品
 │   │   ├── layout/           # Sidebar, Header など、app/layout で呼び出す部品
 │   │   ├── ui/               # Button, Input など、汎用的な最小パーツ
-│   │   └── [feature]/        # TaskCard, NoteList など、特定の機能に紐づくパーツ
-│   ├── hooks/                # 【Logic】Reactの状態管理ロジック（useTasks等）
+│   │   └── [feature]/        # ScheduleGrid, InboxView など、特定の機能に紐づくパーツ
+│   ├── hooks/                # 【Logic】Reactの状態管理ロジック（useSchedules等）
 │   ├── lib/                  # 【Infrastructure】外部接続と汎用関数
 │   │   ├── supabase/
 │   │   │   ├── client.ts     # クライアントコンポーネント用接続設定
 │   │   │   ├── server.ts     # サーバーコンポーネント用接続設定
-│   │   │   └── queries/      # テーブルごとのDB操作関数（tasks.ts, notes.ts等）
+│   │   │   └── queries/      # テーブルごとのDB操作関数（schedules.ts, inboxes.ts等）
 │   │   └── utils.ts          # DBに関係ない汎用ユーティリティ
 │   ├── middleware.ts         # 【Security】認証チェック・リダイレクト処理
 │   └── types/                # 【Definition】TypeScriptの型定義
@@ -54,23 +54,23 @@ monocore
 
 ### 📂 `src/app/` (App Router)
 Next.js 独自のルーティングシステムです。フォルダ名がそのままURLになります。
-* **動的ルーティング `[id]`**: `/tasks/123` のように、URLの一部をIDとして受け取る画面に使用。
+* **動的ルーティング `[id]`**: `/schedules/123` のように、URLの一部をIDとして受け取る画面に使用。
 * **(auth) フォルダ**: `( )` で囲むと、URLには影響を与えず、認証関連のページを論理的にグループ化できます。
 
 ### 📂 `src/components/` (Component Atomic)
 UIを構成するパーツです。機能ごとにサブフォルダを作ります。
 * **`ui/`**: ボタンや入力フォームなどの最小単位（Atomic部品）。
 * **`layout/`**: ヘッダー、サイドバーなどページを跨いで存在し続ける枠組み。
-* **`task/` / `note/`**: 特定の機能に特化した部品（`TaskItem.tsx` など）。
+* **`schedules/` / `inbox/`**: 特定の機能に特化した部品（`DaySection.tsx` など）。
 
 ### 📂 `src/lib/` (Infrastructure & Logic)
 「どうやってデータを取るか」や「どう計算するか」を定義します。
-* **`supabase/queries/`**: **【重要】** テーブルごとにファイルを作成（`tasks.ts` 等）。DB操作関数（CRUD）をここに集約します。
+* **`supabase/queries/`**: **【重要】** テーブルごとにファイルを作成（`schedules.ts` 等）。DB操作関数（CRUD）をここに集約します。
 * **`utils.ts`**: 日付のフォーマットやクラス名の結合など、DB操作を含まない短い関数。
 
 ### 📂 `src/hooks/` (Shared State)
 「データの取得状態」や「特定のUIの振る舞い」をカプセル化します。
-* 例：`useTasks.ts`（Supabaseからデータを取ってきて、`loading` 状態を返す）。
+* 例：`useSchedules.ts`（Supabaseからデータを取ってきて、`loading` 状態を返す）。
 
 ---
 
@@ -87,10 +87,10 @@ UIを構成するパーツです。機能ごとにサブフォルダを作りま
    - サイドバー、ヘッダー、背景デザインなど。
 * **Page (中身)**: `src/app/**/page.tsx`
    - URLごとに完全に入れ替わるコンテンツ。Layoutの `children` として流し込まれる。
-   - タスク一覧画面、メモ詳細画面など
+   - スケジュール画面、ログイン画面など
 * **Components (パーツ)**: `src/components/**`
    - Pageの中で呼び出される、再利用可能な具体的な部品
-   - タスクを表示するカード、保存ボタン、入力フォームなど
+   - スケジュールを表示するカード、保存ボタン、入力フォームなど
    
 ---
 
@@ -99,7 +99,7 @@ UIを構成するパーツです。機能ごとにサブフォルダを作りま
 1. **Database**: Supabaseのダッシュボード等で `notes` テーブルを作成。
 2. **Types**: `npx supabase gen types` 等で `src/types/database.types.ts` を更新。
 3. **Queries**: `src/lib/supabase/queries/notes.ts` を作り、データ取得・保存関数を実装。
-4. **Components**: `src/components/note/` 内に表示用パーツを作成。
+4. **Components**: `src/components/notes/` 内に表示用パーツを作成。
 5. **App**: `src/app/notes/page.tsx` を作成し、Queriesを呼び出してComponentsにデータを渡す。
 
 ---

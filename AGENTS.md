@@ -1,6 +1,6 @@
 # monocore
 
-AI coding agents: follow this file for build commands, architecture, code style, and design rules. This project is a minimalist Personal OS (tasks, schedules, knowledge, items).
+AI coding agents: follow this file for build commands, architecture, code style, and design rules. This project is a minimalist Personal OS (schedules, inbox).
 
 **See also:** `README.md` · `README-design.md` · `docs/directory_structure.md` · `docs/screen_layout.md` · `docs/specification_draft.md`
 
@@ -23,9 +23,9 @@ Reference: `README.md` (Database Management, Testing)
 ## Architecture
 
 - **Routing / pages:** `src/app/` — URL = folder; `page.tsx` per route. Use `(auth)` for route-grouping without URL.
-- **UI components:** `src/components/` — `layout/` (Sidebar, Header), `ui/` (Button, Input), `[feature]/` (e.g. TaskCard).
-- **Data / infra:** `src/lib/` — `lib/supabase/client.ts`, `server.ts`; **all DB access in `lib/supabase/queries/`** (e.g. `tasks.ts`, `notes.ts`). Do not put `supabase.from(...)` in `page.tsx`.
-- **State / logic:** `src/hooks/` — e.g. `useTasks` for fetch + loading.
+- **UI components:** `src/components/` — `layout/` (Sidebar, Header), `ui/` (Button, Input), `[feature]/` (e.g. ScheduleGrid).
+- **Data / infra:** `src/lib/` — `lib/supabase/client.ts`, `server.ts`; **all DB access in `lib/supabase/queries/`** (e.g. `schedules.ts`, `inboxes.ts`). Do not put `supabase.from(...)` in `page.tsx`.
+- **State / logic:** `src/hooks/` — e.g. `useSchedules` for fetch + loading.
 - **Types:** `src/types/` — use generated `database.types.ts`; avoid `any`.
 - **Backend / DB:** `supabase/migrations/`, `supabase/config.toml`, `supabase/seed.sql`.
 
@@ -37,7 +37,7 @@ Reference: `docs/directory_structure.md`
 
 ## Development Philosophy
 
-1. **Everything is a Resource** — Tasks, assets, notes, schedules are equal resources.
+1. **Everything is a Resource** — Schedules, inbox items are equal resources.
 2. **Form follows function / Cognitive load minimization** — No decorative animation; maximize information density and speed; minimize modals and clicks.
 3. **Focus on app logic** — Use `@supabase/ssr` fully; keep boilerplate minimal.
 4. **Prioritize development speed above all** — In this solo, small-scale project, default decisions should favor faster implementation and iteration unless they introduce major product risk.
