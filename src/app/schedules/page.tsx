@@ -94,6 +94,8 @@ export default function SchedulesPage() {
                 scrollTodayAfterInitialMergeRef.current = true;
             })
             .finally(() => {
+                // 同期完了時点の「今日」で強調枠を確定（取得中に日付が変わった場合に備える）
+                setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
                 setIsInitialSyncing(false);
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,6 +111,8 @@ export default function SchedulesPage() {
         if (!error && data) {
             setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz));
         }
+        // 復帰同期・手動更新の完了時点で「今日」を再計算（開いたまま日付が変わると枠だけ前日のまま残るため）
+        setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
         setLoadingTop(false);
         setLoadingBottom(false);
     }, [rangeStart, rangeEnd, tz, supabase]);
