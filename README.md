@@ -1,121 +1,157 @@
 # monocore
 
-**A minimalist all-in-one web application to unify your schedules and inbox into a single digital space.**
+**A minimalist Personal OS for schedules and inbox.**
 
-`monocore` は、散らばった日々の断片（スケジュール、inbox）を一箇所に集約し、自分の支配下に置くための「Personal OS」です。
+`monocore` は、日々の予定と inbox を一箇所に集約し、自分の支配下に置くための Web アプリです。
 
 ---
 
-## 🛠 Technology Stack
+## Getting Started
 
-本プロジェクトは、便利なSDKによる開発効率の最大化を図りつつも、UI表現においては一切の妥協を排し、機能美とスピードを追求した「硬派」なスタックで構築されています。
+```bash
+npm install
+npm run dev
+```
+
+その他のスクリプト:
+
+| コマンド | 内容 |
+| :--- | :--- |
+| `npm run build` | 本番ビルド |
+| `npm start` | 本番サーバー起動 |
+| `npm test` | Vitest（単発） |
+| `npm run test:watch` | Vitest（ウォッチ） |
+| `npm run lint` | ESLint |
+
+ローカル開発には Supabase の環境変数（`.env.local`）が必要です。DB 操作は下記「Database Management」を参照。
+
+---
+
+## Technology Stack
+
+便利な SDK で開発効率を上げつつ、UI では装飾を削ぎ、情報密度と操作スピードを優先しています。
 
 ### Frontend
-- **Framework:** Next.js 15 (App Router / TypeScript)
-- **Styling:** Tailwind CSS (v4)
-- **UI Components:** Custom Tailwind Components (Native elements & ARIA-first approach)
-- **State Management:** React Server Components + Local State
+
+- **Framework:** Next.js 16（App Router） / React 19 / TypeScript 6
+- **Styling:** Tailwind CSS v4
+- **UI:** カスタム Tailwind コンポーネント（ネイティブ要素 + ARIA 重視）
+- **Theme:** `next-themes`（system / light / dark）
+- **Icons:** `lucide-react` のみ
 
 ### Backend & Database
-- **BaaS:** Supabase
-- **Database:** PostgreSQL
-- **SDK:** `@supabase/ssr`
-  - **Philosophy:** 開発効率とアプリロジックへの集中を優先し、Supabaseが提供するエコシステムを最大限に活用します。
+
+- **BaaS:** Supabase（Auth / Postgres / RLS）
+- **SDK:** `@supabase/ssr` + `@supabase/supabase-js`
+- **Philosophy:** ボイラープレートを抑え、アプリロジックに集中する
 
 ### Dev Tools
-- **Build Tool:** Vite / Next Build
-- **Test:** Vitest (Unit Test)
-- **Language:** TypeScript 5.x
+
+- **Test:** Vitest
+- **Lint:** ESLint（`eslint-config-next`）
 
 ---
 
-## 📜 Development Philosophy
+## Development Philosophy
 
-1. **Everything is a Resource**
-   タスクも、資産の推移も、メモも。すべては等しくリソースである。
-2. **Form follows function / Cognitive Load Minimization**
-   デザインは機能に従う。余計なアニメーションや装飾は排し、情報の密度と操作スピードを最大化する。**認知負荷の最小化**を至上命題とする。
-3. **Focus on App Logic**
-   便利なSDK（@supabase/ssr）を全面的に採用し、ボイラープレートを最小限に抑え、アプリケーションの本質的なロジック実装に注力する。
-4. **開発速度を最優先する**
-   個人開発の小規模アプリとして、意思決定は原則として実装速度と反復速度を最優先する。重大な品質リスクがない限り、過度な抽象化や過剰実装は避ける。
+1. **Everything is a Resource**  
+   スケジュールも inbox も、等しくリソースとして扱う。
+2. **Form follows function / Cognitive Load Minimization**  
+   装飾的なアニメーションは排し、情報密度と操作スピードを最大化する。認知負荷の最小化を優先する。
+3. **Focus on App Logic**  
+   `@supabase/ssr` を全面採用し、認証・セッション周りのボイラープレートを最小化する。
+4. **開発速度を最優先する**  
+   個人開発の小規模アプリとして、重大な品質リスクがない限り、実装・反復の速さを優先する。
 
 ---
 
-## 🚀 Database Management (Supabase)
+## Architecture（要約）
 
-データベースのスキーマ管理は Supabase CLI を使用して行います。
+- **画面:** `src/app/`（URL = フォルダ）
+- **UI:** `src/components/`（`layout/` / `ui/` / 機能別）
+- **データ:** `src/lib/supabase/queries/` に集約。`page.tsx` で `supabase.from(...)` を直接書かない
+- **状態:** `src/hooks/`
+- **型:** `src/types/database.types.ts`（Supabase 生成型）を使う。`any` は避ける
+- **認証ゲート:** `src/proxy.ts`（セッション更新・未ログイン時のリダイレクト）
+
+詳細は `docs/directory_structure.md` を参照。
+
+---
+
+## Database Management (Supabase)
+
+スキーマ管理は Supabase CLI で行います。
 
 ### マイグレーション状態の確認
-ローカルとリモートの適用状況を一覧表示します。
+
 ```bash
 npx supabase migration list
 ```
 
 ### マイグレーションの適用
-#### ローカル開発環境
-ローカルのDBに未適用分をすべて適用します。
+
+#### ローカル
+
 ```bash
 npx supabase migration up
 ```
 
-#### リモートプロジェクト (本番・ステージング)
-リンク済みのリモートDBへ新規マイグレーションをプッシュします。
+#### リモート（本番・ステージング）
+
 ```bash
 npx supabase db push
 ```
 
-#### データベースのリセット
-**（※注意：全データ削除）** ローカルDBを初期化し、全てのマイグレーションを最初から適用し直します。
+#### ローカル DB のリセット
+
+**注意: 全データ削除。** ローカル DB を初期化し、全マイグレーションを再適用します。
+
 ```bash
 npx supabase db reset
 ```
 
 ### 本番データの手動ダンプ
-本番DBのダンプを手動で作成し、必要時にローカルへ復元する手順は以下を参照してください。
 
-- `docs/supabase-backup.md`
-
----
-
-## 🧪 Testing
-
-### テストコードの構成
-テストコードは**コロケーションスタイル**で統一し、コンポーネントやロジックのすぐ横に配置します。実装ファイルとテストファイルを近接させることで、変更時の影響範囲の把握とメンテナンスを容易にします。
-
-- **命名規則:** `filename.test.ts` (または `filename.test.tsx`)
-- **配置例:**
-  - `src/utils/date.ts` に対するテスト → `src/utils/date.test.ts`
-  - `src/components/Card.tsx` に対するテスト → `src/components/Card.test.tsx`
-
-### 小規模個人開発におけるテスト方針
-本プロジェクトでは、テスト対象を「手動での確認が難しい（または時間がかかる）領域」「不安が残りやすい変換ロジック」「壊れると影響が大きい重要挙動」に絞ります。  
-一方で、単純なラッパー関数や手動確認が容易な部分は過剰にテストせず、実装速度と保守コストのバランスを優先します。
+手順は `docs/supabase-backup.md` を参照。
 
 ---
 
-## 🎨 UI/UX Requirements
+## Testing
 
+テストは**コロケーション**（実装のすぐ横）で置きます。
 
-視覚的ノイズと操作コストの最小化を追求する。
+- **命名:** `filename.test.ts` / `filename.test.tsx`
+- **例:** `src/lib/date.ts` → `src/lib/date.test.ts`
 
-- **UIコンポーネントの最小化:** 画面上のボタン、メニュー、サイドバーを最小化（または隠蔽）。
-- **アニメーションの抑制:** フェード、スライド等のアニメーションを最小化。
-- **モーダル排除:** 同一プレーンでの完結を基本とし、モーダルウィンドウを極力排除する。
-- **操作コスト低減:** クリック/タップ数の削減。
+### 方針（小規模個人開発）
 
-## 🛠 開発ルール
+手動確認が難しい領域・壊れやすい変換ロジック・影響の大きい挙動に絞る。薄いラッパーや目視で足りる UI は過剰にテストしない。
 
-### アイコン運用ルール
-UIの統一感を維持するため、アイコンライブラリは `lucide-react` に統一します。
+---
+
+## UI/UX
+
+視覚ノイズと操作コストを抑える。詳細なトークン規約は `README-design.md`。
+
+- **ナビ:** デスクトップは左端の細いレールをホバーで展開。モバイルはハンバーガー（左下）
+- **詳細・編集:** 単一アイテムの閲覧・編集はセンターフォーカスのモーダルを優先（Esc / 外側クリックで閉じる）
+- **装飾の抑制:** 装飾アニメーションは使わない。クリック数を減らす
+- **デザイン:** Neutral + Amber（破壊操作のみ Red）。`shadow-*` 禁止。角丸は `rounded-sm` / `rounded` のみ
+
+---
+
+## 開発ルール
+
+### アイコン
+
+`lucide-react` に統一する。他パッケージからアイコンを入れない。
 
 ### コミットメッセージのプレフィックス
-履歴を追いやすくするため、以下のプレフィックスを使い分ける。
 
-| プレフィックス | 内容 | 具体例 |
+| プレフィックス | 内容 | 例 |
 | :--- | :--- | :--- |
-| **feat:** | 新機能の追加・仕様変更 | `feat: add search functionality to inventory list` |
-| **fix:** | バグの修正 | `fix: resolve login error on mobile devices` |
-| **refactor:** | コードの整理（挙動は変えない） | `refactor: simplify data fetching logic` |
-| **docs:** | ドキュメントの修正 | `docs: add commit rules to README` |
-| **chore:** | その他、設定や雑用 | `chore: update dependencies`, `chore: update .gitignore` |
+| **feat:** | 新機能・仕様変更 | `feat: add infinite scroll to schedules` |
+| **fix:** | バグ修正 | `fix: preserve session cookies on auth redirect` |
+| **refactor:** | 挙動を変えない整理 | `refactor: extract schedule text-format helpers` |
+| **docs:** | ドキュメント | `docs: align README with current stack` |
+| **chore:** | 設定・雑用 | `chore: update dependencies` |
