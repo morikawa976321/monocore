@@ -1,7 +1,8 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
 type ScheduleRow = Database['public']['Tables']['schedules']['Row']
+type ScheduleDayRevisionRow = Database['public']['Tables']['schedule_day_revisions']['Row']
 
 /**
  * 指定した時間範囲内のスケジュールを取得する。
@@ -22,6 +23,20 @@ export async function getSchedules(
     return { data, error }
 }
 
+export async function getScheduleDayRevisions(
+    supabase: SupabaseClient<Database>,
+    startDay: string,
+    endDay: string,
+): Promise<{ data: ScheduleDayRevisionRow[] | null; error: PostgrestError | null }> {
+    const { data, error } = await supabase
+        .from('schedule_day_revisions')
+        .select('*')
+        .gte('day_key', startDay)
+        .lte('day_key', endDay)
+        .order('day_key', { ascending: true })
+    return { data, error }
+}
+
 /** 1件分のスケジュール。start_at / end_at は UTC の ISO 文字列であること（呼び出し元で変換する）。 */
 export type ReplaceScheduleItem = {
     activity: string
@@ -37,14 +52,18 @@ export type ReplaceScheduleItem = {
  */
 export async function replaceSchedulesForDay(
     supabase: SupabaseClient<Database>,
+    day_key: string,
     day_start_utc: string,
     day_end_utc: string,
+    expected_revision: number,
     items: ReplaceScheduleItem[]
-): Promise<{ data: undefined; error: Error | null }> {
-    const { error } = await supabase.rpc('replace_schedules_for_day', {
+): Promise<{ data: number | null; error: PostgrestError | null }> {
+    const { data, error } = await supabase.rpc('replace_schedules_for_day', {
+        p_day_key: day_key,
         p_day_start_utc: day_start_utc,
         p_day_end_utc: day_end_utc,
+        p_expected_revision: expected_revision,
         p_items: items,
     })
-    return { data: undefined, error }
+    return { data, error }
 }

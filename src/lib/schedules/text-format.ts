@@ -6,7 +6,7 @@ export type ScheduleRow = Database['public']['Tables']['schedules']['Row'];
 
 const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
-export type DayEntry = { dateLabel: string; content: string };
+export type DayEntry = { dateLabel: string; content: string; revision: number };
 
 /** "2026/03/01 (日)" → "2026-03-01" */
 export function dateLabelToDateStr(dateLabel: string): string {
@@ -157,6 +157,7 @@ export function generateDayEntries(start: Date, end: Date): DayEntry[] {
         entries.push({
             dateLabel: `${yyyy}/${mm}/${dd} (${dow})`,
             content: '',
+            revision: 0,
         });
         current.setDate(current.getDate() + 1);
     }

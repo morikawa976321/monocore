@@ -60,6 +60,27 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_day_revisions: {
+        Row: {
+          day_key: string
+          revision: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          day_key: string
+          revision?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          day_key?: string
+          revision?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       schedules: {
         Row: {
           activity: string
@@ -99,8 +120,14 @@ export type Database = {
     }
     Functions: {
       replace_schedules_for_day: {
-        Args: { p_day_end_utc: string; p_day_start_utc: string; p_items: Json }
-        Returns: undefined
+        Args: {
+          p_day_end_utc: string
+          p_day_key: string
+          p_day_start_utc: string
+          p_expected_revision: number
+          p_items: Json
+        }
+        Returns: number
       }
       replace_schedules_for_day_as: {
         Args: {

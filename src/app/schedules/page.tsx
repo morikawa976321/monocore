@@ -4,7 +4,11 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallba
 import { addDays, addMonths, subMonths, parseISO, format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/src/lib/supabase/client';
-import { getSchedules, replaceSchedulesForDay } from '@/src/lib/supabase/queries/schedules';
+import {
+    getScheduleDayRevisions,
+    getSchedules,
+    replaceSchedulesForDay,
+} from '@/src/lib/supabase/queries/schedules';
 import { getDefaultTimezone, localTimeToUtc } from '@/src/lib/date';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
 import { DaySection } from '@/src/components/schedules/DaySection';
@@ -17,6 +21,11 @@ import {
     mergeSchedulesIntoEntries,
     type DayEntry,
 } from '@/src/lib/schedules/text-format';
+import {
+    applyScheduleRevisions,
+    isScheduleRevisionConflict,
+    ScheduleSaveQueue,
+} from '@/src/lib/schedules/sync';
 import { Inbox } from 'lucide-react';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { PageHeader } from '@/src/components/layout/PageHeader';
@@ -38,6 +47,7 @@ export default function SchedulesPage() {
     const [hasMorePast, setHasMorePast] = useState(true);
     const [isInitialSyncing, setIsInitialSyncing] = useState(true);
     const [isResumeSyncing, setIsResumeSyncing] = useState(false);
+    const [syncError, setSyncError] = useState<string | null>(null);
 
     // Supabaseクライアントは1回作って使い回す。
     const supabase = useMemo(() => createClient(), []);
@@ -50,6 +60,8 @@ export default function SchedulesPage() {
     // beforeunload時に最新entriesへアクセスするためのref。
     const entriesRef = useRef<DayEntry[]>(entries);
     const isResumeSyncingRef = useRef(false);
+    const dirtyDateLabelsRef = useRef(new Set<string>());
+    const saveQueueRef = useRef(new ScheduleSaveQueue());
 
     useLayoutEffect(() => {
         focusedDateLabelRef.current = focusedDateLabel;
@@ -69,7 +81,7 @@ export default function SchedulesPage() {
     const todaySectionRef = useRef<HTMLElement | null>(null);
     const { inboxOpen, setInboxOpen, inboxContent, updateInboxContent, saveInboxNow, hasPendingChanges } =
         useInbox(supabase);
-    const isEditLocked = isInitialSyncing;
+    const isEditLocked = isInitialSyncing || isResumeSyncing;
 
     // --- 初回（クライアントのみ）: 日付確定 → entries 生成 → DB fetch → 今日へスクロール ---
     useEffect(() => {
@@ -87,10 +99,21 @@ export default function SchedulesPage() {
         // 次にDBから実データを取得し、空の骨組みに上書きして完成形にする。
         const startUtc = localTimeToUtc(format(start, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(end, 1), 'yyyy-MM-dd'), '0000', tz);
-        void getSchedules(supabase, startUtc, endUtc)
-            .then(({ data, error }) => {
-                if (error || !data) return;
-                setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz));
+        void Promise.all([
+            getSchedules(supabase, startUtc, endUtc),
+            getScheduleDayRevisions(
+                supabase,
+                format(start, 'yyyy-MM-dd'),
+                format(end, 'yyyy-MM-dd')
+            ),
+        ])
+            .then(([schedulesResult, revisionsResult]) => {
+                if (schedulesResult.error || revisionsResult.error) {
+                    setSyncError('スケジュールの読み込みに失敗しました。');
+                    return;
+                }
+                const merged = mergeSchedulesIntoEntries(initial, schedulesResult.data ?? [], tz);
+                setEntries(applyScheduleRevisions(merged, revisionsResult.data ?? []));
                 scrollTodayAfterInitialMergeRef.current = true;
             })
             .finally(() => {
@@ -107,9 +130,27 @@ export default function SchedulesPage() {
         setLoadingBottom(true);
         const startUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), '0000', tz);
-        const { data, error } = await getSchedules(supabase, startUtc, endUtc);
-        if (!error && data) {
-            setEntries((prev) => mergeSchedulesIntoEntries(prev, data, tz));
+        const [schedulesResult, revisionsResult] = await Promise.all([
+            getSchedules(supabase, startUtc, endUtc),
+            getScheduleDayRevisions(
+                supabase,
+                format(rangeStart, 'yyyy-MM-dd'),
+                format(rangeEnd, 'yyyy-MM-dd')
+            ),
+        ]);
+        if (!schedulesResult.error && !revisionsResult.error) {
+            setEntries((prev) => {
+                const merged = applyScheduleRevisions(
+                    mergeSchedulesIntoEntries(prev, schedulesResult.data ?? [], tz),
+                    revisionsResult.data ?? []
+                );
+                return merged.map((entry, index) =>
+                    dirtyDateLabelsRef.current.has(entry.dateLabel) ? prev[index] : entry
+                );
+            });
+            setSyncError(null);
+        } else {
+            setSyncError('スケジュールの同期に失敗しました。');
         }
         // 復帰同期・手動更新の完了時点で「今日」を再計算（開いたまま日付が変わると枠だけ前日のまま残るため）
         setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
@@ -152,17 +193,48 @@ export default function SchedulesPage() {
     // --- saveDay: dateLabel ベース ---
     const saveDay = useCallback(
         (dateLabel: string) => {
-            // 日付ラベルから該当日の入力内容を取り出す。
-            const entry = entriesRef.current.find((e) => e.dateLabel === dateLabel);
-            if (!entry) return;
-            const dateStr = dateLabelToDateStr(entry.dateLabel);
-            if (!dateStr) return;
-            // ローカル日付の1日区間をUTCに変換してDB保存の範囲を確定する。
-            const day_start_utc = localTimeToUtc(dateStr, '0000', tz);
-            const nextDateStr = format(addDays(parseISO(dateStr), 1), 'yyyy-MM-dd');
-            const day_end_utc = localTimeToUtc(nextDateStr, '0000', tz);
-            const items = dayContentToScheduleItems(dateStr, entry.content, tz);
-            void replaceSchedulesForDay(supabase, day_start_utc, day_end_utc, items);
+            const dateStr = dateLabelToDateStr(dateLabel);
+            if (!dateStr || !dirtyDateLabelsRef.current.has(dateLabel)) return Promise.resolve();
+
+            return saveQueueRef.current.enqueue(dateStr, async () => {
+                if (!dirtyDateLabelsRef.current.has(dateLabel)) return;
+                const entry = entriesRef.current.find((candidate) => candidate.dateLabel === dateLabel);
+                if (!entry) return;
+
+                const savedContent = entry.content;
+                const day_start_utc = localTimeToUtc(dateStr, '0000', tz);
+                const nextDateStr = format(addDays(parseISO(dateStr), 1), 'yyyy-MM-dd');
+                const day_end_utc = localTimeToUtc(nextDateStr, '0000', tz);
+                const items = dayContentToScheduleItems(dateStr, savedContent, tz);
+                const { data: nextRevision, error } = await replaceSchedulesForDay(
+                    supabase,
+                    dateStr,
+                    day_start_utc,
+                    day_end_utc,
+                    entry.revision,
+                    items
+                );
+
+                if (error || nextRevision == null) {
+                    setSyncError(
+                        isScheduleRevisionConflict(error)
+                            ? `${dateStr} は別のデバイスで更新されています。再読み込みしてください。`
+                            : `${dateStr} の保存に失敗しました。`
+                    );
+                    return;
+                }
+
+                const nextEntries = entriesRef.current.map((current) => {
+                    if (current.dateLabel !== dateLabel) return current;
+                    if (current.content === savedContent) {
+                        dirtyDateLabelsRef.current.delete(dateLabel);
+                    }
+                    return { ...current, revision: nextRevision };
+                });
+                entriesRef.current = nextEntries;
+                setEntries(nextEntries);
+                setSyncError(null);
+            });
         },
         [supabase, tz]
     );
@@ -173,7 +245,7 @@ export default function SchedulesPage() {
         const dateLabel = pendingSaveDateLabelRef.current ?? focusedDateLabelRef.current;
         pendingSaveDateLabelRef.current = null;
         if (!dateLabel) return;
-        saveDay(dateLabel);
+        void saveDay(dateLabel);
     }, [clearDebounceTimer, saveDay]);
 
     // --- beforeunload: 未保存スケジュールは flush（saveDay）、Inbox は同期保存 ---
@@ -197,12 +269,15 @@ export default function SchedulesPage() {
     // --- updateDayContent ---
     const updateDayContent = (dateLabel: string, value: string) => {
         if (isEditLocked) return;
+        dirtyDateLabelsRef.current.add(dateLabel);
+        setSyncError(null);
         // まず画面上の該当日の本文を更新する。
         setEntries((prev) => {
             const next = [...prev];
             const idx = next.findIndex((e) => e.dateLabel === dateLabel);
             if (idx === -1) return prev;
             next[idx] = { ...next[idx], content: value };
+            entriesRef.current = next;
             return next;
         });
         // フォーカス中のテキストエリアだけ自動保存対象にする。
@@ -212,7 +287,7 @@ export default function SchedulesPage() {
         debounceTimerRef.current = setTimeout(() => {
             debounceTimerRef.current = null;
             pendingSaveDateLabelRef.current = null;
-            saveDay(dateLabel);
+            void saveDay(dateLabel);
         }, 500);
     };
 
@@ -232,7 +307,7 @@ export default function SchedulesPage() {
                 if (isResumeSyncingRef.current) return;
                 isResumeSyncingRef.current = true;
                 setIsResumeSyncing(true);
-                void reloadSchedules().finally(() => {
+                void saveQueueRef.current.waitForIdle().then(reloadSchedules).finally(() => {
                     isResumeSyncingRef.current = false;
                     setIsResumeSyncing(false);
                 });
@@ -271,8 +346,18 @@ export default function SchedulesPage() {
             tz
         );
         const endUtc = localTimeToUtc(format(addDays(newEnd, 1), 'yyyy-MM-dd'), '0000', tz);
-        const { data } = await getSchedules(supabase, startUtc, endUtc);
-        const merged = mergeSchedulesIntoEntries(newEntries, data ?? [], tz);
+        const [schedulesResult, revisionsResult] = await Promise.all([
+            getSchedules(supabase, startUtc, endUtc),
+            getScheduleDayRevisions(
+                supabase,
+                format(addDays(rangeEnd, 1), 'yyyy-MM-dd'),
+                format(newEnd, 'yyyy-MM-dd')
+            ),
+        ]);
+        const merged = applyScheduleRevisions(
+            mergeSchedulesIntoEntries(newEntries, schedulesResult.data ?? [], tz),
+            revisionsResult.data ?? []
+        );
         // 未来側は末尾に追加する。
         setEntries((prev) => [...prev, ...merged]);
         setRangeEnd(newEnd);
@@ -288,13 +373,23 @@ export default function SchedulesPage() {
         const newEntries = generateDayEntries(newStart, addDays(rangeStart, -1));
         const startUtc = localTimeToUtc(format(newStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
-        const { data } = await getSchedules(supabase, startUtc, endUtc);
-        if (!data || data.length === 0) {
+        const [schedulesResult, revisionsResult] = await Promise.all([
+            getSchedules(supabase, startUtc, endUtc),
+            getScheduleDayRevisions(
+                supabase,
+                format(newStart, 'yyyy-MM-dd'),
+                format(addDays(rangeStart, -1), 'yyyy-MM-dd')
+            ),
+        ]);
+        if (!schedulesResult.data || schedulesResult.data.length === 0) {
             setHasMorePast(false);
             setLoadingTop(false);
             return;
         }
-        const merged = mergeSchedulesIntoEntries(newEntries, data, tz);
+        const merged = applyScheduleRevisions(
+            mergeSchedulesIntoEntries(newEntries, schedulesResult.data, tz),
+            revisionsResult.data ?? []
+        );
         // scroll 位置補正のため prepend 前の scrollHeight を記録
         if (scrollContainerRef.current) {
             scrollHeightBeforePrependRef.current = scrollContainerRef.current.scrollHeight;
@@ -357,6 +452,9 @@ export default function SchedulesPage() {
                         <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
                     </div>
                 )}
+                {syncError && (
+                    <span className="text-sm text-amber-600 dark:text-amber-400">{syncError}</span>
+                )}
                 <div className="hidden sm:inline-flex">
                     <Button
                         onClick={handleInboxToggle}
@@ -418,7 +516,7 @@ export default function SchedulesPage() {
                                 if (isEditLocked) return;
                                 clearDebounceTimer();
                                 pendingSaveDateLabelRef.current = null;
-                                saveDay(entry.dateLabel);
+                                void saveDay(entry.dateLabel);
                             }}
                         />
                     ))}
