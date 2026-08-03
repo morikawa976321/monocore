@@ -60,6 +60,36 @@ export type Database = {
         }
         Relationships: []
       }
+      project_card_decision_answers: {
+        Row: {
+          answer: "accept_recommendation" | "alternative" | "defer"
+          answered_at: string
+          card_slug: string
+          consumed_at: string | null
+          decision_id: string
+          id: string
+          note: string | null
+        }
+        Insert: {
+          answer: "accept_recommendation" | "alternative" | "defer"
+          answered_at?: string
+          card_slug: string
+          consumed_at?: string | null
+          decision_id: string
+          id?: string
+          note?: string | null
+        }
+        Update: {
+          answer?: "accept_recommendation" | "alternative" | "defer"
+          answered_at?: string
+          card_slug?: string
+          consumed_at?: string | null
+          decision_id?: string
+          id?: string
+          note?: string | null
+        }
+        Relationships: []
+      }
       project_cards: {
         Row: {
           ai_next: Json

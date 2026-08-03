@@ -1,4 +1,9 @@
+import { DecisionAnswerForm } from '@/src/components/projects/DecisionAnswerForm'
+import { answerLabel } from '@/src/lib/projects/answers'
 import type { ProjectCardRow } from '@/src/lib/supabase/queries/project-cards'
+import type {
+    DecisionAnswerRow,
+} from '@/src/lib/supabase/queries/project-card-answers'
 import {
     formatDeadlineLabel,
     parseAiNext,
@@ -9,9 +14,21 @@ import {
 type ProjectCardProps = {
     card: ProjectCardRow
     today: string
+    answers: Map<string, DecisionAnswerRow>
+    onAnswered: (row: DecisionAnswerRow) => void
 }
 
-export function ProjectCard({ card, today }: ProjectCardProps) {
+function answerKey(cardSlug: string, decisionId: string): string {
+    return `${cardSlug}::${decisionId}`
+}
+
+function formatAnsweredAt(timestamp: string): string {
+    const date = new Date(timestamp)
+    if (Number.isNaN(date.getTime())) return timestamp
+    return date.toLocaleString('ja-JP')
+}
+
+export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardProps) {
     const deadlineLabel = formatDeadlineLabel(card.deadline, today)
     const aiRecent = parseAiRecent(card.ai_recent)
     const decisions = parseDecisions(card.decisions)
@@ -75,25 +92,54 @@ export function ProjectCard({ card, today }: ProjectCardProps) {
                 )}
 
                 {decisions.length > 0 && (
-                <section className="flex flex-col gap-2">
-                    <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-50">判断</h4>
-                    <ul className="flex flex-col gap-2">
-                        {decisions.map((decision) => (
-                            <li
-                                key={decision.id}
-                                className="rounded-sm border border-neutral-200 bg-neutral-100 p-2 dark:border-neutral-800 dark:bg-neutral-800"
-                            >
-                                <p className="text-sm text-neutral-900 dark:text-neutral-50">{decision.question}</p>
-                                <p className="text-sm text-neutral-800 dark:text-neutral-200">
-                                    推奨: {decision.recommendation}
-                                </p>
-                                <p className="text-sm text-neutral-700 dark:text-neutral-300">
-                                    提示 {decision.times_shown}回目
-                                </p>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
+                    <section className="flex flex-col gap-2">
+                        <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-50">判断</h4>
+                        <ul className="flex flex-col gap-2">
+                            {decisions.map((decision) => {
+                                const existingAnswer =
+                                    answers.get(answerKey(card.slug, decision.id)) ?? null
+                                const isAnswered = existingAnswer !== null
+
+                                return (
+                                    <li
+                                        key={decision.id}
+                                        className={
+                                            isAnswered
+                                                ? 'rounded-sm border border-neutral-200 bg-neutral-100 p-2 dark:border-neutral-700 dark:bg-neutral-800'
+                                                : 'rounded-sm border border-amber-500 bg-neutral-50 p-2 dark:border-amber-400 dark:bg-neutral-900'
+                                        }
+                                    >
+                                        <p className="text-sm text-neutral-900 dark:text-neutral-50">
+                                            {decision.question}
+                                        </p>
+                                        <p className="text-sm text-neutral-800 dark:text-neutral-200">
+                                            推奨: {decision.recommendation}
+                                        </p>
+                                        <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                                            提示 {decision.times_shown}回目
+                                        </p>
+                                        {isAnswered && existingAnswer ? (
+                                            <p className="text-sm text-neutral-800 dark:text-neutral-200">
+                                                回答済み: {answerLabel(existingAnswer.answer)}
+                                                （{formatAnsweredAt(existingAnswer.answered_at)}）
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm text-amber-600 dark:text-amber-400">
+                                                未回答: この判断への回答が必要です
+                                            </p>
+                                        )}
+                                        <DecisionAnswerForm
+                                            cardSlug={card.slug}
+                                            decisionId={decision.id}
+                                            recommendation={decision.recommendation}
+                                            existingAnswer={existingAnswer}
+                                            onAnswered={onAnswered}
+                                        />
+                                    </li>
+                                )
+                            })}
+                        </ul>
+                    </section>
                 )}
 
                 {aiNext.length > 0 && (
