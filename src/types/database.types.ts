@@ -60,6 +60,57 @@ export type Database = {
         }
         Relationships: []
       }
+      project_cards: {
+        Row: {
+          ai_next: Json
+          ai_recent: Json
+          created_at: string | null
+          deadline: string | null
+          deadline_note: string | null
+          decisions: Json
+          definition_of_done: string
+          slug: string
+          sort_order: number
+          sources: string[]
+          status: string
+          title: string
+          updated_at: string | null
+          your_turn: string
+        }
+        Insert: {
+          ai_next?: Json
+          ai_recent?: Json
+          created_at?: string | null
+          deadline?: string | null
+          deadline_note?: string | null
+          decisions?: Json
+          definition_of_done?: string
+          slug: string
+          sort_order?: number
+          sources?: string[]
+          status?: string
+          title: string
+          updated_at?: string | null
+          your_turn?: string
+        }
+        Update: {
+          ai_next?: Json
+          ai_recent?: Json
+          created_at?: string | null
+          deadline?: string | null
+          deadline_note?: string | null
+          decisions?: Json
+          definition_of_done?: string
+          slug?: string
+          sort_order?: number
+          sources?: string[]
+          status?: string
+          title?: string
+          updated_at?: string | null
+          your_turn?: string
+        }
+        Relationships: []
+      }
       schedule_day_revisions: {
         Row: {
           day_key: string

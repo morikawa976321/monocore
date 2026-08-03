@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
     Clock,
+    LayoutGrid,
     Menu,
     LogOut,
 } from "lucide-react";
@@ -12,6 +13,7 @@ import { createClient } from "@/src/lib/supabase/client";
 
 const MENU_ITEMS = [
     { href: "/schedules", icon: Clock, label: "Schedule" },
+    { href: "/projects", icon: LayoutGrid, label: "Projects" },
 ] as const;
 
 export function Sidebar() {

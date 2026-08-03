@@ -1,0 +1,85 @@
+{
+  "cards": [
+    {
+      "slug": "project-board-page",
+      "title": "プロジェクトボードページ公開",
+      "definition_of_done": "読み取り専用ページが本番UIに表示される",
+      "status": "active",
+      "deadline": "2026-08-20",
+      "deadline_note": "先に一覧表示だけ出す",
+      "ai_recent": {},
+      "your_turn": "折りたたみ仕様の最終確認",
+      "decisions": [
+        {
+          "id": "dec-001",
+          "question": "dormant を初期表示するか",
+          "recommendation": "初期は折りたたみ",
+          "first_raised": "2026-08-01",
+          "times_shown": 17,
+          "blocks": [
+            "render-cost"
+          ]
+        }
+      ],
+      "ai_next": [
+        "UIのスナップショット確認",
+        "読み込み失敗時の文言調整"
+      ],
+      "sources": [
+        "https://example.com/spec/project-board"
+      ],
+      "sort_order": 10
+    },
+    {
+      "slug": "inbox-merge",
+      "title": "Inbox統合導線",
+      "definition_of_done": "Projects から Inbox 関連カードを追跡できる",
+      "status": "waiting_user",
+      "deadline": null,
+      "deadline_note": null,
+      "ai_recent": {
+        "text": "Sidebar の導線候補を比較して推奨案を作成",
+        "links": [
+          "https://example.com/docs/nav-options"
+        ]
+      },
+      "your_turn": "導線ラベルを確定する",
+      "decisions": [
+        {
+          "id": "dec-002",
+          "question": "ラベルを Projects に統一するか",
+          "recommendation": "英語ラベルを維持",
+          "first_raised": "2026-08-02",
+          "times_shown": 4,
+          "blocks": []
+        }
+      ],
+      "ai_next": [
+        "モバイル表示の文言幅チェック"
+      ],
+      "sources": [
+        "https://example.com/task/inbox-merge"
+      ],
+      "sort_order": 20
+    },
+    {
+      "slug": "old-experiment",
+      "title": "旧実験カード",
+      "definition_of_done": "必要時のみ参照できれば良い",
+      "status": "dormant",
+      "deadline": "2026-09-10",
+      "deadline_note": "再開時に再見積もり",
+      "ai_recent": {
+        "text": "依存関係メモを更新",
+        "links": []
+      },
+      "your_turn": "",
+      "decisions": [],
+      "ai_next": [
+        "再開時にタスクを再分割"
+      ],
+      "sources": [],
+      "sort_order": 30
+    }
+  ]
+}
