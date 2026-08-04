@@ -1,8 +1,24 @@
 # monocore
 
-**A minimalist Personal OS for schedules and inbox.**
+**A minimalist Personal OS for schedules, inbox, and projects.**
 
-`monocore` は、日々の予定と inbox を一箇所に集約し、自分の支配下に置くための Web アプリです。
+`monocore` は、日々の予定・inbox・プロジェクト板を一箇所に集約し、自分の支配下に置くための Web アプリです。
+
+---
+
+## Features
+
+| ルート | 役割 |
+| :--- | :--- |
+| `/schedules` | 予定の一覧・編集 |
+| `/inbox` | inbox の取り込み・整理 |
+| `/projects` | プロジェクト板（ステータス別カード。判断への回答） |
+
+### Projects（`/projects`）
+
+- カードは status（`active` / `waiting_user` / `waiting_other` / `dormant`）ごとにセクション表示。休止中は折りたたみ。
+- `project_cards` は画面からの手入力は不可（SELECT のみ）。正は context-engine / taskbox 側にあり、`scripts/upsert-project-cards.mjs` が service_role で slug 単位 upsert する。
+- カード上の「判断」への回答は `project_card_decision_answers` へ追記専用で保存（accept / alternative / defer）。
 
 ---
 
@@ -55,7 +71,7 @@ npm run dev
 ## Development Philosophy
 
 1. **Everything is a Resource**  
-   スケジュールも inbox も、等しくリソースとして扱う。
+   スケジュールも inbox もプロジェクトカードも、等しくリソースとして扱う。
 2. **Form follows function / Cognitive Load Minimization**  
    装飾的なアニメーションは排し、情報密度と操作スピードを最大化する。認知負荷の最小化を優先する。
 3. **Focus on App Logic**  
@@ -69,10 +85,11 @@ npm run dev
 
 - **画面:** `src/app/`（URL = フォルダ）
 - **UI:** `src/components/`（`layout/` / `ui/` / 機能別）
-- **データ:** `src/lib/supabase/queries/` に集約。`page.tsx` で `supabase.from(...)` を直接書かない
+- **データ:** `src/lib/supabase/queries/` に集約（例: `schedules.ts`, `inboxes.ts`, `project-cards.ts`）。`page.tsx` で `supabase.from(...)` を直接書かない
 - **状態:** `src/hooks/`
 - **型:** `src/types/database.types.ts`（Supabase 生成型）を使う。`any` は避ける
 - **認証ゲート:** `src/proxy.ts`（セッション更新・未ログイン時のリダイレクト）
+- **Projects UI:** `src/app/projects/page.tsx` + `src/components/projects/`。カード投入は `scripts/upsert-project-cards.mjs`
 
 詳細は `docs/directory_structure.md` を参照。
 
