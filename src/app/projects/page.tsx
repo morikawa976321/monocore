@@ -21,12 +21,18 @@ export default function ProjectsPage() {
     const [projectCards, setProjectCards] = useState<ProjectCardRow[]>([])
     const [decisionAnswers, setDecisionAnswers] = useState<DecisionAnswerRow[]>([])
     const [todayStr, setTodayStr] = useState<string | null>(null)
-    const [isLoading, setIsLoading] = useState(true)
+    const [isInitialLoading, setIsInitialLoading] = useState(true)
+    const [isRefreshing, setIsRefreshing] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [showDormant, setShowDormant] = useState(false)
 
-    const loadProjectData = useCallback(async () => {
-        setIsLoading(true)
+    const loadProjectData = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
+        if (mode === 'refresh') {
+            setIsRefreshing(true)
+        } else {
+            setIsInitialLoading(true)
+        }
+
         const [{ data: cards, error: cardsError }, { data: answers, error: answersError }] =
             await Promise.all([
                 getProjectCards(supabase),
@@ -35,14 +41,16 @@ export default function ProjectsPage() {
 
         if (cardsError || answersError) {
             setErrorMessage('プロジェクトカードの読み込みに失敗しました。')
-            setIsLoading(false)
+            setIsInitialLoading(false)
+            setIsRefreshing(false)
             return
         }
 
         setProjectCards(cards ?? [])
         setDecisionAnswers(answers ?? [])
         setErrorMessage(null)
-        setIsLoading(false)
+        setIsInitialLoading(false)
+        setIsRefreshing(false)
     }, [supabase])
 
     useEffect(() => {
@@ -50,7 +58,7 @@ export default function ProjectsPage() {
     }, [timezone])
 
     useEffect(() => {
-        void loadProjectData()
+        void loadProjectData('initial')
     }, [loadProjectData])
 
     const answersByDecision = useMemo(() => latestAnswerByDecision(decisionAnswers), [decisionAnswers])
@@ -63,18 +71,17 @@ export default function ProjectsPage() {
     const waitingUserCards = projectCards.filter((card) => card.status === 'waiting_user')
     const waitingOtherCards = projectCards.filter((card) => card.status === 'waiting_other')
     const dormantCards = projectCards.filter((card) => card.status === 'dormant')
-
     return (
-        <div className="flex h-screen flex-col bg-neutral-100 dark:bg-neutral-950">
+        <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             <PageHeader
                 title="Projects"
-                onRefresh={() => void loadProjectData()}
-                isRefreshing={isLoading}
+                onRefresh={() => void loadProjectData('refresh')}
+                isRefreshing={isRefreshing}
             >
-                {isLoading && (
+                {isInitialLoading && (
                     <div className="inline-flex items-center gap-2">
                         <LoadingIndicator />
-                        <span className="text-sm text-neutral-700 dark:text-neutral-300">読み込み中…</span>
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
                     </div>
                 )}
                 {errorMessage && (
@@ -82,69 +89,76 @@ export default function ProjectsPage() {
                 )}
             </PageHeader>
 
-            <main className="flex-1 overflow-y-auto px-2 py-1 sm:px-6 sm:py-4">
-                {(isLoading || todayStr === null) && (
-                    <div className="flex h-full items-center justify-center">
-                        <LoadingIndicator size="md" />
+            <div className="flex-1 overflow-hidden relative">
+                <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4">
+                    {!isInitialLoading && todayStr !== null && projectCards.length === 0 && (
+                        <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
+                            <div className="p-1 sm:p-4">
+                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100">
+                                    表示できるプロジェクトカードはありません。
+                                </p>
+                            </div>
+                        </section>
+                    )}
+
+                    {!isInitialLoading && todayStr !== null && projectCards.length > 0 && (
+                        <>
+                            <ProjectSection
+                                title="動いている"
+                                cards={activeCards}
+                                today={todayStr}
+                                answers={answersByDecision}
+                                onAnswered={handleAnswered}
+                            />
+                            <ProjectSection
+                                title="あなた待ち"
+                                cards={waitingUserCards}
+                                today={todayStr}
+                                answers={answersByDecision}
+                                onAnswered={handleAnswered}
+                            />
+                            <ProjectSection
+                                title="他人待ち"
+                                cards={waitingOtherCards}
+                                today={todayStr}
+                                answers={answersByDecision}
+                                onAnswered={handleAnswered}
+                            />
+
+                            {dormantCards.length > 0 && (
+                                <section className="space-y-2 sm:space-y-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDormant((prev) => !prev)}
+                                        aria-expanded={showDormant}
+                                        className="w-full rounded border border-neutral-400 bg-neutral-50 px-2 sm:px-4 py-2 text-left text-sm leading-6 font-medium text-neutral-700 transition-colors duration-150 ease-in-out hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus-visible:ring-neutral-400"
+                                    >
+                                        他{dormantCards.length}件
+                                    </button>
+                                    {showDormant && (
+                                        <ProjectSection
+                                            title="休止中"
+                                            cards={dormantCards}
+                                            today={todayStr}
+                                            answers={answersByDecision}
+                                            onAnswered={handleAnswered}
+                                        />
+                                    )}
+                                </section>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {isInitialLoading && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-100/80 dark:bg-neutral-950/80">
+                        <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 rounded p-4">
+                            <LoadingIndicator />
+                            <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
+                        </div>
                     </div>
                 )}
-
-                {!isLoading && todayStr !== null && projectCards.length === 0 && (
-                    <div className="overflow-hidden rounded border border-neutral-400 bg-neutral-50 p-2 dark:border-neutral-600 dark:bg-neutral-900 sm:p-4">
-                        <p className="text-sm text-neutral-800 dark:text-neutral-200">
-                            表示できるプロジェクトカードはありません。
-                        </p>
-                    </div>
-                )}
-
-                {!isLoading && todayStr !== null && projectCards.length > 0 && (
-                    <div className="flex flex-col gap-2 sm:gap-4">
-                        <ProjectSection
-                            title="動いている"
-                            cards={activeCards}
-                            today={todayStr}
-                            answers={answersByDecision}
-                            onAnswered={handleAnswered}
-                        />
-                        <ProjectSection
-                            title="あなた待ち"
-                            cards={waitingUserCards}
-                            today={todayStr}
-                            answers={answersByDecision}
-                            onAnswered={handleAnswered}
-                        />
-                        <ProjectSection
-                            title="他人待ち"
-                            cards={waitingOtherCards}
-                            today={todayStr}
-                            answers={answersByDecision}
-                            onAnswered={handleAnswered}
-                        />
-
-                        {dormantCards.length > 0 && (
-                            <section className="flex flex-col gap-2 sm:gap-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDormant((prev) => !prev)}
-                                    aria-expanded={showDormant}
-                                    className="w-full rounded border border-neutral-400 bg-neutral-50 px-2 py-2 text-left text-sm font-medium text-neutral-900 transition-colors duration-150 ease-in-out hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-50 dark:hover:bg-neutral-800 dark:focus-visible:ring-neutral-500 sm:px-4"
-                                >
-                                    他{dormantCards.length}件
-                                </button>
-                                {showDormant && (
-                                    <ProjectSection
-                                        title="休止中"
-                                        cards={dormantCards}
-                                        today={todayStr}
-                                        answers={answersByDecision}
-                                        onAnswered={handleAnswered}
-                                    />
-                                )}
-                            </section>
-                        )}
-                    </div>
-                )}
-            </main>
+            </div>
         </div>
     )
 }

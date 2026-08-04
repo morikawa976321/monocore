@@ -35,37 +35,41 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
     const aiNext = parseAiNext(card.ai_next)
 
     return (
-        <article className="overflow-hidden rounded border border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900">
-            <header className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-2 py-2 text-sm leading-6 dark:border-neutral-800 dark:bg-neutral-800/50 sm:px-4">
-                <h3 className="font-medium text-neutral-900 dark:text-neutral-50">{card.title}</h3>
+        <article className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
+            <header className="px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 flex items-center justify-between">
+                <div className="flex items-center text-neutral-700 dark:text-neutral-300">
+                    <span>{card.title}</span>
+                </div>
             </header>
 
-            <div className="flex flex-col gap-4 p-2 sm:p-4">
-                <p className="text-sm text-neutral-800 dark:text-neutral-200">{card.definition_of_done}</p>
+            <div className="flex flex-col gap-4 p-1 sm:p-4 text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100">
+                <p>{card.definition_of_done}</p>
 
                 {card.deadline && (
                     <section className="flex flex-col gap-2">
-                        <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-50">期限</h4>
+                        <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
+                            期限
+                        </h4>
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm text-neutral-900 dark:text-neutral-50">{card.deadline}</span>
+                            <span>{card.deadline}</span>
                             {deadlineLabel && (
-                                <span className="rounded-sm border border-amber-500 px-1 py-0.5 text-sm font-medium leading-none text-amber-600 dark:border-amber-400 dark:text-amber-400">
+                                <span className="px-1 py-0.5 rounded-sm border border-amber-500 dark:border-amber-400 text-amber-600 dark:text-amber-400 text-sm font-medium leading-none">
                                     {deadlineLabel}
                                 </span>
                             )}
                         </div>
                         {card.deadline_note && (
-                            <p className="text-sm text-neutral-700 dark:text-neutral-300">{card.deadline_note}</p>
+                            <p className="text-neutral-700 dark:text-neutral-300">{card.deadline_note}</p>
                         )}
                     </section>
                 )}
 
                 {aiRecent && (
                     <section className="flex flex-col gap-2">
-                        <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-50">
+                        <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
                             AIがやったこと
                         </h4>
-                        <p className="text-sm text-neutral-800 dark:text-neutral-200">{aiRecent.text}</p>
+                        <p>{aiRecent.text}</p>
                         {aiRecent.links.length > 0 && (
                             <ul className="flex flex-col gap-1">
                                 {aiRecent.links.map((link) => (
@@ -74,7 +78,7 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
                                             href={link}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="break-all text-sm text-amber-600 transition-colors duration-150 ease-in-out hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-400"
+                                            className="break-all text-amber-600 transition-colors duration-150 ease-in-out hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-400"
                                         >
                                             {link}
                                         </a>
@@ -87,14 +91,18 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
 
                 {card.your_turn.trim().length > 0 && (
                     <section className="flex flex-col gap-2">
-                        <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-50">あなたの番</h4>
-                        <p className="text-sm text-neutral-800 dark:text-neutral-200">{card.your_turn}</p>
+                        <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
+                            あなたの番
+                        </h4>
+                        <p>{card.your_turn}</p>
                     </section>
                 )}
 
                 {decisions.length > 0 && (
                     <section className="flex flex-col gap-2">
-                        <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-50">判断</h4>
+                        <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
+                            判断
+                        </h4>
                         <ul className="flex flex-col gap-2">
                             {decisions.map((decision) => {
                                 const existingAnswer =
@@ -110,22 +118,20 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
                                                 : 'rounded-sm border border-amber-500 bg-neutral-50 p-2 dark:border-amber-400 dark:bg-neutral-900'
                                         }
                                     >
-                                        <p className="text-sm text-neutral-900 dark:text-neutral-50">
-                                            {decision.question}
-                                        </p>
-                                        <p className="text-sm text-neutral-800 dark:text-neutral-200">
+                                        <p>{decision.question}</p>
+                                        <p className="text-neutral-800 dark:text-neutral-200">
                                             推奨: {decision.recommendation}
                                         </p>
-                                        <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                                        <p className="text-neutral-700 dark:text-neutral-300">
                                             提示 {decision.times_shown}回目
                                         </p>
                                         {isAnswered && existingAnswer ? (
-                                            <p className="text-sm text-neutral-800 dark:text-neutral-200">
+                                            <p className="text-neutral-800 dark:text-neutral-200">
                                                 回答済み: {answerLabel(existingAnswer.answer)}
                                                 （{formatAnsweredAt(existingAnswer.answered_at)}）
                                             </p>
                                         ) : (
-                                            <p className="text-sm text-amber-600 dark:text-amber-400">
+                                            <p className="text-amber-600 dark:text-amber-400">
                                                 未回答: この判断への回答が必要です
                                             </p>
                                         )}
@@ -145,12 +151,12 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
 
                 {aiNext.length > 0 && (
                     <section className="flex flex-col gap-2">
-                        <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-50">AIの次の一手</h4>
+                        <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
+                            AIの次の一手
+                        </h4>
                         <ul className="flex flex-col gap-1">
                             {aiNext.map((nextStep, index) => (
-                                <li key={`${card.slug}-next-${index}`} className="text-sm text-neutral-800 dark:text-neutral-200">
-                                    ・{nextStep}
-                                </li>
+                                <li key={`${card.slug}-next-${index}`}>・{nextStep}</li>
                             ))}
                         </ul>
                     </section>

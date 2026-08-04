@@ -58,7 +58,7 @@ export function DecisionAnswerForm({
     return (
         <div className="flex flex-col gap-2">
             <label className="flex flex-col gap-1">
-                <span className="text-sm text-neutral-800 dark:text-neutral-200">メモ（任意）</span>
+                <span className="text-sm text-neutral-700 dark:text-neutral-300">メモ（任意）</span>
                 <input
                     type="text"
                     value={note}
