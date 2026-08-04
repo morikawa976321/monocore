@@ -14,9 +14,11 @@ export function ProjectSection({ title, cards, today, answers, onAnswered }: Pro
     if (cards.length === 0) return null
 
     return (
-        <section className="flex flex-col gap-4">
-            <h2 className="text-base font-medium text-neutral-900 dark:text-neutral-50">{title}</h2>
-            <div className="flex flex-col gap-4">
+        <section className="flex flex-col gap-2 sm:gap-4">
+            <h2 className="px-2 text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300 sm:px-0">
+                {title}
+            </h2>
+            <div className="flex flex-col gap-2 sm:gap-4">
                 {cards.map((card) => (
                     <ProjectCard
                         key={card.slug}

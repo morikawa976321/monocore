@@ -35,12 +35,13 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
     const aiNext = parseAiNext(card.ai_next)
 
     return (
-        <article className="rounded border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-900">
-            <div className="flex flex-col gap-4">
-                <header className="flex flex-col gap-2">
-                    <h3 className="text-base font-medium text-neutral-900 dark:text-neutral-50">{card.title}</h3>
-                    <p className="text-sm text-neutral-800 dark:text-neutral-200">{card.definition_of_done}</p>
-                </header>
+        <article className="overflow-hidden rounded border border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900">
+            <header className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-2 py-2 text-sm leading-6 dark:border-neutral-800 dark:bg-neutral-800/50 sm:px-4">
+                <h3 className="font-medium text-neutral-900 dark:text-neutral-50">{card.title}</h3>
+            </header>
+
+            <div className="flex flex-col gap-4 p-2 sm:p-4">
+                <p className="text-sm text-neutral-800 dark:text-neutral-200">{card.definition_of_done}</p>
 
                 {card.deadline && (
                     <section className="flex flex-col gap-2">
@@ -48,7 +49,7 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
                         <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm text-neutral-900 dark:text-neutral-50">{card.deadline}</span>
                             {deadlineLabel && (
-                                <span className="rounded-sm border border-amber-500 px-2 py-1 text-sm text-amber-600 dark:border-amber-400 dark:text-amber-400">
+                                <span className="rounded-sm border border-amber-500 px-1 py-0.5 text-sm font-medium leading-none text-amber-600 dark:border-amber-400 dark:text-amber-400">
                                     {deadlineLabel}
                                 </span>
                             )}
