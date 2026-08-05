@@ -62,7 +62,7 @@ export type Database = {
       }
       project_card_decision_answers: {
         Row: {
-          answer: "accept_recommendation" | "alternative" | "defer"
+          answer: string
           answered_at: string
           card_slug: string
           consumed_at: string | null
@@ -71,7 +71,7 @@ export type Database = {
           note: string | null
         }
         Insert: {
-          answer: "accept_recommendation" | "alternative" | "defer"
+          answer: string
           answered_at?: string
           card_slug: string
           consumed_at?: string | null
@@ -80,7 +80,7 @@ export type Database = {
           note?: string | null
         }
         Update: {
-          answer?: "accept_recommendation" | "alternative" | "defer"
+          answer?: string
           answered_at?: string
           card_slug?: string
           consumed_at?: string | null
@@ -88,7 +88,15 @@ export type Database = {
           id?: string
           note?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "project_card_decision_answers_card_slug_fkey"
+            columns: ["card_slug"]
+            isOneToOne: false
+            referencedRelation: "project_cards"
+            referencedColumns: ["slug"]
+          },
+        ]
       }
       project_cards: {
         Row: {
@@ -176,7 +184,7 @@ export type Database = {
           day_key: string
           revision?: number
           updated_at?: string
-          user_id?: string
+          user_id: string
         }
         Update: {
           day_key?: string
