@@ -22,7 +22,9 @@ export function AutoHeightTextarea({
             ref={ref}
             value={value}
             onChange={onChange}
-            className={className}
+            // block: デフォルトの inline-block だと親の行ボックスに
+            // ベースライン用の下余白が付き、下だけ空隙が開く。
+            className={['block', className].filter(Boolean).join(' ')}
             style={{ overflow: 'hidden' }}
             {...props}
         />
