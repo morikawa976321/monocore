@@ -1,9 +1,6 @@
-import { DecisionAnswerForm } from '@/src/components/projects/DecisionAnswerForm'
-import { answerLabel } from '@/src/lib/projects/answers'
+import { ProjectNoteForm } from '@/src/components/projects/ProjectNoteForm'
 import type { ProjectCardRow } from '@/src/lib/supabase/queries/project-cards'
-import type {
-    DecisionAnswerRow,
-} from '@/src/lib/supabase/queries/project-card-answers'
+import type { ProjectNoteRow } from '@/src/lib/supabase/queries/project-notes'
 import {
     formatDeadlineLabel,
     parseAiNext,
@@ -14,21 +11,11 @@ import {
 type ProjectCardProps = {
     card: ProjectCardRow
     today: string
-    answers: Map<string, DecisionAnswerRow>
-    onAnswered: (row: DecisionAnswerRow) => void
+    latestNote: ProjectNoteRow | null
+    onNoteSaved: (row: ProjectNoteRow) => void
 }
 
-function answerKey(cardSlug: string, decisionId: string): string {
-    return `${cardSlug}::${decisionId}`
-}
-
-function formatAnsweredAt(timestamp: string): string {
-    const date = new Date(timestamp)
-    if (Number.isNaN(date.getTime())) return timestamp
-    return date.toLocaleString('ja-JP')
-}
-
-export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardProps) {
+export function ProjectCard({ card, today, latestNote, onNoteSaved }: ProjectCardProps) {
     const deadlineLabel = formatDeadlineLabel(card.deadline, today)
     const aiRecent = parseAiRecent(card.ai_recent)
     const decisions = parseDecisions(card.decisions)
@@ -98,55 +85,30 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
                     </section>
                 )}
 
+                {/* 問いは表示だけ。推奨・選択肢・回答ボタンは置かない。
+                    2026-08-05の実測で、20件の回答のうち12件が「別の選択」で、
+                    問いの枠組み自体を否定する回答が複数あった（「そもそも衝突していない」
+                    「製品決定が未完了。それが初手」等）。選択肢は答えの形を先に決めてしまい、
+                    枠が外れているときに二度手間になる。入力は下の自由記述欄に一本化する。 */}
                 {decisions.length > 0 && (
                     <section className="flex flex-col gap-2">
                         <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
-                            判断
+                            AIが聞きたいこと
                         </h4>
                         <ul className="flex flex-col gap-2">
-                            {decisions.map((decision) => {
-                                const existingAnswer =
-                                    answers.get(answerKey(card.slug, decision.id)) ?? null
-                                const isAnswered = existingAnswer !== null
-
-                                return (
-                                    <li
-                                        key={decision.id}
-                                        className={
-                                            isAnswered
-                                                ? 'rounded-sm border border-neutral-200 bg-neutral-100 p-2 dark:border-neutral-700 dark:bg-neutral-800'
-                                                : 'rounded-sm border border-amber-500 bg-neutral-50 p-2 dark:border-amber-400 dark:bg-neutral-900'
-                                        }
-                                    >
-                                        <p>{decision.question}</p>
-                                        <p className="text-neutral-800 dark:text-neutral-200">
-                                            推奨: {decision.recommendation}
+                            {decisions.map((decision) => (
+                                <li
+                                    key={decision.id}
+                                    className="rounded-sm border border-amber-500 bg-neutral-50 p-2 dark:border-amber-400 dark:bg-neutral-900"
+                                >
+                                    <p>{decision.question}</p>
+                                    {decision.times_shown > 0 && (
+                                        <p className="text-neutral-700 dark:text-neutral-300">
+                                            提示 {decision.times_shown}回目
                                         </p>
-                                        {decision.times_shown > 0 && (
-                                            <p className="text-neutral-700 dark:text-neutral-300">
-                                                提示 {decision.times_shown}回目
-                                            </p>
-                                        )}
-                                        {isAnswered && existingAnswer ? (
-                                            <p className="text-neutral-800 dark:text-neutral-200">
-                                                回答済み: {answerLabel(existingAnswer.answer)}
-                                                （{formatAnsweredAt(existingAnswer.answered_at)}）
-                                            </p>
-                                        ) : (
-                                            <p className="text-amber-600 dark:text-amber-400">
-                                                未回答: この判断への回答が必要です
-                                            </p>
-                                        )}
-                                        <DecisionAnswerForm
-                                            cardSlug={card.slug}
-                                            decisionId={decision.id}
-                                            recommendation={decision.recommendation}
-                                            existingAnswer={existingAnswer}
-                                            onAnswered={onAnswered}
-                                        />
-                                    </li>
-                                )
-                            })}
+                                    )}
+                                </li>
+                            ))}
                         </ul>
                     </section>
                 )}
@@ -163,6 +125,14 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
                         </ul>
                     </section>
                 )}
+
+                <ProjectNoteForm
+                    cardSlug={card.slug}
+                    label="このプロジェクトについて"
+                    placeholder="答え・訂正・状況・「これはもう終わった」など、何でも"
+                    latestNote={latestNote}
+                    onSaved={onNoteSaved}
+                />
             </div>
         </article>
     )

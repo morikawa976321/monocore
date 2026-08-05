@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
@@ -6,20 +6,21 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { ProjectSection } from '@/src/components/projects/ProjectSection'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
+import { ProjectNoteForm } from '@/src/components/projects/ProjectNoteForm'
 import { getDefaultTimezone } from '@/src/lib/date'
-import { latestAnswerByDecision } from '@/src/lib/projects/answers'
 import { createClient } from '@/src/lib/supabase/client'
 import { getProjectCards, type ProjectCardRow } from '@/src/lib/supabase/queries/project-cards'
 import {
-    getDecisionAnswers,
-    type DecisionAnswerRow,
-} from '@/src/lib/supabase/queries/project-card-answers'
+    getProjectNotes,
+    latestNoteByCard,
+    type ProjectNoteRow,
+} from '@/src/lib/supabase/queries/project-notes'
 
 export default function ProjectsPage() {
     const supabase = useMemo(() => createClient(), [])
     const timezone = useMemo(() => getDefaultTimezone(), [])
     const [projectCards, setProjectCards] = useState<ProjectCardRow[]>([])
-    const [decisionAnswers, setDecisionAnswers] = useState<DecisionAnswerRow[]>([])
+    const [projectNotes, setProjectNotes] = useState<ProjectNoteRow[]>([])
     const [todayStr, setTodayStr] = useState<string | null>(null)
     const [isInitialLoading, setIsInitialLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
@@ -33,13 +34,13 @@ export default function ProjectsPage() {
             setIsInitialLoading(true)
         }
 
-        const [{ data: cards, error: cardsError }, { data: answers, error: answersError }] =
+        const [{ data: cards, error: cardsError }, { data: notes, error: notesError }] =
             await Promise.all([
                 getProjectCards(supabase),
-                getDecisionAnswers(supabase),
+                getProjectNotes(supabase),
             ])
 
-        if (cardsError || answersError) {
+        if (cardsError || notesError) {
             setErrorMessage('プロジェクトカードの読み込みに失敗しました。')
             setIsInitialLoading(false)
             setIsRefreshing(false)
@@ -47,7 +48,7 @@ export default function ProjectsPage() {
         }
 
         setProjectCards(cards ?? [])
-        setDecisionAnswers(answers ?? [])
+        setProjectNotes(notes ?? [])
         setErrorMessage(null)
         setIsInitialLoading(false)
         setIsRefreshing(false)
@@ -61,10 +62,10 @@ export default function ProjectsPage() {
         void loadProjectData('initial')
     }, [loadProjectData])
 
-    const answersByDecision = useMemo(() => latestAnswerByDecision(decisionAnswers), [decisionAnswers])
+    const notesByCard = useMemo(() => latestNoteByCard(projectNotes), [projectNotes])
 
-    function handleAnswered(row: DecisionAnswerRow) {
-        setDecisionAnswers((prev) => [row, ...prev])
+    function handleNoteSaved(row: ProjectNoteRow) {
+        setProjectNotes((prev) => [row, ...prev])
     }
 
     const activeCards = projectCards.filter((card) => card.status === 'active')
@@ -110,22 +111,22 @@ export default function ProjectsPage() {
                                 title="動いている"
                                 cards={activeCards}
                                 today={todayStr}
-                                answers={answersByDecision}
-                                onAnswered={handleAnswered}
+                                notesByCard={notesByCard}
+                                onNoteSaved={handleNoteSaved}
                             />
                             <ProjectSection
                                 title="あなた待ち"
                                 cards={waitingUserCards}
                                 today={todayStr}
-                                answers={answersByDecision}
-                                onAnswered={handleAnswered}
+                                notesByCard={notesByCard}
+                                onNoteSaved={handleNoteSaved}
                             />
                             <ProjectSection
                                 title="他人待ち"
                                 cards={waitingOtherCards}
                                 today={todayStr}
-                                answers={answersByDecision}
-                                onAnswered={handleAnswered}
+                                notesByCard={notesByCard}
+                                onNoteSaved={handleNoteSaved}
                             />
 
                             {collapsedCount > 0 && (
@@ -144,21 +145,37 @@ export default function ProjectsPage() {
                                                 title="休止中"
                                                 cards={dormantCards}
                                                 today={todayStr}
-                                                answers={answersByDecision}
-                                                onAnswered={handleAnswered}
+                                                notesByCard={notesByCard}
+                                onNoteSaved={handleNoteSaved}
                                             />
                                             <ProjectSection
                                                 title="完了"
                                                 cards={doneCards}
                                                 today={todayStr}
-                                                answers={answersByDecision}
-                                                onAnswered={handleAnswered}
+                                                notesByCard={notesByCard}
+                                onNoteSaved={handleNoteSaved}
                                             />
                                         </>
                                     )}
                                 </section>
                             )}
                         </>
+                    )}
+
+                    {/* 板全体への記述欄。個別カードに属さない指示をここで受ける
+                        （新規プロジェクトの追加・クローズ・横断の方針など）。 */}
+                    {!isInitialLoading && (
+                        <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
+                            <div className="p-1 sm:p-4">
+                                <ProjectNoteForm
+                                    cardSlug={null}
+                                    label="板全体について"
+                                    placeholder="プロジェクトの追加・クローズ・横断の方針など、特定のカードに属さないこと"
+                                    latestNote={notesByCard.get(null) ?? null}
+                                    onSaved={handleNoteSaved}
+                                />
+                            </div>
+                        </section>
                     )}
                 </div>
 

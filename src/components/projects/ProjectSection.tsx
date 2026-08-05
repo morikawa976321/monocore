@@ -1,16 +1,22 @@
 import { ProjectCard } from '@/src/components/projects/ProjectCard'
 import type { ProjectCardRow } from '@/src/lib/supabase/queries/project-cards'
-import type { DecisionAnswerRow } from '@/src/lib/supabase/queries/project-card-answers'
+import type { ProjectNoteRow } from '@/src/lib/supabase/queries/project-notes'
 
 type ProjectSectionProps = {
     title: string
     cards: ProjectCardRow[]
     today: string
-    answers: Map<string, DecisionAnswerRow>
-    onAnswered: (row: DecisionAnswerRow) => void
+    notesByCard: Map<string | null, ProjectNoteRow>
+    onNoteSaved: (row: ProjectNoteRow) => void
 }
 
-export function ProjectSection({ title, cards, today, answers, onAnswered }: ProjectSectionProps) {
+export function ProjectSection({
+    title,
+    cards,
+    today,
+    notesByCard,
+    onNoteSaved,
+}: ProjectSectionProps) {
     if (cards.length === 0) return null
 
     return (
@@ -24,8 +30,8 @@ export function ProjectSection({ title, cards, today, answers, onAnswered }: Pro
                         key={card.slug}
                         card={card}
                         today={today}
-                        answers={answers}
-                        onAnswered={onAnswered}
+                        latestNote={notesByCard.get(card.slug) ?? null}
+                        onNoteSaved={onNoteSaved}
                     />
                 ))}
             </div>

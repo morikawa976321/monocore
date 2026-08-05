@@ -141,6 +141,30 @@ export type Database = {
         }
         Relationships: []
       }
+      project_notes: {
+        Row: {
+          body: string
+          card_slug: string | null
+          consumed_at: string | null
+          created_at: string
+          id: string
+        }
+        Insert: {
+          body: string
+          card_slug?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          body?: string
+          card_slug?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       schedule_day_revisions: {
         Row: {
           day_key: string
