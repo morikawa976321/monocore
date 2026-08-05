@@ -66,11 +66,16 @@ export function parseDecisions(value: Json): Decision[] {
         if (typeof recommendation !== 'string' || recommendation.trim().length === 0) continue
         if (typeof firstRaised !== 'string' || firstRaised.trim().length === 0) continue
         if (typeof timesShown !== 'number' || !Number.isInteger(timesShown) || timesShown < 0) continue
-        if (!Array.isArray(blocks)) continue
 
-        const parsedBlocks = blocks.filter(
-            (block): block is string => typeof block === 'string' && block.trim().length > 0
-        )
+        // blocks は画面に描画していない補助情報なので、欠けていても判断ごと捨てない。
+        // 必須にしていた結果、2026-08-04に全20件の判断が「判断」セクションごと消え、
+        // 回答ボタンが1つも出ない状態でDB投入もテストもQAも通過した。
+        // 表示に使わない項目で描画を止めないこと。
+        const parsedBlocks = Array.isArray(blocks)
+            ? blocks.filter(
+                  (block): block is string => typeof block === 'string' && block.trim().length > 0
+              )
+            : []
 
         parsed.push({
             id,

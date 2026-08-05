@@ -85,11 +85,18 @@ describe('parseDecisions', () => {
             },
             {
                 id: 'd4',
-                question: 'blocks が不正',
-                recommendation: 'invalid',
+                question: 'blocks が不正でも判断は残す',
+                recommendation: '表示に使わない項目で描画を止めない',
                 first_raised: '2026-08-01',
                 times_shown: 2,
                 blocks: 'release',
+            },
+            {
+                id: 'd5',
+                question: 'blocks が欠落していても判断は残す',
+                recommendation: '2026-08-04に全20件が消えた実例のケース',
+                first_raised: '2026-08-01',
+                times_shown: 3,
             },
         ]
 
@@ -101,6 +108,22 @@ describe('parseDecisions', () => {
                 first_raised: '2026-08-01',
                 times_shown: 17,
                 blocks: ['release'],
+            },
+            {
+                id: 'd4',
+                question: 'blocks が不正でも判断は残す',
+                recommendation: '表示に使わない項目で描画を止めない',
+                first_raised: '2026-08-01',
+                times_shown: 2,
+                blocks: [],
+            },
+            {
+                id: 'd5',
+                question: 'blocks が欠落していても判断は残す',
+                recommendation: '2026-08-04に全20件が消えた実例のケース',
+                first_raised: '2026-08-01',
+                times_shown: 3,
+                blocks: [],
             },
         ])
     })
