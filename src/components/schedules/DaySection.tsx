@@ -76,7 +76,9 @@ export function DaySection({
                 )}
             </header>
             {/* 予定と自由記述メモ。高さはそれぞれ入力量に合わせて自動調整。 */}
-            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-neutral-200 dark:divide-neutral-800 px-1 sm:px-4 py-0 sm:py-2">
+            {/* 仕切り線はセクションの外枠より一段濃くする。プレースホルダを置かないぶん、
+                予定欄とメモ欄の境目はこの線だけが示すため。 */}
+            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-neutral-300 dark:divide-neutral-700 px-1 sm:px-4 py-0 sm:py-2">
                 <div className="sm:basis-3/5 sm:min-w-0 sm:pr-4">
                     <AutoHeightTextarea
                         value={entry.content}
@@ -105,7 +107,6 @@ export function DaySection({
                         value={note}
                         onChange={(e) => onNoteChange(e.target.value)}
                         readOnly={isReadOnly}
-                        placeholder="notes"
                         className={[
                             'w-full min-h-6 py-2 resize-none bg-transparent border-none outline-none',
                             'text-sm leading-6 sm:text-base sm:leading-7',
