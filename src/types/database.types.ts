@@ -173,6 +173,30 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_day_notes: {
+        Row: {
+          body: string
+          created_at: string
+          day_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          day_key: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          day_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       schedule_day_revisions: {
         Row: {
           day_key: string

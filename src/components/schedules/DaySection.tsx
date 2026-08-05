@@ -12,6 +12,9 @@ type DaySectionProps = {
     todayRef?: React.Ref<HTMLElement>;
     // テキスト変更時の通知。
     onContentChange: (value: string) => void;
+    // 自由記述メモと変更時の通知。
+    note: string;
+    onNoteChange: (value: string) => void;
     // フォーカス開始/終了時の通知（保存制御に使う）。
     onFocus: () => void;
     onBlur: () => void;
@@ -24,6 +27,8 @@ export function DaySection({
     isToday,
     todayRef,
     onContentChange,
+    note,
+    onNoteChange,
     onFocus,
     onBlur,
     isReadOnly = false,
@@ -70,29 +75,50 @@ export function DaySection({
                     </div>
                 )}
             </header>
-            {/* 1日分の本文編集エリア。高さは入力量に合わせて自動調整。 */}
-            <div className="p-1 sm:p-4">
-                <AutoHeightTextarea
-                    value={entry.content}
-                    onChange={(e) => {
-                        setPreviousContent(entry.content);
-                        onContentChange(e.target.value);
-                    }}
-                    onFocus={onFocus}
-                    onBlur={onBlur}
-                    readOnly={isReadOnly}
-                    className={[
-                        'w-full min-h-[4rem] resize-none bg-transparent border-none outline-none',
-                        'text-sm leading-6 sm:text-base sm:leading-7',
-                        'text-neutral-900 dark:text-neutral-100',
-                        'placeholder:text-neutral-400 dark:placeholder:text-neutral-600',
-                        isReadOnly ? 'cursor-not-allowed' : '',
-                    ].join(' ')}
-                    spellCheck={false}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    rows={3}
-                />
+            {/* 予定と自由記述メモ。高さはそれぞれ入力量に合わせて自動調整。 */}
+            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-neutral-200 dark:divide-neutral-800 px-1 sm:px-4 py-0 sm:py-2">
+                <div className="sm:basis-3/5 sm:min-w-0 sm:pr-4">
+                    <AutoHeightTextarea
+                        value={entry.content}
+                        onChange={(e) => {
+                            setPreviousContent(entry.content);
+                            onContentChange(e.target.value);
+                        }}
+                        onFocus={onFocus}
+                        onBlur={onBlur}
+                        readOnly={isReadOnly}
+                        className={[
+                            'w-full min-h-6 py-2 resize-none bg-transparent border-none outline-none',
+                            'text-sm leading-6 sm:text-base sm:leading-7',
+                            'text-neutral-900 dark:text-neutral-100',
+                            'placeholder:text-neutral-400 dark:placeholder:text-neutral-600',
+                            isReadOnly ? 'cursor-not-allowed' : '',
+                        ].join(' ')}
+                        spellCheck={false}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        rows={1}
+                    />
+                </div>
+                <div className="sm:basis-2/5 sm:min-w-0 sm:pl-4">
+                    <AutoHeightTextarea
+                        value={note}
+                        onChange={(e) => onNoteChange(e.target.value)}
+                        readOnly={isReadOnly}
+                        placeholder="メモ"
+                        className={[
+                            'w-full min-h-6 py-2 resize-none bg-transparent border-none outline-none',
+                            'text-sm leading-6 sm:text-base sm:leading-7',
+                            'text-neutral-900 dark:text-neutral-100',
+                            'placeholder:text-neutral-400 dark:placeholder:text-neutral-600',
+                            isReadOnly ? 'cursor-not-allowed' : '',
+                        ].join(' ')}
+                        spellCheck={false}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        rows={1}
+                    />
+                </div>
             </div>
         </section>
     );

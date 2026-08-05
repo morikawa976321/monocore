@@ -14,6 +14,7 @@ import { InboxPanel } from '@/src/components/inbox/InboxPanel';
 import { DaySection } from '@/src/components/schedules/DaySection';
 import { Button } from '@/src/components/ui/Button';
 import { useInbox } from '@/src/hooks/useInbox';
+import { useDayNotes } from '@/src/hooks/useDayNotes';
 import {
     dateLabelToDateStr,
     dayContentToScheduleItems,
@@ -81,6 +82,20 @@ export default function SchedulesPage() {
     const todaySectionRef = useRef<HTMLElement | null>(null);
     const { inboxOpen, setInboxOpen, inboxContent, updateInboxContent, saveInboxNow, hasPendingChanges } =
         useInbox(supabase);
+    const {
+        notes,
+        loadNotes,
+        updateNote,
+        flushPendingNoteSaves,
+        hasPendingNoteChanges,
+        noteError,
+    } = useDayNotes(supabase);
+    // イベントハンドラ内から最新値を読むためのref。依存配列に入れると、未保存状態が
+    // 切り替わるたびにeffectが張り直され、その掃除でデバウンス待ちが即時保存されてしまう。
+    const hasPendingNoteChangesRef = useRef(false);
+    useLayoutEffect(() => {
+        hasPendingNoteChangesRef.current = hasPendingNoteChanges;
+    });
     const isEditLocked = isInitialSyncing || isResumeSyncing;
 
     // --- 初回（クライアントのみ）: 日付確定 → entries 生成 → DB fetch → 今日へスクロール ---
@@ -99,6 +114,7 @@ export default function SchedulesPage() {
         // 次にDBから実データを取得し、空の骨組みに上書きして完成形にする。
         const startUtc = localTimeToUtc(format(start, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(end, 1), 'yyyy-MM-dd'), '0000', tz);
+        void loadNotes(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'));
         void Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(
@@ -128,6 +144,7 @@ export default function SchedulesPage() {
         if (!rangeStart || !rangeEnd) return;
         setLoadingTop(true);
         setLoadingBottom(true);
+        void loadNotes(format(rangeStart, 'yyyy-MM-dd'), format(rangeEnd, 'yyyy-MM-dd'));
         const startUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), '0000', tz);
         const [schedulesResult, revisionsResult] = await Promise.all([
@@ -156,7 +173,7 @@ export default function SchedulesPage() {
         setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
         setLoadingTop(false);
         setLoadingBottom(false);
-    }, [rangeStart, rangeEnd, tz, supabase]);
+    }, [rangeStart, rangeEnd, tz, supabase, loadNotes]);
 
     // entries 初期生成後に今日のセクションへスクロール
     useEffect(() => {
@@ -253,8 +270,9 @@ export default function SchedulesPage() {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             const hadScheduleDebounce = debounceTimerRef.current != null;
             flushPendingScheduleSave();
+            flushPendingNoteSaves();
             if (hasPendingChanges) saveInboxNow();
-            if (!hadScheduleDebounce && !hasPendingChanges) return;
+            if (!hadScheduleDebounce && !hasPendingChanges && !hasPendingNoteChangesRef.current) return;
             e.preventDefault();
             e.returnValue = '';
         };
@@ -264,7 +282,8 @@ export default function SchedulesPage() {
             flushPendingScheduleSave();
             if (hasPendingChanges) saveInboxNow();
         };
-    }, [flushPendingScheduleSave, hasPendingChanges, saveInboxNow]);
+        // メモのアンマウント時保存は useDayNotes 側が行うため、ここでは flush しない。
+    }, [flushPendingScheduleSave, flushPendingNoteSaves, hasPendingChanges, saveInboxNow]);
 
     // --- updateDayContent ---
     const updateDayContent = (dateLabel: string, value: string) => {
@@ -297,11 +316,17 @@ export default function SchedulesPage() {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden') {
                 flushPendingScheduleSave();
+                flushPendingNoteSaves();
                 if (hasPendingChanges) saveInboxNow();
                 setFocusedDateLabel(null);
                 pendingSaveDateLabelRef.current = null;
             } else if (document.visibilityState === 'visible') {
-                if (pendingSaveDateLabelRef.current != null || focusedDateLabelRef.current != null || hasPendingChanges) {
+                if (
+                    pendingSaveDateLabelRef.current != null
+                    || focusedDateLabelRef.current != null
+                    || hasPendingChanges
+                    || hasPendingNoteChangesRef.current
+                ) {
                     return;
                 }
                 if (isResumeSyncingRef.current) return;
@@ -315,10 +340,12 @@ export default function SchedulesPage() {
         };
         const handlePageHide = () => {
             flushPendingScheduleSave();
+            flushPendingNoteSaves();
             if (hasPendingChanges) saveInboxNow();
         };
         const handleFreeze = () => {
             flushPendingScheduleSave();
+            flushPendingNoteSaves();
             if (hasPendingChanges) saveInboxNow();
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -331,7 +358,14 @@ export default function SchedulesPage() {
             flushPendingScheduleSave();
             if (hasPendingChanges) saveInboxNow();
         };
-    }, [flushPendingScheduleSave, hasPendingChanges, saveInboxNow, reloadSchedules]);
+        // メモのアンマウント時保存は useDayNotes 側が行うため、ここでは flush しない。
+    }, [
+        flushPendingScheduleSave,
+        flushPendingNoteSaves,
+        hasPendingChanges,
+        saveInboxNow,
+        reloadSchedules,
+    ]);
 
     // --- 未来方向: loadMoreFuture ---
     const loadMoreFuture = useCallback(async () => {
@@ -340,6 +374,10 @@ export default function SchedulesPage() {
         // 現在末尾のさらに1か月先までを生成して取得する。
         const newEnd = addMonths(rangeEnd, 1);
         const newEntries = generateDayEntries(addDays(rangeEnd, 1), newEnd);
+        void loadNotes(
+            format(addDays(rangeEnd, 1), 'yyyy-MM-dd'),
+            format(newEnd, 'yyyy-MM-dd')
+        );
         const startUtc = localTimeToUtc(
             format(addDays(rangeEnd, 1), 'yyyy-MM-dd'),
             '0000',
@@ -362,7 +400,7 @@ export default function SchedulesPage() {
         setEntries((prev) => [...prev, ...merged]);
         setRangeEnd(newEnd);
         setLoadingBottom(false);
-    }, [loadingBottom, rangeEnd, supabase, tz]);
+    }, [loadingBottom, rangeEnd, supabase, tz, loadNotes]);
 
     // --- 過去方向: loadMorePast ---
     const loadMorePast = useCallback(async () => {
@@ -373,21 +411,29 @@ export default function SchedulesPage() {
         const newEntries = generateDayEntries(newStart, addDays(rangeStart, -1));
         const startUtc = localTimeToUtc(format(newStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
-        const [schedulesResult, revisionsResult] = await Promise.all([
-            getSchedules(supabase, startUtc, endUtc),
-            getScheduleDayRevisions(
-                supabase,
+        const [noteCount, [schedulesResult, revisionsResult]] = await Promise.all([
+            loadNotes(
                 format(newStart, 'yyyy-MM-dd'),
                 format(addDays(rangeStart, -1), 'yyyy-MM-dd')
             ),
+            Promise.all([
+                getSchedules(supabase, startUtc, endUtc),
+                getScheduleDayRevisions(
+                    supabase,
+                    format(newStart, 'yyyy-MM-dd'),
+                    format(addDays(rangeStart, -1), 'yyyy-MM-dd')
+                ),
+            ]),
         ]);
-        if (!schedulesResult.data || schedulesResult.data.length === 0) {
+        // 予定が無くてもメモだけある月は表示対象。両方空のときだけ過去方向を打ち切る。
+        const scheduleRows = schedulesResult.data ?? [];
+        if (scheduleRows.length === 0 && noteCount === 0) {
             setHasMorePast(false);
             setLoadingTop(false);
             return;
         }
         const merged = applyScheduleRevisions(
-            mergeSchedulesIntoEntries(newEntries, schedulesResult.data, tz),
+            mergeSchedulesIntoEntries(newEntries, scheduleRows, tz),
             revisionsResult.data ?? []
         );
         // scroll 位置補正のため prepend 前の scrollHeight を記録
@@ -399,7 +445,7 @@ export default function SchedulesPage() {
         setEntries((prev) => [...merged, ...prev]);
         setRangeStart(newStart);
         setLoadingTop(false);
-    }, [loadingTop, hasMorePast, rangeStart, supabase, tz]);
+    }, [loadingTop, hasMorePast, rangeStart, supabase, tz, loadNotes]);
 
     // --- IntersectionObserver ---
     useEffect(() => {
@@ -455,6 +501,9 @@ export default function SchedulesPage() {
                 {syncError && (
                     <span className="text-sm text-amber-600 dark:text-amber-400">{syncError}</span>
                 )}
+                {noteError && (
+                    <span className="text-sm text-amber-600 dark:text-amber-400">{noteError}</span>
+                )}
                 <div className="hidden sm:inline-flex">
                     <Button
                         onClick={handleInboxToggle}
@@ -507,6 +556,11 @@ export default function SchedulesPage() {
                             todayRef={todaySectionRef}
                             isReadOnly={isEditLocked}
                             onContentChange={(value) => updateDayContent(entry.dateLabel, value)}
+                            note={notes.get(dateLabelToDateStr(entry.dateLabel)) ?? ''}
+                            onNoteChange={(value) => {
+                                if (isEditLocked) return;
+                                updateNote(dateLabelToDateStr(entry.dateLabel), value);
+                            }}
                             onFocus={() => {
                                 if (isEditLocked) return;
                                 setFocusedDateLabel(entry.dateLabel);
