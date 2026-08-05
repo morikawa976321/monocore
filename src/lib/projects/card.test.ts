@@ -77,11 +77,9 @@ describe('parseDecisions', () => {
             },
             {
                 id: 'd3',
-                question: 'times_shown が文字列',
-                recommendation: 'invalid',
-                first_raised: '2026-08-01',
+                question: 'times_shown が不正でも判断は残す',
+                recommendation: '補助情報の欠落で判断を捨てない',
                 times_shown: '2',
-                blocks: [],
             },
             {
                 id: 'd4',
@@ -108,6 +106,14 @@ describe('parseDecisions', () => {
                 first_raised: '2026-08-01',
                 times_shown: 17,
                 blocks: ['release'],
+            },
+            {
+                id: 'd3',
+                question: 'times_shown が不正でも判断は残す',
+                recommendation: '補助情報の欠落で判断を捨てない',
+                first_raised: '',
+                times_shown: 0,
+                blocks: [],
             },
             {
                 id: 'd4',

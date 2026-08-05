@@ -71,6 +71,9 @@ export default function ProjectsPage() {
     const waitingUserCards = projectCards.filter((card) => card.status === 'waiting_user')
     const waitingOtherCards = projectCards.filter((card) => card.status === 'waiting_other')
     const dormantCards = projectCards.filter((card) => card.status === 'dormant')
+    const doneCards = projectCards.filter((card) => card.status === 'done')
+    // 「寝ている」と「完了」は畳む点は同じだが意味が違うので件数を分けて出す。
+    const collapsedCount = dormantCards.length + doneCards.length
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             <PageHeader
@@ -125,7 +128,7 @@ export default function ProjectsPage() {
                                 onAnswered={handleAnswered}
                             />
 
-                            {dormantCards.length > 0 && (
+                            {collapsedCount > 0 && (
                                 <section className="space-y-2 sm:space-y-4">
                                     <button
                                         type="button"
@@ -133,16 +136,25 @@ export default function ProjectsPage() {
                                         aria-expanded={showDormant}
                                         className="w-full rounded border border-neutral-400 bg-neutral-50 px-2 sm:px-4 py-2 text-left text-sm leading-6 font-medium text-neutral-700 transition-colors duration-150 ease-in-out hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus-visible:ring-neutral-400"
                                     >
-                                        他{dormantCards.length}件
+                                        休止中{dormantCards.length}件・完了{doneCards.length}件
                                     </button>
                                     {showDormant && (
-                                        <ProjectSection
-                                            title="休止中"
-                                            cards={dormantCards}
-                                            today={todayStr}
-                                            answers={answersByDecision}
-                                            onAnswered={handleAnswered}
-                                        />
+                                        <>
+                                            <ProjectSection
+                                                title="休止中"
+                                                cards={dormantCards}
+                                                today={todayStr}
+                                                answers={answersByDecision}
+                                                onAnswered={handleAnswered}
+                                            />
+                                            <ProjectSection
+                                                title="完了"
+                                                cards={doneCards}
+                                                today={todayStr}
+                                                answers={answersByDecision}
+                                                onAnswered={handleAnswered}
+                                            />
+                                        </>
                                     )}
                                 </section>
                             )}

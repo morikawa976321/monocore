@@ -122,9 +122,11 @@ export function ProjectCard({ card, today, answers, onAnswered }: ProjectCardPro
                                         <p className="text-neutral-800 dark:text-neutral-200">
                                             推奨: {decision.recommendation}
                                         </p>
-                                        <p className="text-neutral-700 dark:text-neutral-300">
-                                            提示 {decision.times_shown}回目
-                                        </p>
+                                        {decision.times_shown > 0 && (
+                                            <p className="text-neutral-700 dark:text-neutral-300">
+                                                提示 {decision.times_shown}回目
+                                            </p>
+                                        )}
                                         {isAnswered && existingAnswer ? (
                                             <p className="text-neutral-800 dark:text-neutral-200">
                                                 回答済み: {answerLabel(existingAnswer.answer)}

@@ -61,16 +61,20 @@ export function parseDecisions(value: Json): Decision[] {
         const timesShown = item.times_shown
         const blocks = item.blocks
 
+        // 必須は「判断として成立するために画面へ出す3つ」だけに限る。
+        // 補助情報(first_raised / times_shown / blocks)が欠けても判断ごと捨てない。
+        // かつて blocks を必須にしていた結果、2026-08-04に全20件の判断が
+        // 「判断」セクションごと消え、回答ボタンが1つも出ない状態で
+        // DB投入もテストもQAも通過した。表示に使わない項目で描画を止めないこと。
         if (typeof id !== 'string' || id.trim().length === 0) continue
         if (typeof question !== 'string' || question.trim().length === 0) continue
         if (typeof recommendation !== 'string' || recommendation.trim().length === 0) continue
-        if (typeof firstRaised !== 'string' || firstRaised.trim().length === 0) continue
-        if (typeof timesShown !== 'number' || !Number.isInteger(timesShown) || timesShown < 0) continue
 
-        // blocks は画面に描画していない補助情報なので、欠けていても判断ごと捨てない。
-        // 必須にしていた結果、2026-08-04に全20件の判断が「判断」セクションごと消え、
-        // 回答ボタンが1つも出ない状態でDB投入もテストもQAも通過した。
-        // 表示に使わない項目で描画を止めないこと。
+        const parsedFirstRaised = typeof firstRaised === 'string' ? firstRaised.trim() : ''
+        const parsedTimesShown =
+            typeof timesShown === 'number' && Number.isInteger(timesShown) && timesShown > 0
+                ? timesShown
+                : 0
         const parsedBlocks = Array.isArray(blocks)
             ? blocks.filter(
                   (block): block is string => typeof block === 'string' && block.trim().length > 0
@@ -81,8 +85,8 @@ export function parseDecisions(value: Json): Decision[] {
             id,
             question,
             recommendation,
-            first_raised: firstRaised,
-            times_shown: timesShown,
+            first_raised: parsedFirstRaised,
+            times_shown: parsedTimesShown,
             blocks: parsedBlocks,
         })
     }

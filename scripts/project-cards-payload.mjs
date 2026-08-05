@@ -8,7 +8,23 @@
 
 import { format, isValid, parseISO } from 'date-fns'
 
-export const ALLOWED_STATUSES = new Set(['active', 'waiting_user', 'waiting_other', 'dormant'])
+export const ALLOWED_STATUSES = new Set([
+    'active',
+    'waiting_user',
+    'waiting_other',
+    'dormant',
+    // 完了。dormant(寝ている=再開しうる)と意味が違うので分けている。
+    // upsertは行を消さないため、終わったカードはこの状態で板から下ろす。
+    'done',
+])
+
+/**
+ * 画面側 parseDecisions が判断を採用する条件と同じ必須項目。
+ * ここを緩めると「DBには入ったのに画面に出ない」判断が生まれる。
+ * 2026-08-04にその状態が実際に起き、20件すべての判断と回答ボタンが消えた。
+ * 生成側と表示側の契約は必ず一致させること。
+ */
+const DECISION_REQUIRED_FIELDS = ['id', 'question', 'recommendation']
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
@@ -65,6 +81,52 @@ export function validateCards(cards) {
         // 未指定(undefined)は null と同じ「期限なし」として扱う。
         if (card.deadline != null && !isValidDateString(card.deadline)) {
             errors.push(`Card ${tag}: field "deadline" must be null or yyyy-MM-dd`)
+        }
+
+        errors.push(...validateDecisions(card.decisions, tag))
+    }
+
+    return errors
+}
+
+/**
+ * 判断が画面に出る形になっているかを投入前に弾く。
+ * 「DBには入ったが画面には出ない」を沈黙させないための境界。
+ */
+export function validateDecisions(decisions, tag) {
+    const errors = []
+    if (decisions == null) return errors
+    if (!Array.isArray(decisions)) {
+        errors.push(`Card ${tag}: field "decisions" must be an array`)
+        return errors
+    }
+
+    const seenIds = new Set()
+    for (let index = 0; index < decisions.length; index += 1) {
+        const decision = decisions[index]
+        if (!isPlainObject(decision)) {
+            errors.push(`Card ${tag}: decisions[${index}] must be an object`)
+            continue
+        }
+
+        for (const field of DECISION_REQUIRED_FIELDS) {
+            const value = decision[field]
+            if (typeof value !== 'string' || value.trim().length === 0) {
+                errors.push(
+                    `Card ${tag}: decisions[${index}].${field} must be a non-empty string ` +
+                        `(欠けると画面に出ないまま投入が通ってしまう)`
+                )
+            }
+        }
+
+        // 回答は (card_slug, decision_id) で紐づくため、カード内で重複すると
+        // 別々の判断への回答が同じ1件として扱われる。
+        const id = typeof decision.id === 'string' ? decision.id.trim() : ''
+        if (id.length > 0) {
+            if (seenIds.has(id)) {
+                errors.push(`Card ${tag}: decisions[${index}].id "${id}" is duplicated`)
+            }
+            seenIds.add(id)
         }
     }
 
