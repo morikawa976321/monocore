@@ -10,15 +10,23 @@
 
 | ルート | 役割 |
 | :--- | :--- |
-| `/schedules` | 予定の一覧・編集 |
-| `/inbox` | inbox の取り込み・整理 |
+| `/schedules` | 予定の一覧・編集。日別メモ欄と inbox パネルを同居 |
 | `/projects` | プロジェクト板（ステータス別カード。判断への回答） |
+
+実装が守る設計制約と、未決の論点は `docs/design.md`。
+
+### Schedules（`/schedules`）
+
+- 予定は行テキストで編集。日単位の版管理（`schedule_day_revisions`）で 2 デバイス間の上書きを防ぐ。
+- 各日セクションに記法制約なしの自由記述メモ欄（`schedule_day_notes`）。taskbox が回収したら本文をクリアする。
+- inbox パネルを同居。ラップトップ（＝AI 側）が寝ている間に成立する唯一のモバイル書き込み経路なので、独立ルートは持たせていない。
 
 ### Projects（`/projects`）
 
-- カードは status（`active` / `waiting_user` / `waiting_other` / `dormant`）ごとにセクション表示。休止中は折りたたみ。
+- カードは status（`active` / `waiting_user` / `waiting_other` / `dormant`）+ 完了ごとにセクション表示。休止中・完了は折りたたみ。
 - `project_cards` は画面からの手入力は不可（SELECT のみ）。正は context-engine / taskbox 側にあり、`scripts/upsert-project-cards.mjs` が service_role で slug 単位 upsert する。
-- カード上の「判断」への回答は `project_card_decision_answers` へ追記専用で保存（accept / alternative / defer）。
+- カードへの書き込みは自由記述メモ（`project_notes`、カード単位と板全体）。**追記専用**で、taskbox 側が回収したら `consumed_at` を埋める。
+- `project_card_decision_answers`（accept / alternative / defer の選択肢式）は 2026-08-05 に `project_notes` へ置き換えた。テーブルは残っているがアプリからは読み書きしない。
 
 ---
 
@@ -92,6 +100,24 @@ npm run dev
 - **Projects UI:** `src/app/projects/page.tsx` + `src/components/projects/`。カード投入は `scripts/upsert-project-cards.mjs`
 
 詳細は `docs/directory_structure.md` を参照。
+
+### データの正と書き込み規約
+
+monocore は AI 活用基盤（context-engine / taskbox）の**人間向け窓口**であり、DB のテーブルは「人間が書いたもの」と「AI が投入した導出物」に分かれる。理由は `docs/design.md` §1。
+
+| テーブル | 書き込み | 正の所在 |
+| :--- | :--- | :--- |
+| `schedules` | 画面 / AI スキル | monocore |
+| `schedule_day_notes` / `schedule_day_revisions` | 画面 | monocore |
+| `inboxes` | 画面（単一 TEXT blob） | monocore |
+| `project_cards` | `service_role` のみ（投入スクリプト） | **context-engine / taskbox** |
+| `project_notes` | `authenticated` のみ（追記専用） | monocore → taskbox が回収 |
+
+- **導出物に手入力欄を作らない。** `project_cards` は消えても再生成できるものとして扱う。
+- **`replace_*` 系 RPC を新規に使わない。** 空配列で実データを消した事故があるため、投入は slug 単位の upsert にする。既存の `replace_schedules_for_day` / `replace_schedules_for_day_as` は日単位の全置換なので、呼ぶ前にローカルバックアップを取る。
+- **AI が書いた行は `updated_by = 'agent'`** で識別する（現状 schedules のみ。UI 表示は未実装）。
+- **AI の書き込みは read→modify→write を 1 操作で行い、`updated_at` 不一致なら再読込する**（2 デバイス編集の競合対策）。
+- **認証情報（ID / パスワード等）を DB に置かない。** `service_key` は RLS を迂回するため、inbox を読む AI セッションは自動的に全行を読む。
 
 ---
 
