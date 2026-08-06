@@ -18,6 +18,14 @@ export const ALLOWED_STATUSES = new Set([
     'done',
 ])
 
+export const ALLOWED_GOAL_SLUGS = new Set([
+    'monodukuri',
+    'career',
+    'health',
+    'simple-life',
+    'ai-collab',
+])
+
 /**
  * 画面側 parseDecisions が判断を採用する条件と同じ必須項目。
  * ここを緩めると「DBには入ったのに画面に出ない」判断が生まれる。
@@ -83,6 +91,22 @@ export function validateCards(cards) {
             errors.push(`Card ${tag}: field "deadline" must be null or yyyy-MM-dd`)
         }
 
+        if (
+            card.goal_slug !== undefined &&
+            card.goal_slug !== null &&
+            (typeof card.goal_slug !== 'string' || !ALLOWED_GOAL_SLUGS.has(card.goal_slug))
+        ) {
+            errors.push(
+                `Card ${tag}: field "goal_slug" must be null or one of ` +
+                    `${Array.from(ALLOWED_GOAL_SLUGS).join(', ')} ` +
+                    `(未知の goal_slug は画面で未分類になるため投入を拒否します)`
+            )
+        }
+
+        if (card.collapsed !== undefined && typeof card.collapsed !== 'boolean') {
+            errors.push(`Card ${tag}: field "collapsed" must be a boolean`)
+        }
+
         errors.push(...validateDecisions(card.decisions, tag))
     }
 
@@ -146,6 +170,8 @@ export function buildRow(card) {
         definition_of_done:
             typeof card.definition_of_done === 'string' ? card.definition_of_done : '',
         status: card.status,
+        goal_slug: card.goal_slug ?? null,
+        collapsed: typeof card.collapsed === 'boolean' ? card.collapsed : false,
         deadline: card.deadline ?? null,
         deadline_note: typeof card.deadline_note === 'string' ? card.deadline_note : null,
         ai_recent: isPlainObject(card.ai_recent) ? card.ai_recent : {},

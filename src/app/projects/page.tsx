@@ -9,6 +9,7 @@ import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { ProjectNoteForm } from '@/src/components/projects/ProjectNoteForm'
 import { getDefaultTimezone } from '@/src/lib/date'
 import { createClient } from '@/src/lib/supabase/client'
+import { getGoals, type GoalRow } from '@/src/lib/supabase/queries/goals'
 import { getProjectCards, type ProjectCardRow } from '@/src/lib/supabase/queries/project-cards'
 import {
     getProjectNotes,
@@ -19,6 +20,7 @@ import {
 export default function ProjectsPage() {
     const supabase = useMemo(() => createClient(), [])
     const timezone = useMemo(() => getDefaultTimezone(), [])
+    const [goals, setGoals] = useState<GoalRow[]>([])
     const [projectCards, setProjectCards] = useState<ProjectCardRow[]>([])
     const [projectNotes, setProjectNotes] = useState<ProjectNoteRow[]>([])
     const [todayStr, setTodayStr] = useState<string | null>(null)
@@ -34,13 +36,17 @@ export default function ProjectsPage() {
             setIsInitialLoading(true)
         }
 
-        const [{ data: cards, error: cardsError }, { data: notes, error: notesError }] =
-            await Promise.all([
-                getProjectCards(supabase),
-                getProjectNotes(supabase),
-            ])
+        const [
+            { data: cards, error: cardsError },
+            { data: notes, error: notesError },
+            { data: loadedGoals, error: goalsError },
+        ] = await Promise.all([
+            getProjectCards(supabase),
+            getProjectNotes(supabase),
+            getGoals(supabase),
+        ])
 
-        if (cardsError || notesError) {
+        if (cardsError || notesError || goalsError) {
             setErrorMessage('プロジェクトカードの読み込みに失敗しました。')
             setIsInitialLoading(false)
             setIsRefreshing(false)
@@ -49,6 +55,7 @@ export default function ProjectsPage() {
 
         setProjectCards(cards ?? [])
         setProjectNotes(notes ?? [])
+        setGoals(loadedGoals ?? [])
         setErrorMessage(null)
         setIsInitialLoading(false)
         setIsRefreshing(false)
@@ -68,9 +75,25 @@ export default function ProjectsPage() {
         setProjectNotes((prev) => [row, ...prev])
     }
 
-    const activeCards = projectCards.filter((card) => card.status === 'active')
-    const waitingUserCards = projectCards.filter((card) => card.status === 'waiting_user')
-    const waitingOtherCards = projectCards.filter((card) => card.status === 'waiting_other')
+    const visibleCards = projectCards.filter(
+        (card) =>
+            card.status === 'active' ||
+            card.status === 'waiting_user' ||
+            card.status === 'waiting_other'
+    )
+    const cardsByGoal = new Map<string, ProjectCardRow[]>()
+    for (const goal of goals) {
+        cardsByGoal.set(goal.slug, [])
+    }
+    const unclassifiedCards: ProjectCardRow[] = []
+    for (const card of visibleCards) {
+        const goalCards = card.goal_slug ? cardsByGoal.get(card.goal_slug) : undefined
+        if (goalCards) {
+            goalCards.push(card)
+        } else {
+            unclassifiedCards.push(card)
+        }
+    }
     const dormantCards = projectCards.filter((card) => card.status === 'dormant')
     const doneCards = projectCards.filter((card) => card.status === 'done')
     // 「寝ている」と「完了」は畳む点は同じだが意味が違うので件数を分けて出す。
@@ -105,29 +128,34 @@ export default function ProjectsPage() {
                         </section>
                     )}
 
-                    {!isInitialLoading && todayStr !== null && projectCards.length > 0 && (
+                    {/* 目標見出しはカードが1枚も無くても出す（5つの目標は固定の枠であって、
+                        カードの有無で消える面ではない）。 */}
+                    {!isInitialLoading && todayStr !== null && (
                         <>
-                            <ProjectSection
-                                title="動いている"
-                                cards={activeCards}
-                                today={todayStr}
-                                notesByCard={notesByCard}
-                                onNoteSaved={handleNoteSaved}
-                            />
-                            <ProjectSection
-                                title="あなた待ち"
-                                cards={waitingUserCards}
-                                today={todayStr}
-                                notesByCard={notesByCard}
-                                onNoteSaved={handleNoteSaved}
-                            />
-                            <ProjectSection
-                                title="他人待ち"
-                                cards={waitingOtherCards}
-                                today={todayStr}
-                                notesByCard={notesByCard}
-                                onNoteSaved={handleNoteSaved}
-                            />
+                            {unclassifiedCards.length > 0 && (
+                                <ProjectSection
+                                    title="未分類"
+                                    description="目標が未設定です。撤退候補か、目標定義の宿題です。"
+                                    cards={unclassifiedCards}
+                                    today={todayStr}
+                                    notesByCard={notesByCard}
+                                    onNoteSaved={handleNoteSaved}
+                                    collapseCards
+                                    tone="warning"
+                                />
+                            )}
+                            {goals.map((goal) => (
+                                <ProjectSection
+                                    key={goal.slug}
+                                    title={goal.title}
+                                    cards={cardsByGoal.get(goal.slug) ?? []}
+                                    today={todayStr}
+                                    notesByCard={notesByCard}
+                                    onNoteSaved={handleNoteSaved}
+                                    showWhenEmpty
+                                    collapseCards
+                                />
+                            ))}
 
                             {collapsedCount > 0 && (
                                 <section className="space-y-2 sm:space-y-4">
@@ -146,14 +174,14 @@ export default function ProjectsPage() {
                                                 cards={dormantCards}
                                                 today={todayStr}
                                                 notesByCard={notesByCard}
-                                onNoteSaved={handleNoteSaved}
+                                                onNoteSaved={handleNoteSaved}
                                             />
                                             <ProjectSection
                                                 title="完了"
                                                 cards={doneCards}
                                                 today={todayStr}
                                                 notesByCard={notesByCard}
-                                onNoteSaved={handleNoteSaved}
+                                                onNoteSaved={handleNoteSaved}
                                             />
                                         </>
                                     )}

@@ -15,6 +15,11 @@ type AiRecent = {
     links: string[]
 }
 
+export type YourTurnLine = {
+    text: string
+    done: boolean
+}
+
 function isRecord(value: Json): value is { [key: string]: Json | undefined } {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -30,6 +35,26 @@ export function formatDeadlineLabel(deadline: string | null, today: string): str
     if (remainingDays > 0) return `あと${remainingDays}日`
     if (remainingDays === 0) return '今日'
     return `${Math.abs(remainingDays)}日超過`
+}
+
+export function parseYourTurnLines(value: string): YourTurnLine[] {
+    return value
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => {
+            const doneMatch = line.match(/^\[\s*[xX]\s*\]\s*(.*)$/)
+            if (doneMatch) {
+                return { text: doneMatch[1].trim(), done: true }
+            }
+
+            const pendingMatch = line.match(/^\[\s+\]\s*(.*)$/)
+            if (pendingMatch) {
+                return { text: pendingMatch[1].trim(), done: false }
+            }
+
+            return { text: line, done: false }
+        })
 }
 
 export function parseAiRecent(value: Json): AiRecent | null {

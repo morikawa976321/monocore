@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -39,6 +34,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      goals: {
+        Row: {
+          created_at: string | null
+          slug: string
+          sort_order: number
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          slug: string
+          sort_order?: number
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          slug?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       inboxes: {
         Row: {
           content: string
@@ -102,11 +121,13 @@ export type Database = {
         Row: {
           ai_next: Json
           ai_recent: Json
+          collapsed: boolean
           created_at: string | null
           deadline: string | null
           deadline_note: string | null
           decisions: Json
           definition_of_done: string
+          goal_slug: string | null
           slug: string
           sort_order: number
           sources: string[]
@@ -118,11 +139,13 @@ export type Database = {
         Insert: {
           ai_next?: Json
           ai_recent?: Json
+          collapsed?: boolean
           created_at?: string | null
           deadline?: string | null
           deadline_note?: string | null
           decisions?: Json
           definition_of_done?: string
+          goal_slug?: string | null
           slug: string
           sort_order?: number
           sources?: string[]
@@ -134,11 +157,13 @@ export type Database = {
         Update: {
           ai_next?: Json
           ai_recent?: Json
+          collapsed?: boolean
           created_at?: string | null
           deadline?: string | null
           deadline_note?: string | null
           decisions?: Json
           definition_of_done?: string
+          goal_slug?: string | null
           slug?: string
           sort_order?: number
           sources?: string[]
@@ -147,7 +172,15 @@ export type Database = {
           updated_at?: string | null
           your_turn?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "project_cards_goal_slug_fkey"
+            columns: ["goal_slug"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["slug"]
+          },
+        ]
       }
       project_notes: {
         Row: {
@@ -410,3 +443,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

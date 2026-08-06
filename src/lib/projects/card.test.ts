@@ -6,6 +6,7 @@ import {
     parseAiNext,
     parseAiRecent,
     parseDecisions,
+    parseYourTurnLines,
 } from './card'
 
 describe('daysUntil', () => {
@@ -37,6 +38,52 @@ describe('formatDeadlineLabel', () => {
 
     it('returns null for null deadline', () => {
         expect(formatDeadlineLabel(null, '2026-08-05')).toBeNull()
+    })
+})
+
+describe('parseYourTurnLines', () => {
+    it('splits multiple lines into pending items', () => {
+        expect(parseYourTurnLines('準備する\n提出する')).toEqual([
+            { text: '準備する', done: false },
+            { text: '提出する', done: false },
+        ])
+    })
+
+    it('parses lowercase and uppercase completed markers', () => {
+        expect(parseYourTurnLines('[x] 完了済み\n[X] 確認済み')).toEqual([
+            { text: '完了済み', done: true },
+            { text: '確認済み', done: true },
+        ])
+    })
+
+    it('parses an unchecked marker', () => {
+        expect(parseYourTurnLines('[ ] 未完了')).toEqual([{ text: '未完了', done: false }])
+    })
+
+    it('trims lines and drops blank lines', () => {
+        expect(parseYourTurnLines('  最初  \n\n   \n  次  ')).toEqual([
+            { text: '最初', done: false },
+            { text: '次', done: false },
+        ])
+    })
+
+    it('returns an empty array for empty or whitespace-only input', () => {
+        expect(parseYourTurnLines('')).toEqual([])
+        expect(parseYourTurnLines(' \n  ')).toEqual([])
+    })
+
+    it('supports CRLF line endings', () => {
+        expect(parseYourTurnLines('[ ] 一つ目\r\n[x] 二つ目')).toEqual([
+            { text: '一つ目', done: false },
+            { text: '二つ目', done: true },
+        ])
+    })
+
+    it('allows whitespace around checklist markers', () => {
+        expect(parseYourTurnLines(' [ x ]   完了 \n [   ]   未完了 ')).toEqual([
+            { text: '完了', done: true },
+            { text: '未完了', done: false },
+        ])
     })
 })
 

@@ -6,6 +6,7 @@ import {
     parseAiNext,
     parseAiRecent,
     parseDecisions,
+    parseYourTurnLines,
 } from '@/src/lib/projects/card'
 
 type ProjectCardProps = {
@@ -20,6 +21,7 @@ export function ProjectCard({ card, today, latestNote, onNoteSaved }: ProjectCar
     const aiRecent = parseAiRecent(card.ai_recent)
     const decisions = parseDecisions(card.decisions)
     const aiNext = parseAiNext(card.ai_next)
+    const yourTurnLines = parseYourTurnLines(card.your_turn)
 
     return (
         <article className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
@@ -76,12 +78,26 @@ export function ProjectCard({ card, today, latestNote, onNoteSaved }: ProjectCar
                     </section>
                 )}
 
-                {card.your_turn.trim().length > 0 && (
+                {yourTurnLines.length > 0 && (
                     <section className="flex flex-col gap-2">
                         <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
                             あなたの番
                         </h4>
-                        <p>{card.your_turn}</p>
+                        <ul className="flex flex-col gap-1">
+                            {yourTurnLines.map((line, index) => (
+                                <li
+                                    key={`${card.slug}-your-turn-${index}`}
+                                    className={`flex gap-2 ${
+                                        line.done
+                                            ? 'text-neutral-700 dark:text-neutral-300'
+                                            : 'text-neutral-900 dark:text-neutral-100'
+                                    }`}
+                                >
+                                    <span aria-hidden="true">{line.done ? '✓' : '☐'}</span>
+                                    <span>{line.text}</span>
+                                </li>
+                            ))}
+                        </ul>
                     </section>
                 )}
 

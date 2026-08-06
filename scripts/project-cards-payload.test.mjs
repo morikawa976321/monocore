@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildRow, normalizeCards, validateCards } from './project-cards-payload.mjs'
+import {
+    ALLOWED_GOAL_SLUGS,
+    buildRow,
+    normalizeCards,
+    validateCards,
+} from './project-cards-payload.mjs'
 
 /** 最小の妥当なカード。個別テストで一部だけ壊して使う。 */
 function validCard(overrides = {}) {
@@ -32,7 +37,13 @@ describe('normalizeCards', () => {
 
 describe('validateCards', () => {
     it('passes a well-formed batch', () => {
-        expect(validateCards([validCard(), validCard({ slug: 'other' })])).toEqual([])
+        expect(
+            validateCards([
+                validCard({ goal_slug: 'monodukuri', collapsed: true }),
+                validCard({ slug: 'other', goal_slug: 'health', collapsed: false }),
+            ])
+        ).toEqual([])
+        expect(ALLOWED_GOAL_SLUGS.size).toBe(5)
     })
 
     it('rejects an unknown status', () => {
@@ -54,6 +65,29 @@ describe('validateCards', () => {
         const omitted = validCard()
         delete omitted.deadline
         expect(validateCards([omitted])).toEqual([])
+    })
+
+    it('rejects an unknown goal_slug and explains the display consequence', () => {
+        const errors = validateCards([validCard({ goal_slug: 'unknown' })])
+        expect(errors).toHaveLength(1)
+        expect(errors[0]).toContain('未知の goal_slug は画面で未分類になる')
+    })
+
+    it('rejects an empty goal_slug', () => {
+        const errors = validateCards([validCard({ goal_slug: '' })])
+        expect(errors).toHaveLength(1)
+        expect(errors[0]).toContain('"goal_slug"')
+    })
+
+    it('allows null and omitted goal_slug', () => {
+        expect(validateCards([validCard({ goal_slug: null })])).toEqual([])
+        expect(validateCards([validCard()])).toEqual([])
+    })
+
+    it('rejects a non-boolean collapsed value', () => {
+        const errors = validateCards([validCard({ collapsed: 'true' })])
+        expect(errors).toHaveLength(1)
+        expect(errors[0]).toContain('"collapsed"')
     })
 
     it('reports EVERY bad card in the batch, not just the first', () => {
@@ -83,6 +117,8 @@ describe('buildRow', () => {
             deadline: null,
             deadline_note: null,
             definition_of_done: '',
+            goal_slug: null,
+            collapsed: false,
             your_turn: '',
             ai_recent: {},
             decisions: [],
@@ -104,6 +140,12 @@ describe('buildRow', () => {
         expect(row.title).toBe('題')
     })
 
+    it('returns goal_slug and collapsed', () => {
+        const row = buildRow(validCard({ goal_slug: 'ai-collab', collapsed: true }))
+        expect(row.goal_slug).toBe('ai-collab')
+        expect(row.collapsed).toBe(true)
+    })
+
     it('drops non-string entries from string array columns', () => {
         const row = buildRow(validCard({ ai_next: ['ok', 42, null], sources: ['a.md', {}] }))
         expect(row.ai_next).toEqual(['ok'])
@@ -116,10 +158,12 @@ describe('buildRow', () => {
             [
                 'ai_next',
                 'ai_recent',
+                'collapsed',
                 'deadline',
                 'deadline_note',
                 'decisions',
                 'definition_of_done',
+                'goal_slug',
                 'slug',
                 'sort_order',
                 'sources',
