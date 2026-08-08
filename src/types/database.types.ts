@@ -206,6 +206,30 @@ export type Database = {
         }
         Relationships: []
       }
+      reports: {
+        Row: {
+          body_html: string
+          slug: string
+          title: string
+          toc: Json
+          updated_at: string
+        }
+        Insert: {
+          body_html: string
+          slug: string
+          title: string
+          toc?: Json
+          updated_at: string
+        }
+        Update: {
+          body_html?: string
+          slug?: string
+          title?: string
+          toc?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       schedule_day_notes: {
         Row: {
           body: string

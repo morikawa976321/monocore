@@ -8,3 +8,101 @@
   --font-sans: var(--font-geist-sans), var(--font-noto-sans-jp);
   --font-mono: var(--font-geist-mono);
 }
+
+/* --- Report body ---
+   Tailwind v4に typography プラグインが無いため、/reports/[slug] が
+   dangerouslySetInnerHTMLで差し込むHTML(見出し・表・コード・リスト等)への
+   基本スタイルを自前で当てる。README-design.mdの制約(フォントサイズは
+   text-sm/base/lgのみ、ウェイトはnormal/mediumのみ、余白は1/2/4/6/12のみ、
+   任意値[]禁止、パレットはneutral/amber/red/transparentのみ)に厳密に従う。
+   見出しの階層は数の少ないサイズしか使えないため、mt(区切りの大きさ)と
+   h2のborder-bで差をつける。 */
+.report-body :where(h1, h2, h3, h4, h5, h6) {
+  @apply mb-2 font-medium text-neutral-900 dark:text-neutral-50;
+}
+.report-body :where(h1, h2, h3, h4, h5, h6):first-child {
+  @apply mt-0;
+}
+.report-body :where(h1) {
+  @apply mt-6 text-lg;
+}
+.report-body :where(h2) {
+  @apply mt-12 border-b border-neutral-200 pb-1 text-lg dark:border-neutral-800;
+}
+.report-body :where(h3, h4, h5, h6) {
+  @apply mt-6 text-base;
+}
+
+.report-body :where(p) {
+  @apply my-4 leading-6 sm:leading-7;
+}
+
+.report-body :where(ul) {
+  @apply my-4 ml-4 list-disc space-y-1;
+}
+.report-body :where(ol) {
+  @apply my-4 ml-4 list-decimal space-y-1;
+}
+.report-body :where(li) {
+  @apply leading-6 sm:leading-7;
+}
+.report-body :where(li > ul, li > ol) {
+  @apply mt-1 mb-0;
+}
+.report-body :where(li.task-list-item) {
+  @apply -ml-4 list-none;
+}
+
+.report-body :where(a) {
+  @apply text-amber-600 underline underline-offset-2 dark:text-amber-400;
+}
+
+.report-body :where(strong) {
+  @apply font-medium;
+}
+.report-body :where(em) {
+  @apply italic;
+}
+.report-body :where(del) {
+  @apply text-neutral-500 line-through;
+}
+
+.report-body :where(blockquote) {
+  @apply my-4 border-l-2 border-neutral-400 pl-4 text-neutral-700 dark:border-neutral-600 dark:text-neutral-300;
+}
+
+.report-body :where(hr) {
+  @apply my-12 border-neutral-200 dark:border-neutral-800;
+}
+
+.report-body :where(code) {
+  @apply rounded-sm bg-neutral-200 px-1 py-1 font-mono text-sm dark:bg-neutral-800;
+}
+.report-body :where(pre) {
+  @apply my-4 overflow-x-auto rounded bg-neutral-200 p-2 sm:p-4 dark:bg-neutral-800;
+}
+.report-body :where(pre code) {
+  @apply bg-transparent p-0;
+}
+
+.report-body :where(table) {
+  @apply my-4 block w-full overflow-x-auto border-collapse text-sm;
+}
+.report-body :where(th, td) {
+  @apply border border-neutral-200 px-2 py-1 text-left align-top dark:border-neutral-800;
+}
+.report-body :where(th) {
+  @apply bg-neutral-200 font-medium dark:bg-neutral-800;
+}
+
+.report-body :where(img) {
+  @apply my-4 max-w-full rounded;
+}
+
+/* 画面外セクションの描画をスキップする(実測レポート最大がgzip 58KBあるため)。
+   同期スクリプト(scripts/upsert-reports.mjs)が本文を見出し単位で
+   <section>にラップ済みで、ここではCSSを当てるだけ。 */
+.report-body section {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 600px;
+}

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
     Clock,
+    FileText,
     LayoutGrid,
     Menu,
     LogOut,
@@ -14,6 +15,7 @@ import { createClient } from "@/src/lib/supabase/client";
 const MENU_ITEMS = [
     { href: "/schedules", icon: Clock, label: "Schedule" },
     { href: "/projects", icon: LayoutGrid, label: "Projects" },
+    { href: "/reports", icon: FileText, label: "Reports" },
 ] as const;
 
 export function Sidebar() {
