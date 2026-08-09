@@ -35,9 +35,12 @@ AIコーディングエージェントは、本ガイドラインに記載され
   - Base Surface (Card/Menu/Modal): `bg-neutral-50` / Dark: `bg-neutral-900`
   - Sub Surface (Hovered/Selected): `bg-neutral-200` / Dark: `bg-neutral-800`
 
-- **ボーダー (Border)**
-  - Default: `border-neutral-200` / Dark: `border-neutral-800`
-  - Focus/Active: `border-neutral-400` / Dark: `border-neutral-600`
+- **ボーダー (Border)** — **状態ではなく役割で選ぶ**（2026-08-09に実装の実態へ合わせて改訂。旧規定は Default=200/800 / Focus·Active=400/600 という状態の軸だけを持っており、実装が使っている役割の軸を記述していなかった）
+  - **囲みの外枠** (Card / Section / Panel / FAB — 単独で立つ箱の外周): `border-neutral-400` / Dark: `border-neutral-600`
+  - **内部の区切り線** (header の下線・footer の上線・ドロワーやサイドバーの縁・テーブル罫線・`hr`・`h2` の下線): `border-neutral-200` / Dark: `border-neutral-800`
+  - **オーバーレイの小箱** (暗転した背景の上に浮く「同期中…」等): `border-neutral-200` / Dark: `border-neutral-800`。背景が暗転しているぶん枠は弱くてよい
+  - **Focus/Active**: `focus:border-neutral-400` / Dark: `focus:border-neutral-600`（入力欄など、平常時が200/800のものに当てる）
+  - ボタンはこの表に含めない。**ボタンは必ず `components/ui/Button` を使う**（§8）
 
 - **テキスト (Text)**
   - Primary: `text-neutral-900` / Dark: `text-neutral-50`
@@ -91,22 +94,15 @@ AIコーディングエージェントは、本ガイドラインに記載され
 ## 8. コンポーネント実装の制約（Agent向けテンプレート）
 AIエージェントは、以下のクラスの組み合わせルールにのみ従ってUIコンポーネントを実装せよ。
 
-- **Primary Button**
-  - Light: `bg-amber-500 text-neutral-50 hover:bg-amber-600`
-  - Dark: `dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400`
-  - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400`
-- **Secondary Button**
-  - Light: `bg-neutral-200 border border-neutral-300 text-neutral-900 hover:bg-neutral-300`
-  - Dark: `dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-50 dark:hover:bg-neutral-700`
-  - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:focus-visible:ring-neutral-500`
-- **Danger Button**
-  - Light: `bg-neutral-50 border border-red-800 text-red-800 hover:bg-neutral-100 hover:border-red-900 hover:text-red-900`
-  - Dark: `dark:bg-neutral-900 dark:border-red-700 dark:text-red-400 dark:hover:bg-neutral-800 dark:hover:border-red-600 dark:hover:text-red-300`
-  - 共通: `px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-700 dark:focus-visible:ring-red-500`
+- **ボタン（Primary / Secondary / Danger）** — **クラスを手書きしない。必ず `components/ui/Button` を使う**（2026-08-09改訂）。
+  - 見た目の**正は `Button.tsx` の実装**であり、このファイルはクラス列を持たない。以前はここに3種のクラス列を書いていたが、実装と全項目（枠幅・枠色・背景）で食い違ったまま誰も気づかなかったため、二重管理をやめた。
+  - 使い分け: `primary`=その画面の主操作（amber） / `secondary`=それ以外の通常操作 / `danger`=破壊的操作。サイズは `sm` / `md`。
+  - Buttonが表現できない形（アイコンのみの正方形・枠なしのゴースト・ナビ行）が必要なら、**手書きせずButtonにバリアントを足す**。
 - **Surface / Card / Dialog**
-  - Light: `bg-neutral-50 border border-neutral-200`
-  - Dark: `dark:bg-neutral-900 dark:border-neutral-800`
+  - Light: `bg-neutral-50 border border-neutral-400`
+  - Dark: `dark:bg-neutral-900 dark:border-neutral-600`
   - 共通: `rounded p-4` または `p-6`
+  - （2026-08-09改訂。上の「ボーダー」の**囲みの外枠**に揃えた。旧記載は200/800で、ProjectCard・DaySection・各セクションの実装と食い違っていた）
 - **Input / Textarea**
   - Light: `bg-neutral-50 border text-neutral-900 border-neutral-200 placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400`
   - Dark: `dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600`
