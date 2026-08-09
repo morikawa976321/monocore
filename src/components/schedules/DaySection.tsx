@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Undo2 } from 'lucide-react';
 import { AutoHeightTextarea } from '@/src/components/schedules/AutoHeightTextarea';
+import { Button } from '@/src/components/ui/Button';
 import { hasOrphanLines, type DayEntry } from '@/src/lib/schedules/text-format';
 
 type DaySectionProps = {
@@ -64,14 +65,15 @@ export function DaySection({
                 </div>
                 {previousContent !== null && previousContent !== entry.content && (
                     <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150">
-                        <button
-                            type="button"
+                        <Button
+                            color="ghost"
+                            size="icon"
                             title="元に戻す"
                             onClick={handleUndo}
-                            className="p-2 -mr-2 rounded-sm transition-colors text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400"
+                            className="-mr-2"
                         >
                             <Undo2 className="w-4 h-4" />
-                        </button>
+                        </Button>
                     </div>
                 )}
             </header>

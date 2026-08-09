@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { ProjectSection } from '@/src/components/projects/ProjectSection'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
+import { Button } from '@/src/components/ui/Button'
 import { ProjectNoteForm } from '@/src/components/projects/ProjectNoteForm'
 import { getDefaultTimezone } from '@/src/lib/date'
 import { createClient } from '@/src/lib/supabase/client'
@@ -159,14 +160,15 @@ export default function ProjectsPage() {
 
                             {collapsedCount > 0 && (
                                 <section className="space-y-2 sm:space-y-4">
-                                    <button
-                                        type="button"
+                                    <Button
+                                        color="surface"
+                                        size="bar"
                                         onClick={() => setShowDormant((prev) => !prev)}
                                         aria-expanded={showDormant}
-                                        className="w-full rounded border border-neutral-400 bg-neutral-50 px-2 sm:px-4 py-2 text-left text-sm leading-6 font-medium text-neutral-700 transition-colors duration-150 ease-in-out hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus-visible:ring-neutral-400"
+                                        className="leading-6"
                                     >
                                         休止中{dormantCards.length}件・完了{doneCards.length}件
-                                    </button>
+                                    </Button>
                                     {showDormant && (
                                         <>
                                             <ProjectSection

@@ -94,10 +94,12 @@ AIコーディングエージェントは、本ガイドラインに記載され
 ## 8. コンポーネント実装の制約（Agent向けテンプレート）
 AIエージェントは、以下のクラスの組み合わせルールにのみ従ってUIコンポーネントを実装せよ。
 
-- **ボタン（Primary / Secondary / Danger）** — **クラスを手書きしない。必ず `components/ui/Button` を使う**（2026-08-09改訂）。
+- **ボタン（Primary / Secondary / Danger / Ghost / Surface / Link）** — **クラスを手書きしない。必ず `components/ui/Button` を使う**（2026-08-09改訂）。
   - 見た目の**正は `Button.tsx` の実装**であり、このファイルはクラス列を持たない。以前はここに3種のクラス列を書いていたが、実装と全項目（枠幅・枠色・背景）で食い違ったまま誰も気づかなかったため、二重管理をやめた。
-  - 使い分け: `primary`=その画面の主操作（amber） / `secondary`=それ以外の通常操作 / `danger`=破壊的操作。サイズは `sm` / `md`。
-  - Buttonが表現できない形（アイコンのみの正方形・枠なしのゴースト・ナビ行）が必要なら、**手書きせずButtonにバリアントを足す**。
+  - `color` の使い分け: `primary`=その画面の主操作（amber） / `secondary`=それ以外の通常操作（枠あり） / `danger`=破壊的操作 / `ghost`=枠なし・hover背景のみ（アイコンのみのゴーストボタン・ナビ行など、常時は枠を出したくない操作） / `surface`=Card/Panel/FABと同じ「囲みの外枠」トークンを使う操作要素（FAB・全幅の開閉バーなど、単独で立つ箱として見せたい操作） / `link`=下線のみのテキストリンク（フォーム内の補助操作など）。
+  - `size` の使い分け: `sm` / `md`=通常ボタン（アイコン＋ラベル可） / `icon`=アイコンのみの正方形32px / `fab`=アイコンのみの正方形48px / `bar`=全幅・左寄せの開閉バー / `nav`=全幅・左寄せのナビ行（アイコン＋ラベル、間隔やレスポンシブ拡張は呼び出し側で足す） / `link`=テキストリンク（下線付き）。
+  - **`ref` はforwardされる**（React 19のref-as-prop）。フォーカス復帰など、呼び出し側でDOM参照が要る箇所で使える。
+  - Buttonが表現できない形が必要なら、**手書きせずButtonに `color` / `size` のバリアントを足す**。
 - **Surface / Card / Dialog**
   - Light: `bg-neutral-50 border border-neutral-400`
   - Dark: `dark:bg-neutral-900 dark:border-neutral-600`

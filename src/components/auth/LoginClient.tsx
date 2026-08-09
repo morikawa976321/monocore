@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { createClient } from '@/src/lib/supabase/client'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
+import { Button } from '@/src/components/ui/Button'
 
 const ERROR_MESSAGES: Record<string, string> = {
     invalid_or_expired_link:
@@ -64,15 +65,16 @@ export function LoginClient({ initialErrorCode }: LoginClientProps) {
                         <p className="text-sm leading-6 text-neutral-500">
                             メールを確認してリンクをクリックしてください。
                         </p>
-                        <button
+                        <Button
+                            color="link"
+                            size="link"
                             onClick={() => {
                                 setSent(false)
                                 setEmail('')
                             }}
-                            className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-50 transition-colors underline underline-offset-4"
                         >
                             別のメールアドレスで試す
-                        </button>
+                        </Button>
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-4">
@@ -90,13 +92,15 @@ export function LoginClient({ initialErrorCode }: LoginClientProps) {
                                 {error}
                             </p>
                         )}
-                        <button
+                        <Button
                             type="submit"
+                            color="primary"
+                            size="md"
                             disabled={loading || !email.trim()}
-                            className="w-full px-4 py-2 text-sm font-medium rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 dark:focus-visible:ring-amber-400 bg-amber-500 text-neutral-50 hover:bg-amber-600 dark:bg-amber-500 dark:text-neutral-950 dark:hover:bg-amber-400 disabled:opacity-40"
+                            className="w-full"
                         >
                             {loading ? <LoadingIndicator label="送信中" /> : 'ログインリンクを送信'}
-                        </button>
+                        </Button>
                     </form>
                 )}
             </div>

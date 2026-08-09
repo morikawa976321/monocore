@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
+import { Button } from '@/src/components/ui/Button'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { parseToc, tocForDisplay, type TocEntry } from '@/src/lib/reports/toc'
 import { createClient } from '@/src/lib/supabase/client'
@@ -249,16 +250,17 @@ export default function ReportDetailPage() {
                         {/* スマホ: sm+のsticky sidebarが無いぶん、固定トリガー+ドロワーで
                             「目次はどのスクロール位置からでも開ける」を代替する。 */}
                         {report.toc.length > 0 && (
-                            <button
+                            <Button
                                 ref={tocTriggerRef}
-                                type="button"
+                                color="surface"
+                                size="fab"
                                 onClick={() => setIsTocOpen(true)}
                                 aria-expanded={isTocOpen}
                                 aria-label="目次を開く"
-                                className="sm:hidden fixed bottom-4 right-4 z-10 flex items-center justify-center w-12 h-12 rounded-sm border-2 border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
+                                className="sm:hidden fixed bottom-4 right-4 z-10"
                             >
                                 <List className="w-6 h-6" />
-                            </button>
+                            </Button>
                         )}
 
                         {isTocOpen && (
@@ -287,14 +289,14 @@ export default function ReportDetailPage() {
                                     <span className="text-sm leading-6 text-neutral-700 dark:text-neutral-300">
                                         目次
                                     </span>
-                                    <button
-                                        type="button"
+                                    <Button
+                                        color="ghost"
+                                        size="icon"
                                         onClick={closeToc}
                                         aria-label="目次を閉じる"
-                                        className="flex items-center justify-center w-8 h-8 rounded-sm text-neutral-700 transition-colors duration-150 ease-in-out hover:bg-neutral-200 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-600"
                                     >
                                         <X className="w-5 h-5" />
-                                    </button>
+                                    </Button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-1 sm:p-2">
                                     <ReportToc toc={report.toc} onNavigate={closeToc} />

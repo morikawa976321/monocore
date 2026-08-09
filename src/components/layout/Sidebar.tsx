@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { createClient } from "@/src/lib/supabase/client";
+import { Button } from "@/src/components/ui/Button";
 
 const MENU_ITEMS = [
     { href: "/schedules", icon: Clock, label: "Schedule" },
@@ -68,15 +69,15 @@ export function Sidebar() {
 
             {/* Mobile: ハンバーガーボタン（左下固定） */}
             <div className="fixed bottom-4 left-4 z-30 sm:hidden">
-                <button
-                    type="button"
+                <Button
+                    color="surface"
+                    size="fab"
                     onClick={() => setIsOpen((prev) => !prev)}
                     aria-expanded={isOpen}
                     aria-label={isOpen ? "メニューを閉じる" : "メニューを開く"}
-                    className="flex items-center justify-center w-12 h-12 rounded-sm border-2 border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
                 >
                     <Menu className="w-6 h-6" />
-                </button>
+                </Button>
             </div>
 
             {/* Mobile: オーバーレイ（メニュー外タップで閉じる） */}
@@ -173,11 +174,12 @@ const SidebarActionButton = ({
     disabled?: boolean;
 }) => {
     return (
-        <button
-            type="button"
+        <Button
+            color="ghost"
+            size="nav"
             onClick={onClick}
             disabled={disabled}
-            className="w-full flex items-center gap-2 sm:gap-4 px-2 py-2 text-sm sm:text-base font-medium leading-6 sm:leading-7 transition-colors rounded-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-50 disabled:opacity-50 group-hover:px-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
+            className="gap-2 sm:gap-4 sm:text-base leading-6 sm:leading-7 group-hover:px-4"
         >
             <div className="flex items-center justify-center w-8 h-8 shrink-0">{icon}</div>
             <span
@@ -187,6 +189,6 @@ const SidebarActionButton = ({
             >
                 {label}
             </span>
-        </button>
+        </Button>
     );
 };
