@@ -79,44 +79,6 @@ export type Database = {
         }
         Relationships: []
       }
-      project_card_decision_answers: {
-        Row: {
-          answer: string
-          answered_at: string
-          card_slug: string
-          consumed_at: string | null
-          decision_id: string
-          id: string
-          note: string | null
-        }
-        Insert: {
-          answer: string
-          answered_at?: string
-          card_slug: string
-          consumed_at?: string | null
-          decision_id: string
-          id?: string
-          note?: string | null
-        }
-        Update: {
-          answer?: string
-          answered_at?: string
-          card_slug?: string
-          consumed_at?: string | null
-          decision_id?: string
-          id?: string
-          note?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_card_decision_answers_card_slug_fkey"
-            columns: ["card_slug"]
-            isOneToOne: false
-            referencedRelation: "project_cards"
-            referencedColumns: ["slug"]
-          },
-        ]
-      }
       project_cards: {
         Row: {
           ai_next: Json

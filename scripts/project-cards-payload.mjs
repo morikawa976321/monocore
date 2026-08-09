@@ -143,8 +143,7 @@ export function validateDecisions(decisions, tag) {
             }
         }
 
-        // 回答は (card_slug, decision_id) で紐づくため、カード内で重複すると
-        // 別々の判断への回答が同じ1件として扱われる。
+        // 画面のリスト key と times_shown の追跡が id 単位なので、カード内で重複させない。
         const id = typeof decision.id === 'string' ? decision.id.trim() : ''
         if (id.length > 0) {
             if (seenIds.has(id)) {

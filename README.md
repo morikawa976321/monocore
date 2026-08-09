@@ -11,7 +11,7 @@
 | ルート | 役割 |
 | :--- | :--- |
 | `/schedules` | 予定の一覧・編集。日別メモ欄と inbox パネルを同居 |
-| `/projects` | プロジェクト板（ステータス別カード。判断への回答） |
+| `/projects` | プロジェクト板（ステータス別カード。自由記述メモ） |
 
 実装が守る設計制約と、未決の論点は `docs/design.md`。
 
@@ -25,8 +25,7 @@
 
 - カードは status（`active` / `waiting_user` / `waiting_other` / `dormant`）+ 完了ごとにセクション表示。休止中・完了は折りたたみ。
 - `project_cards` は画面からの手入力は不可（SELECT のみ）。正は context-engine / taskbox 側にあり、`scripts/upsert-project-cards.mjs` が service_role で slug 単位 upsert する。
-- カードへの書き込みは自由記述メモ（`project_notes`、カード単位と板全体）。**追記専用**で、taskbox 側が回収したら `consumed_at` を埋める。
-- `project_card_decision_answers`（accept / alternative / defer の選択肢式）は 2026-08-05 に `project_notes` へ置き換えた。テーブルは残っているがアプリからは読み書きしない。
+- カードへの書き込みは自由記述メモ（`project_notes`、カード単位と板全体）。**追記専用**で、taskbox 側が回収したら `consumed_at` を埋める。選択肢式の `project_card_decision_answers` は 2026-08-05 に置き換え、2026-08-09 に drop した。
 
 ---
 
