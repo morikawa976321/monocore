@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
-import { parseToc, type TocEntry } from '@/src/lib/reports/toc'
+import { parseToc, tocForDisplay, type TocEntry } from '@/src/lib/reports/toc'
 import { createClient } from '@/src/lib/supabase/client'
 import { getReportBySlug } from '@/src/lib/supabase/queries/reports'
 
@@ -17,15 +17,11 @@ type ReportDetail = {
     toc: TocEntry[]
 }
 
-// レベルが増えるほど字下げする。README-design.mdの余白スケール(1/2/4/6/12)の
-// 範囲に収めるため、6段階すべてを別々の深さにはせず3段に丸める。
+// 目次はh1〜h3のみ。README-design.mdの余白スケール(1/2/4/6/12)に合わせる。
 const TOC_INDENT_CLASS: Record<number, string> = {
     1: 'pl-0',
     2: 'pl-2',
-    3: 'pl-2',
-    4: 'pl-4',
-    5: 'pl-4',
-    6: 'pl-4',
+    3: 'pl-4',
 }
 
 function scrollStorageKey(slug: string) {
@@ -108,7 +104,7 @@ export default function ReportDetailPage() {
                 slug: data.slug,
                 title: data.title,
                 bodyHtml: data.body_html,
-                toc: parseToc(data.toc),
+                toc: tocForDisplay(parseToc(data.toc)),
             })
             setIsLoading(false)
         })()

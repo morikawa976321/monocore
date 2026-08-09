@@ -35,6 +35,14 @@ export function parseToc(value: Json): TocEntry[] {
     return parsed
 }
 
+/** 詳細ページの目次に出す最大見出しレベル（### = h3）。####以下は出さない。 */
+export const TOC_DISPLAY_MAX_LEVEL = 3
+
+/** 詳細ページ用。h1〜h3だけを残す。一覧検索はparseTocの全件を使う。 */
+export function tocForDisplay(entries: TocEntry[]): TocEntry[] {
+    return entries.filter((entry) => entry.level <= TOC_DISPLAY_MAX_LEVEL)
+}
+
 /**
  * 一覧の絞り込み。タイトルまたはtocの見出しテキストのいずれかに
  * queryが部分一致すればtrue(本文は検索対象にしない)。大文字小文字を区別しない。

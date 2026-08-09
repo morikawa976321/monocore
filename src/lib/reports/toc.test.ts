@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { matchesReportQuery, parseToc } from './toc'
+import { matchesReportQuery, parseToc, tocForDisplay } from './toc'
 
 describe('parseToc', () => {
     it('parses a well-formed toc array', () => {
@@ -30,6 +30,25 @@ describe('parseToc', () => {
             { level: 0, text: 'out of range low', anchor: 'oor2' },
         ])
         expect(toc).toEqual([{ level: 1, text: 'ok', anchor: 'ok' }])
+    })
+})
+
+describe('tocForDisplay', () => {
+    it('keeps headings through ### and drops #### and deeper', () => {
+        expect(
+            tocForDisplay([
+                { level: 1, text: 'h1', anchor: 'h1' },
+                { level: 2, text: 'h2', anchor: 'h2' },
+                { level: 3, text: 'h3', anchor: 'h3' },
+                { level: 4, text: 'h4', anchor: 'h4' },
+                { level: 5, text: 'h5', anchor: 'h5' },
+                { level: 6, text: 'h6', anchor: 'h6' },
+            ])
+        ).toEqual([
+            { level: 1, text: 'h1', anchor: 'h1' },
+            { level: 2, text: 'h2', anchor: 'h2' },
+            { level: 3, text: 'h3', anchor: 'h3' },
+        ])
     })
 })
 
