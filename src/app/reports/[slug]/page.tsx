@@ -48,7 +48,7 @@ function ReportToc({
                     <a
                         href={`#${entry.anchor}`}
                         onClick={onNavigate}
-                        className="block truncate text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-50 hover:underline"
+                        className="block truncate rounded-sm px-2 py-1 text-neutral-800 transition-colors duration-150 ease-in-out hover:bg-neutral-200 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-600"
                     >
                         {entry.text}
                     </a>
@@ -180,7 +180,7 @@ export default function ReportDetailPage() {
             <PageHeader title={report?.title ?? 'Report'}>
                 <Link
                     href="/reports"
-                    className="inline-flex items-center gap-1 text-sm leading-6 text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-50"
+                    className="inline-flex h-9 items-center gap-2 rounded-sm border-2 border-neutral-600 bg-neutral-50 px-2 text-sm font-medium text-neutral-900 transition-colors duration-150 ease-in-out hover:border-neutral-700 hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:border-neutral-500 dark:bg-neutral-900 dark:text-neutral-50 dark:hover:border-neutral-400 dark:hover:bg-neutral-800 dark:focus-visible:ring-neutral-500"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     一覧
@@ -198,16 +198,26 @@ export default function ReportDetailPage() {
                 )}
 
                 {!isLoading && notFound && (
-                    <div className="h-full flex items-center justify-center px-2 sm:px-6">
-                        <p className="text-sm leading-6 text-neutral-700 dark:text-neutral-300">
-                            レポートが見つかりません。
-                        </p>
+                    <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4">
+                        <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
+                            <div className="p-1 sm:p-4">
+                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100">
+                                    レポートが見つかりません。
+                                </p>
+                            </div>
+                        </section>
                     </div>
                 )}
 
                 {!isLoading && errorMessage && (
-                    <div className="h-full flex items-center justify-center px-2 sm:px-6">
-                        <p className="text-sm leading-6 text-amber-600 dark:text-amber-400">{errorMessage}</p>
+                    <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4">
+                        <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
+                            <div className="p-1 sm:p-4">
+                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-amber-600 dark:text-amber-400">
+                                    {errorMessage}
+                                </p>
+                            </div>
+                        </section>
                     </div>
                 )}
 
@@ -216,20 +226,25 @@ export default function ReportDetailPage() {
                         <div
                             ref={scrollContainerRef}
                             onScroll={handleScroll}
-                            className="h-full overflow-y-auto px-2 sm:px-6 py-2 sm:py-4"
+                            className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4"
                         >
                             <div className="sm:flex sm:items-start sm:gap-6">
                                 {report.toc.length > 0 && (
                                     <nav
                                         aria-label="目次"
-                                        className="hidden sm:block sm:sticky sm:top-2 sm:w-56 sm:shrink-0 sm:max-h-screen sm:overflow-y-auto rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 p-2"
+                                        className="hidden sm:block sm:sticky sm:top-1 sm:w-56 sm:shrink-0 sm:max-h-screen sm:overflow-y-auto rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600"
                                     >
-                                        <ReportToc toc={report.toc} />
+                                        <header className="px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
+                                            目次
+                                        </header>
+                                        <div className="p-1 sm:p-2">
+                                            <ReportToc toc={report.toc} />
+                                        </div>
                                     </nav>
                                 )}
 
                                 <article
-                                    className="report-body min-w-0 flex-1 pb-12"
+                                    className="report-body min-w-0 flex-1 rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600 p-1 sm:p-4 pb-12 sm:pb-4"
                                     dangerouslySetInnerHTML={{ __html: report.bodyHtml }}
                                 />
                             </div>
@@ -244,7 +259,7 @@ export default function ReportDetailPage() {
                                 onClick={() => setIsTocOpen(true)}
                                 aria-expanded={isTocOpen}
                                 aria-label="目次を開く"
-                                className="sm:hidden fixed bottom-4 right-4 z-30 flex items-center justify-center w-12 h-12 rounded-sm border-2 border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
+                                className="sm:hidden fixed bottom-4 right-4 z-10 flex items-center justify-center w-12 h-12 rounded-sm border-2 border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
                             >
                                 <List className="w-6 h-6" />
                             </button>
@@ -272,20 +287,20 @@ export default function ReportDetailPage() {
                                 aria-label="目次"
                                 aria-hidden={!isTocOpen}
                             >
-                                <div className="flex items-center justify-between px-2 py-2 border-b border-neutral-200 dark:border-neutral-800">
-                                    <span className="text-sm leading-6 font-medium text-neutral-700 dark:text-neutral-300">
+                                <div className="flex items-center justify-between px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
+                                    <span className="text-sm leading-6 text-neutral-700 dark:text-neutral-300">
                                         目次
                                     </span>
                                     <button
                                         type="button"
                                         onClick={closeToc}
                                         aria-label="目次を閉じる"
-                                        className="flex items-center justify-center w-8 h-8 rounded-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
+                                        className="flex items-center justify-center w-8 h-8 rounded-sm text-neutral-700 transition-colors duration-150 ease-in-out hover:bg-neutral-200 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-600"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-2">
+                                <div className="flex-1 overflow-y-auto p-1 sm:p-2">
                                     <ReportToc toc={report.toc} onNavigate={closeToc} />
                                 </div>
                             </div>

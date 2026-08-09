@@ -95,14 +95,14 @@ export default function ReportsPage() {
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder="タイトル・見出しで絞り込み"
                             aria-label="レポートを絞り込む"
-                            className="w-full rounded border border-neutral-400 bg-neutral-50 px-2 sm:px-4 py-2 text-sm leading-6 text-neutral-900 placeholder:text-neutral-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-500 dark:focus-visible:ring-neutral-500"
+                            className="w-full rounded-sm border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 outline-none transition-colors duration-150 ease-in-out placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
                         />
                     )}
 
                     {!isInitialLoading && reports.length === 0 && (
                         <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
-                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-50">
+                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100">
                                     表示できるレポートはありません。
                                 </p>
                             </div>
@@ -112,7 +112,7 @@ export default function ReportsPage() {
                     {!isInitialLoading && reports.length > 0 && filteredReports.length === 0 && (
                         <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
-                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-50">
+                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100">
                                     「{query}」に一致するレポートはありません。
                                 </p>
                             </div>
@@ -125,12 +125,12 @@ export default function ReportsPage() {
                                 <li key={report.slug}>
                                     <Link
                                         href={`/reports/${report.slug}`}
-                                        className="flex items-center justify-between gap-2 rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600 px-2 sm:px-4 py-2 sm:py-4 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-500"
+                                        className="flex items-center justify-between gap-2 rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600 px-2 sm:px-4 py-2 text-sm leading-6 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-500"
                                     >
-                                        <span className="min-w-0 truncate text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-50">
+                                        <span className="min-w-0 truncate text-neutral-900 dark:text-neutral-50">
                                             {report.title}
                                         </span>
-                                        <span className="shrink-0 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
+                                        <span className="shrink-0 text-neutral-700 dark:text-neutral-300">
                                             {format(toZonedTime(parseISO(report.updatedAt), timezone), 'yyyy-MM-dd')}
                                         </span>
                                     </Link>

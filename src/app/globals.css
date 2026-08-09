@@ -16,25 +16,31 @@
    text-sm/base/lgのみ、ウェイトはnormal/mediumのみ、余白は1/2/4/6/12のみ、
    任意値[]禁止、パレットはneutral/amber/red/transparentのみ)に厳密に従う。
    見出しの階層は数の少ないサイズしか使えないため、mt(区切りの大きさ)と
-   h2のborder-bで差をつける。 */
+   h2のborder-bで差をつける。
+   本文の基準タイポは schedules / projects のカード本文と同じ
+   text-sm leading-6 sm:text-base sm:leading-7 / dark:text-neutral-100。 */
+.report-body {
+  @apply text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100;
+}
+
 .report-body :where(h1, h2, h3, h4, h5, h6) {
-  @apply mb-2 font-medium text-neutral-900 dark:text-neutral-50;
+  @apply mb-2 font-medium text-neutral-900 dark:text-neutral-100;
 }
 .report-body :where(h1, h2, h3, h4, h5, h6):first-child {
   @apply mt-0;
 }
 .report-body :where(h1) {
-  @apply mt-6 text-lg;
+  @apply mt-6 text-lg leading-7;
 }
 .report-body :where(h2) {
-  @apply mt-12 border-b border-neutral-200 pb-1 text-lg dark:border-neutral-800;
+  @apply mt-12 border-b border-neutral-200 pb-2 text-lg leading-7 dark:border-neutral-800;
 }
 .report-body :where(h3, h4, h5, h6) {
-  @apply mt-6 text-base;
+  @apply mt-6 text-base leading-7;
 }
 
 .report-body :where(p) {
-  @apply my-4 leading-6 sm:leading-7;
+  @apply my-4;
 }
 
 .report-body :where(ul) {
@@ -43,9 +49,6 @@
 .report-body :where(ol) {
   @apply my-4 ml-4 list-decimal space-y-1;
 }
-.report-body :where(li) {
-  @apply leading-6 sm:leading-7;
-}
 .report-body :where(li > ul, li > ol) {
   @apply mt-1 mb-0;
 }
@@ -53,8 +56,9 @@
   @apply -ml-4 list-none;
 }
 
+/* ProjectCard内リンクと同じアンバー。本文では下線を残してリンクだと分かるようにする。 */
 .report-body :where(a) {
-  @apply text-amber-600 underline underline-offset-2 dark:text-amber-400;
+  @apply text-amber-600 underline underline-offset-2 transition-colors duration-150 ease-in-out hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-400;
 }
 
 .report-body :where(strong) {
@@ -64,11 +68,11 @@
   @apply italic;
 }
 .report-body :where(del) {
-  @apply text-neutral-500 line-through;
+  @apply text-neutral-700 line-through dark:text-neutral-300;
 }
 
 .report-body :where(blockquote) {
-  @apply my-4 border-l-2 border-neutral-400 pl-4 text-neutral-700 dark:border-neutral-600 dark:text-neutral-300;
+  @apply my-4 border-l-2 border-neutral-400 pl-4 text-neutral-800 dark:border-neutral-600 dark:text-neutral-200;
 }
 
 .report-body :where(hr) {
@@ -86,13 +90,13 @@
 }
 
 .report-body :where(table) {
-  @apply my-4 block w-full overflow-x-auto border-collapse text-sm;
+  @apply my-4 block w-full overflow-x-auto border-collapse text-sm leading-6;
 }
 .report-body :where(th, td) {
   @apply border border-neutral-200 px-2 py-1 text-left align-top dark:border-neutral-800;
 }
 .report-body :where(th) {
-  @apply bg-neutral-200 font-medium dark:bg-neutral-800;
+  @apply bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100;
 }
 
 .report-body :where(img) {
