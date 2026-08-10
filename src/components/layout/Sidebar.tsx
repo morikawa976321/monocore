@@ -70,7 +70,7 @@ export function Sidebar() {
             {/* Mobile: ハンバーガーボタン（左下固定） */}
             <div className="fixed bottom-4 left-4 z-30 sm:hidden">
                 <Button
-                    color="surface"
+                    color="secondary"
                     size="fab"
                     onClick={() => setIsOpen((prev) => !prev)}
                     aria-expanded={isOpen}

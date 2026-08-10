@@ -36,11 +36,11 @@ AIコーディングエージェントは、本ガイドラインに記載され
   - Sub Surface (Hovered/Selected): `bg-neutral-200` / Dark: `bg-neutral-800`
 
 - **ボーダー (Border)** — **状態ではなく役割で選ぶ**（2026-08-09に実装の実態へ合わせて改訂。旧規定は Default=200/800 / Focus·Active=400/600 という状態の軸だけを持っており、実装が使っている役割の軸を記述していなかった）
-  - **囲みの外枠** (Card / Section / Panel / FAB — 単独で立つ箱の外周): `border-neutral-400` / Dark: `border-neutral-600`
+  - **囲みの外枠** (Card / Section / Panel — 単独で立つ箱の外周): `border-neutral-400` / Dark: `border-neutral-600`
   - **内部の区切り線** (header の下線・footer の上線・ドロワーやサイドバーの縁・テーブル罫線・`hr`・`h2` の下線): `border-neutral-200` / Dark: `border-neutral-800`
   - **オーバーレイの小箱** (暗転した背景の上に浮く「同期中…」等): `border-neutral-200` / Dark: `border-neutral-800`。背景が暗転しているぶん枠は弱くてよい
   - **Focus/Active**: `focus:border-neutral-400` / Dark: `focus:border-neutral-600`（入力欄など、平常時が200/800のものに当てる）
-  - ボタンはこの表に含めない。**ボタンは必ず `components/ui/Button` を使う**（§8）
+  - ボタンはこの表に含めない。**ボタンは必ず `components/ui/Button` を使う**（§8）。単独で立つ操作要素（FAB・全幅トグル等）も `<button>` である限り Button の `color`（primary / secondary / danger / ghost / link）で表現し、「囲みの外枠」トークンは Card / Section / Panel のような非操作コンテナ専用とする
 
 - **テキスト (Text)**
   - Primary: `text-neutral-900` / Dark: `text-neutral-50`
@@ -94,10 +94,10 @@ AIコーディングエージェントは、本ガイドラインに記載され
 ## 8. コンポーネント実装の制約（Agent向けテンプレート）
 AIエージェントは、以下のクラスの組み合わせルールにのみ従ってUIコンポーネントを実装せよ。
 
-- **ボタン（Primary / Secondary / Danger / Ghost / Surface / Link）** — **クラスを手書きしない。必ず `components/ui/Button` を使う**（2026-08-09改訂）。
+- **ボタン（Primary / Secondary / Danger / Ghost / Link）** — **クラスを手書きしない。必ず `components/ui/Button` を使う**（2026-08-09改訂、2026-08-11に `surface` / `sm` / `bar` を削減）。
   - 見た目の**正は `Button.tsx` の実装**であり、このファイルはクラス列を持たない。以前はここに3種のクラス列を書いていたが、実装と全項目（枠幅・枠色・背景）で食い違ったまま誰も気づかなかったため、二重管理をやめた。
-  - `color` の使い分け: `primary`=その画面の主操作（amber） / `secondary`=それ以外の通常操作（枠あり） / `danger`=破壊的操作 / `ghost`=枠なし・hover背景のみ（アイコンのみのゴーストボタン・ナビ行など、常時は枠を出したくない操作） / `surface`=Card/Panel/FABと同じ「囲みの外枠」トークンを使う操作要素（FAB・全幅の開閉バーなど、単独で立つ箱として見せたい操作） / `link`=下線のみのテキストリンク（フォーム内の補助操作など）。
-  - `size` の使い分け: `sm` / `md`=通常ボタン（アイコン＋ラベル可） / `icon`=アイコンのみの正方形32px / `fab`=アイコンのみの正方形48px / `bar`=全幅・左寄せの開閉バー / `nav`=全幅・左寄せのナビ行（アイコン＋ラベル、間隔やレスポンシブ拡張は呼び出し側で足す） / `link`=テキストリンク（下線付き）。
+  - `color` の使い分け: `primary`=その画面の主操作（amber） / `secondary`=それ以外の通常操作（枠あり。FAB・全幅トグルなど単独で立つ操作も含む） / `danger`=破壊的操作 / `ghost`=枠なし・hover背景のみ（アイコンのみのゴーストボタン・ナビ行など、常時は枠を出したくない操作） / `link`=下線のみのテキストリンク（フォーム内の補助操作など）。
+  - `size` の使い分け: `md`=通常ボタン（アイコン＋ラベル可） / `icon`=アイコンのみの正方形32px / `fab`=アイコンのみの正方形48px / `nav`=全幅・左寄せのナビ行および開閉バー（アイコン＋ラベル、間隔やレスポンシブ拡張は呼び出し側で足す） / `link`=テキストリンク（下線付き）。
   - **`ref` はforwardされる**（React 19のref-as-prop）。フォーカス復帰など、呼び出し側でDOM参照が要る箇所で使える。
   - Buttonが表現できない形が必要なら、**手書きせずButtonに `color` / `size` のバリアントを足す**。
 - **Surface / Card / Dialog**

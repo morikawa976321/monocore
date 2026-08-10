@@ -33,8 +33,8 @@ export function ProjectCard({ card, today, latestNote, onNoteSaved }: ProjectCar
     return (
         <div className="flex flex-col gap-2">
             <Button
-                color="surface"
-                size="bar"
+                color="secondary"
+                size="nav"
                 onClick={() => setIsOpen((prev) => !prev)}
                 aria-expanded={isOpen}
                 aria-controls={panelId}

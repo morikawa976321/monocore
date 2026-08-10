@@ -252,7 +252,7 @@ export default function ReportDetailPage() {
                         {report.toc.length > 0 && (
                             <Button
                                 ref={tocTriggerRef}
-                                color="surface"
+                                color="secondary"
                                 size="fab"
                                 onClick={() => setIsTocOpen(true)}
                                 aria-expanded={isTocOpen}

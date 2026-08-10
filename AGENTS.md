@@ -112,7 +112,7 @@ Reference: `README.md` (development rules), `docs/directory_structure.md` (codin
 - Do not override visual tokens via `className` (`bg-*`, `text-*`, `px-*`, `py-*`, `rounded-*`, `focus-visible:ring-*`) unless there is an explicit approved exception.
 - If the same visual exception appears 3+ times, add a new `color`/`size` variant in `Button` instead of repeating local overrides.
 - Keep semantic emphasis consistent: one `primary` action per view; use `secondary` for the rest.
-- Required variants: `color` = `primary | secondary | danger`, `size` = `sm | md`.
+- Required variants: `color` = `primary | secondary | danger | ghost | link`, `size` = `md | icon | fab | nav | link`.
 
 ### Self-check before submitting
 

@@ -172,8 +172,8 @@ export default function ProjectsPage() {
                     {!isInitialLoading && (
                         <div className="flex flex-col gap-2">
                             <Button
-                                color="surface"
-                                size="bar"
+                                color="secondary"
+                                size="nav"
                                 onClick={() => setIsBoardNoteOpen((prev) => !prev)}
                                 aria-expanded={isBoardNoteOpen}
                                 aria-controls={boardNotePanelId}
