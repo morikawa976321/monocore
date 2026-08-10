@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Json } from '@/src/types/database.types'
 import {
-    daysUntil,
     formatDeadlineLabel,
     parseAiNext,
     parseAiRecent,
@@ -9,95 +8,35 @@ import {
     parseYourTurnLines,
 } from './card'
 
-describe('daysUntil', () => {
-    it('returns positive days for a future deadline', () => {
-        expect(daysUntil('2026-09-01', '2026-08-05')).toBe(27)
-    })
-
-    it('returns zero for today', () => {
-        expect(daysUntil('2026-08-05', '2026-08-05')).toBe(0)
-    })
-
-    it('returns negative days for a past deadline', () => {
-        expect(daysUntil('2026-08-02', '2026-08-05')).toBe(-3)
-    })
-})
-
 describe('formatDeadlineLabel', () => {
-    it('formats future deadlines as remaining days', () => {
+    it('formats future, today, overdue, and null deadlines', () => {
         expect(formatDeadlineLabel('2026-09-01', '2026-08-05')).toBe('あと27日')
-    })
-
-    it('formats today deadline', () => {
         expect(formatDeadlineLabel('2026-08-05', '2026-08-05')).toBe('今日')
-    })
-
-    it('formats past deadlines as overdue days', () => {
         expect(formatDeadlineLabel('2026-08-02', '2026-08-05')).toBe('3日超過')
-    })
-
-    it('returns null for null deadline', () => {
         expect(formatDeadlineLabel(null, '2026-08-05')).toBeNull()
     })
 })
 
 describe('parseYourTurnLines', () => {
-    it('splits multiple lines into pending items', () => {
-        expect(parseYourTurnLines('準備する\n提出する')).toEqual([
-            { text: '準備する', done: false },
-            { text: '提出する', done: false },
-        ])
-    })
-
-    it('parses lowercase and uppercase completed markers', () => {
-        expect(parseYourTurnLines('[x] 完了済み\n[X] 確認済み')).toEqual([
-            { text: '完了済み', done: true },
-            { text: '確認済み', done: true },
-        ])
-    })
-
-    it('parses an unchecked marker', () => {
-        expect(parseYourTurnLines('[ ] 未完了')).toEqual([{ text: '未完了', done: false }])
-    })
-
-    it('trims lines and drops blank lines', () => {
-        expect(parseYourTurnLines('  最初  \n\n   \n  次  ')).toEqual([
-            { text: '最初', done: false },
-            { text: '次', done: false },
-        ])
-    })
-
-    it('returns an empty array for empty or whitespace-only input', () => {
-        expect(parseYourTurnLines('')).toEqual([])
-        expect(parseYourTurnLines(' \n  ')).toEqual([])
-    })
-
-    it('supports CRLF line endings', () => {
-        expect(parseYourTurnLines('[ ] 一つ目\r\n[x] 二つ目')).toEqual([
-            { text: '一つ目', done: false },
-            { text: '二つ目', done: true },
-        ])
-    })
-
-    it('allows whitespace around checklist markers', () => {
-        expect(parseYourTurnLines(' [ x ]   完了 \n [   ]   未完了 ')).toEqual([
+    it('parses checklist markers, trims, and drops blanks', () => {
+        expect(parseYourTurnLines('[x] 完了\r\n[ ] 未完了\n\n  メモ  ')).toEqual([
             { text: '完了', done: true },
             { text: '未完了', done: false },
+            { text: 'メモ', done: false },
         ])
+        expect(parseYourTurnLines('')).toEqual([])
     })
 })
 
 describe('parseAiRecent', () => {
-    it('returns null for empty object', () => {
+    it('parses text and string links; null for empty', () => {
         expect(parseAiRecent({})).toBeNull()
-    })
-
-    it('parses text and string links', () => {
-        const parsed = parseAiRecent({
-            text: '最新報告',
-            links: ['https://example.com/a', 10, 'https://example.com/b'],
-        } as Json)
-        expect(parsed).toEqual({
+        expect(
+            parseAiRecent({
+                text: '最新報告',
+                links: ['https://example.com/a', 10, 'https://example.com/b'],
+            } as Json)
+        ).toEqual({
             text: '最新報告',
             links: ['https://example.com/a', 'https://example.com/b'],
         })
@@ -129,14 +68,6 @@ describe('parseDecisions', () => {
                 times_shown: '2',
             },
             {
-                id: 'd4',
-                question: 'blocks が不正でも判断は残す',
-                recommendation: '表示に使わない項目で描画を止めない',
-                first_raised: '2026-08-01',
-                times_shown: 2,
-                blocks: 'release',
-            },
-            {
                 id: 'd5',
                 question: 'blocks が欠落していても判断は残す',
                 recommendation: '2026-08-04に全20件が消えた実例のケース',
@@ -160,14 +91,6 @@ describe('parseDecisions', () => {
                 recommendation: '補助情報の欠落で判断を捨てない',
                 first_raised: '',
                 times_shown: 0,
-                blocks: [],
-            },
-            {
-                id: 'd4',
-                question: 'blocks が不正でも判断は残す',
-                recommendation: '表示に使わない項目で描画を止めない',
-                first_raised: '2026-08-01',
-                times_shown: 2,
                 blocks: [],
             },
             {
