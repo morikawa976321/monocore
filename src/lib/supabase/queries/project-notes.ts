@@ -4,8 +4,7 @@ import type { Database } from '../../../types/database.types'
 export type ProjectNoteRow = Database['public']['Tables']['project_notes']['Row']
 
 type InsertProjectNoteInput = {
-    /** null は「板全体について」の記述を意味する。 */
-    card_slug: string | null
+    card_slug: string
     body: string
 }
 
@@ -32,11 +31,11 @@ export async function insertProjectNote(
 }
 
 /**
- * カードごとの最新1件を引く。null キーが板全体ぶん。
+ * カードごとの最新1件を引く。
  * 追記専用テーブルなので「現在の内容」＝最新行という約束。
  */
-export function latestNoteByCard(notes: ProjectNoteRow[]): Map<string | null, ProjectNoteRow> {
-    const latest = new Map<string | null, ProjectNoteRow>()
+export function latestNoteByCard(notes: ProjectNoteRow[]): Map<string, ProjectNoteRow> {
+    const latest = new Map<string, ProjectNoteRow>()
     for (const note of notes) {
         const key = note.card_slug
         const current = latest.get(key)

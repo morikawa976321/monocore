@@ -10,8 +10,7 @@ import {
 } from '@/src/lib/supabase/queries/project-notes'
 
 type ProjectNoteFormProps = {
-    /** null は「板全体について」の欄。 */
-    cardSlug: string | null
+    cardSlug: string
     label: string
     placeholder: string
     latestNote: ProjectNoteRow | null

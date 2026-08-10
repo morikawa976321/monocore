@@ -7,7 +7,7 @@ type ProjectSectionProps = {
     description?: string
     cards: ProjectCardRow[]
     today: string
-    notesByCard: Map<string | null, ProjectNoteRow>
+    notesByCard: Map<string, ProjectNoteRow>
     onNoteSaved: (row: ProjectNoteRow) => void
     showWhenEmpty?: boolean
     tone?: 'default' | 'warning'

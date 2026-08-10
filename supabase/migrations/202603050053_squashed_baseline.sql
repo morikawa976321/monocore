@@ -201,11 +201,12 @@ CREATE TRIGGER update_project_cards_updated_at
     EXECUTE FUNCTION public.update_updated_at_column();
 
 -- =======================================================
--- project_notes（追記専用）
+-- project_notes（追記専用・カード単位のみ。card_slug 必須）
 -- =======================================================
 CREATE TABLE public.project_notes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    card_slug TEXT,
+    -- カード削除時に道連れにしないので外部キーは張らない
+    card_slug TEXT NOT NULL,
     body TEXT NOT NULL CHECK (length(btrim(body)) > 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     consumed_at TIMESTAMPTZ

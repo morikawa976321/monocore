@@ -2,13 +2,10 @@
 
 import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
-import { ChevronDown, ChevronRight } from 'lucide-react'
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { ProjectSection } from '@/src/components/projects/ProjectSection'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
-import { Button } from '@/src/components/ui/Button'
-import { ProjectNoteForm } from '@/src/components/projects/ProjectNoteForm'
 import { getDefaultTimezone } from '@/src/lib/date'
 import { createClient } from '@/src/lib/supabase/client'
 import { getGoals, type GoalRow } from '@/src/lib/supabase/queries/goals'
@@ -29,8 +26,6 @@ export default function ProjectsPage() {
     const [isInitialLoading, setIsInitialLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
-    const [isBoardNoteOpen, setIsBoardNoteOpen] = useState(false)
-    const boardNotePanelId = useId()
 
     const loadProjectData = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
         if (mode === 'refresh') {
@@ -165,46 +160,6 @@ export default function ProjectsPage() {
                                 onNoteSaved={handleNoteSaved}
                             />
                         </>
-                    )}
-
-                    {/* 板全体への記述欄。個別カードに属さない指示をここで受ける
-                        （新規プロジェクトの追加・クローズ・横断の方針など）。 */}
-                    {!isInitialLoading && (
-                        <div className="flex flex-col gap-2">
-                            <Button
-                                color="secondary"
-                                size="nav"
-                                onClick={() => setIsBoardNoteOpen((prev) => !prev)}
-                                aria-expanded={isBoardNoteOpen}
-                                aria-controls={boardNotePanelId}
-                                className="leading-6"
-                            >
-                                <span className="flex w-full min-w-0 items-center justify-between gap-2">
-                                    <span className="min-w-0 truncate">板全体について</span>
-                                    {isBoardNoteOpen ? (
-                                        <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    ) : (
-                                        <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    )}
-                                </span>
-                            </Button>
-                            {isBoardNoteOpen && (
-                                <div
-                                    id={boardNotePanelId}
-                                    className="rounded border-2 border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900 overflow-hidden"
-                                >
-                                    <div className="p-1 sm:p-4">
-                                        <ProjectNoteForm
-                                            cardSlug={null}
-                                            label="板全体について"
-                                            placeholder="プロジェクトの追加・クローズ・横断の方針など、特定のカードに属さないこと"
-                                            latestNote={notesByCard.get(null) ?? null}
-                                            onSaved={handleNoteSaved}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
                     )}
                 </div>
 
