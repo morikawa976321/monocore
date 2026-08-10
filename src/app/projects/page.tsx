@@ -2,7 +2,8 @@
 
 import { format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { ProjectSection } from '@/src/components/projects/ProjectSection'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
@@ -29,6 +30,8 @@ export default function ProjectsPage() {
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [showDormant, setShowDormant] = useState(false)
+    const [isBoardNoteOpen, setIsBoardNoteOpen] = useState(false)
+    const boardNotePanelId = useId()
 
     const loadProjectData = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
         if (mode === 'refresh') {
@@ -183,17 +186,41 @@ export default function ProjectsPage() {
                     {/* 板全体への記述欄。個別カードに属さない指示をここで受ける
                         （新規プロジェクトの追加・クローズ・横断の方針など）。 */}
                     {!isInitialLoading && (
-                        <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
-                            <div className="p-1 sm:p-4">
-                                <ProjectNoteForm
-                                    cardSlug={null}
-                                    label="板全体について"
-                                    placeholder="プロジェクトの追加・クローズ・横断の方針など、特定のカードに属さないこと"
-                                    latestNote={notesByCard.get(null) ?? null}
-                                    onSaved={handleNoteSaved}
-                                />
-                            </div>
-                        </section>
+                        <div className="flex flex-col gap-2">
+                            <Button
+                                color="surface"
+                                size="bar"
+                                onClick={() => setIsBoardNoteOpen((prev) => !prev)}
+                                aria-expanded={isBoardNoteOpen}
+                                aria-controls={boardNotePanelId}
+                                className="leading-6"
+                            >
+                                <span className="flex w-full min-w-0 items-center justify-between gap-2">
+                                    <span className="min-w-0 truncate">板全体について</span>
+                                    {isBoardNoteOpen ? (
+                                        <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    ) : (
+                                        <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    )}
+                                </span>
+                            </Button>
+                            {isBoardNoteOpen && (
+                                <div
+                                    id={boardNotePanelId}
+                                    className="rounded border-2 border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900 overflow-hidden"
+                                >
+                                    <div className="p-1 sm:p-4">
+                                        <ProjectNoteForm
+                                            cardSlug={null}
+                                            label="板全体について"
+                                            placeholder="プロジェクトの追加・クローズ・横断の方針など、特定のカードに属さないこと"
+                                            latestNote={notesByCard.get(null) ?? null}
+                                            onSaved={handleNoteSaved}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
 

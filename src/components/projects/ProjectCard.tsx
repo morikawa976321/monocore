@@ -57,15 +57,6 @@ export function ProjectCard({ card, today, latestNote, onNoteSaved }: ProjectCar
                 </span>
             </Button>
 
-            {/* 畳んだカードでも、再開トリガーや監視条件は1行だけ見せる。
-                「畳む=完全に見えなくなる」だと、トリガー監視ものを畳めなくなる
-                (2026-08-07 本人指摘: デスクトップ処分は相場トリガーの常時監視が要る)。 */}
-            {!isOpen && card.deadline_note && (
-                <p className="px-2 sm:px-4 text-sm leading-5 text-neutral-700 dark:text-neutral-300 truncate">
-                    {card.deadline_note}
-                </p>
-            )}
-
             {isOpen && (
                 <div
                     id={panelId}
