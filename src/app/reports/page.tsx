@@ -5,6 +5,7 @@ import { toZonedTime } from 'date-fns-tz'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
+import { Input } from '@/src/components/ui/Input'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { getDefaultTimezone } from '@/src/lib/date'
 import { matchesReportQuery, parseToc, type TocEntry } from '@/src/lib/reports/toc'
@@ -89,13 +90,12 @@ export default function ReportsPage() {
             <div className="flex-1 overflow-hidden relative">
                 <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4">
                     {!isInitialLoading && (
-                        <input
+                        <Input
                             type="search"
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder="タイトル・見出しで絞り込み"
                             aria-label="レポートを絞り込む"
-                            className="w-full rounded-sm border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 outline-none transition-colors duration-150 ease-in-out placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
                         />
                     )}
 

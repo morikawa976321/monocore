@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { createClient } from '@/src/lib/supabase/client'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { Button } from '@/src/components/ui/Button'
+import { Input } from '@/src/components/ui/Input'
 
 const ERROR_MESSAGES: Record<string, string> = {
     invalid_or_expired_link:
@@ -78,14 +79,13 @@ export function LoginClient({ initialErrorCode }: LoginClientProps) {
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-4">
-                        <input
+                        <Input
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="メールアドレス"
                             required
                             autoFocus
-                            className="w-full px-3 py-2 text-sm rounded-sm outline-none transition-colors bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-50 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
                         />
                         {error && (
                             <p className="text-sm text-red-600 dark:text-red-400">

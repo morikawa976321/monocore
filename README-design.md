@@ -33,7 +33,7 @@ AIコーディングエージェントは、本ガイドラインに記載され
 
 - **背景 (Background / Surface)**
   - App Background: `bg-neutral-100` / Dark: `bg-neutral-950`
-  - Base Surface (Card/Menu/Modal): `bg-neutral-50` / Dark: `bg-neutral-900`
+  - Base Surface (Card/Menu/Panel): `bg-neutral-50` / Dark: `bg-neutral-900`
   - Sub Surface (Hovered/Selected): `bg-neutral-200` / Dark: `bg-neutral-800`
 
 - **ボーダー (Border)** — **状態ではなく役割で選ぶ**（2026-08-09に実装の実態へ合わせて改訂。旧規定は Default=200/800 / Focus·Active=400/600 という状態の軸だけを持っており、実装が使っている役割の軸を記述していなかった）
@@ -101,15 +101,16 @@ AIエージェントは、以下のクラスの組み合わせルールにのみ
   - `size` の使い分け: `md`=通常ボタン（アイコン＋ラベル可） / `icon`=アイコンのみの正方形32px / `fab`=アイコンのみの正方形48px / `nav`=全幅・左寄せのナビ行および開閉バー（アイコン＋ラベル、間隔やレスポンシブ拡張は呼び出し側で足す） / `link`=テキストリンク（下線付き）。
   - **`ref` はforwardされる**（React 19のref-as-prop）。フォーカス復帰など、呼び出し側でDOM参照が要る箇所で使える。
   - Buttonが表現できない形が必要なら、**手書きせずButtonに `color` / `size` のバリアントを足す**。
-- **Surface / Card / Dialog**
+- **Surface / Card / Panel**
   - Light: `bg-neutral-50 border border-neutral-400`
   - Dark: `dark:bg-neutral-900 dark:border-neutral-600`
   - 共通: `rounded p-4` または `p-6`
   - （2026-08-09改訂。上の「ボーダー」の**囲みの外枠**に揃えた。旧記載は200/800で、ProjectCard・DaySection・各セクションの実装と食い違っていた）
-- **Input / Textarea**
-  - Light: `bg-neutral-50 border text-neutral-900 border-neutral-200 placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400`
-  - Dark: `dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600`
-  - 共通: `px-3 py-2 text-sm rounded-sm outline-none transition-colors`
+- **Input / Textarea** — **クラスを手書きしない。必ず `components/ui/Input` / `Textarea` を使う**。
+  - 見た目の**正は各コンポーネント実装**であり、このファイルはクラス列を持たない。
+  - `variant`: `field`=枠付きフォーム入力（既定） / `plain`=枠なし・透明（Schedules 本文や Inbox などカード内エディタ）。
+  - `className` はレイアウト専用（`w-full` は既定、`min-h-*` / `resize-none` / `leading-*` など）。見た目トークン（`bg-*` / `border-*` / `text-*` / `px-*` / `rounded-*`）は上書きしない。
+  - 表現できない形が必要なら、**手書きせずコンポーネントに `variant` を足す**。
 
 ## 9. z-index レイヤールール
 
@@ -119,13 +120,13 @@ AIエージェントは、以下のクラスの組み合わせルールにのみ
 - `z-10`: ページ内の固定補助要素（例: FAB）
 - `z-20`: メニュー/ドロワー等の背景オーバーレイ
 - `z-30`: ナビゲーション/ドロワーパネル/トリガー
-- `z-40`: モーダル背景
-- `z-50`: モーダル本体（最前面インタラクション）
+- `z-40`: ページオーバーレイ背景（例: Inbox パネルの暗転）
+- `z-50`: ページオーバーレイ本体（例: Inbox パネル）
 
 運用ルール:
 
-1. 常に **背景 < パネル/本体** の順序を守る。
-2. モーダル表示中は、ナビゲーション要素が前面で操作可能にならないようにする。
+1. 常に **背景 < パネル** の順序を守る。
+2. オーバーレイ表示中は、背面のナビが前面で操作可能にならないようにする。
 3. 競合時は局所的に `z-*` を足さず、スケール全体で再配置する。
 
 ## 10. 禁止事項の確認（Agent Checking Rules）
@@ -136,3 +137,4 @@ AIエージェントは、以下のクラスの組み合わせルールにのみ
 4. 色指定に **`neutral`, `amber`, `red`, `transparent` 以外が含まれていないか？（`white`, `black`, `slate` 等はすべて禁止）**
 5. `dark:` の指定が漏れていないか？
 6. アニメーションに `animate-*` などの装飾的クラスが使われていないか？
+7. 標準の input / textarea に長い見た目クラスを手書きしていないか？（`Input` / `Textarea` を使う）

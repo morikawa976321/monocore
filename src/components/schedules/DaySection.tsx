@@ -92,10 +92,8 @@ export function DaySection({
                         onBlur={onBlur}
                         readOnly={isReadOnly}
                         className={[
-                            'w-full min-h-6 py-2 resize-none bg-transparent border-none outline-none',
-                            'text-sm leading-6 sm:text-base sm:leading-7',
-                            'text-neutral-900 dark:text-neutral-100',
-                            'placeholder:text-neutral-400 dark:placeholder:text-neutral-600',
+                            'min-h-6 py-2 resize-none',
+                            'leading-6 sm:text-base sm:leading-7',
                             isReadOnly ? 'cursor-not-allowed' : '',
                         ].join(' ')}
                         spellCheck={false}
@@ -110,10 +108,8 @@ export function DaySection({
                         onChange={(e) => onNoteChange(e.target.value)}
                         readOnly={isReadOnly}
                         className={[
-                            'w-full min-h-6 py-2 resize-none bg-transparent border-none outline-none',
-                            'text-sm leading-6 sm:text-base sm:leading-7',
-                            'text-neutral-900 dark:text-neutral-100',
-                            'placeholder:text-neutral-400 dark:placeholder:text-neutral-600',
+                            'min-h-6 py-2 resize-none',
+                            'leading-6 sm:text-base sm:leading-7',
                             isReadOnly ? 'cursor-not-allowed' : '',
                         ].join(' ')}
                         spellCheck={false}

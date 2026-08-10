@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/src/components/ui/Button'
+import { Textarea } from '@/src/components/ui/Textarea'
 import { createClient } from '@/src/lib/supabase/client'
 import {
     insertProjectNote,
@@ -87,12 +88,11 @@ export function ProjectNoteForm({
                 <span className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
                     {label}
                 </span>
-                <textarea
+                <Textarea
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
                     disabled={isSubmitting}
                     rows={3}
-                    className="w-full rounded-sm border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 outline-none transition-colors duration-150 ease-in-out placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-50 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600"
                     placeholder={placeholder}
                 />
             </label>

@@ -77,8 +77,8 @@ npm run dev
 
 ## Development Philosophy
 
-1. **Everything is a Resource**  
-   スケジュールも inbox もプロジェクトカードも、等しくリソースとして扱う。
+1. **Schedules-centered Personal OS**  
+   予定（Schedules）を主画面とする。Inbox は予定ページ上の補助パネルであり、対等な独立ルートではない。Projects / Reports はそれぞれ専用ルートを持つ。
 2. **Form follows function / Cognitive Load Minimization**  
    装飾的なアニメーションは排し、情報密度と操作スピードを最大化する。認知負荷の最小化を優先する。
 3. **Focus on App Logic**  
@@ -176,7 +176,7 @@ npx supabase db reset
 視覚ノイズと操作コストを抑える。詳細なトークン規約は `README-design.md`。
 
 - **ナビ:** デスクトップは左端の細いレールをホバーで展開。モバイルはハンバーガー（左下）
-- **詳細・編集:** 単一アイテムの閲覧・編集はセンターフォーカスのモーダルを優先（Esc / 外側クリックで閉じる）
+- **詳細・編集:** ページ内のインライン編集を基本とする
 - **装飾の抑制:** 装飾アニメーションは使わない。クリック数を減らす
 - **デザイン:** Neutral + Amber（破壊操作のみ Red）。`shadow-*` 禁止。角丸は `rounded-sm` / `rounded` のみ
 

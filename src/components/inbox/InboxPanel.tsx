@@ -2,6 +2,7 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/src/components/ui/Button';
+import { Textarea } from '@/src/components/ui/Textarea';
 
 type InboxPanelProps = {
     content: string;
@@ -83,7 +84,7 @@ export function InboxPanel({ content, onContentChange, onClose, isReadOnly = fal
 
     return (
         <>
-            {/* 背面を暗くしてタップで閉じる（モーダルと同じレイヤー規則: z-40 / z-50） */}
+            {/* 背面を暗くしてタップで閉じる（オーバーレイ: z-40 / 本体: z-50） */}
             <div
                 className="absolute inset-0 z-40 bg-neutral-950/50"
                 onClick={onClose}
@@ -105,11 +106,12 @@ export function InboxPanel({ content, onContentChange, onClose, isReadOnly = fal
                     className="pointer-events-auto flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded border-2 border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900"
                 >
                     <div className="flex min-h-0 flex-1 flex-col p-4">
-                        <textarea
+                        <Textarea
+                            variant="plain"
                             value={content}
                             onChange={(e) => onContentChange(e.target.value)}
                             readOnly={isReadOnly}
-                            className="min-h-0 w-full flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600"
+                            className="min-h-0 flex-1 resize-none overflow-y-auto leading-6 sm:text-base sm:leading-7"
                             spellCheck={false}
                             autoComplete="off"
                             autoCorrect="off"

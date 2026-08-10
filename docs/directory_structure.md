@@ -13,7 +13,7 @@ monocore
 │   │       └── layout.tsx    # (任意) その機能グループ専用のレイアウト
 │   ├── components/           # 【UI Parts】再利用可能な部品
 │   │   ├── layout/           # Sidebar, Header など、app/layout で呼び出す部品
-│   │   ├── ui/               # Button など、汎用的な最小パーツ
+│   │   ├── ui/               # Button, Input, Textarea など、汎用的な最小パーツ
 │   │   └── [feature]/        # DaySection, InboxPanel など、特定の機能に紐づくパーツ
 │   ├── hooks/                # 【Logic】Reactの状態管理ロジック（useSchedules等）
 │   ├── lib/                  # 【Infrastructure】外部接続と汎用関数

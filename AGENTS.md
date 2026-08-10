@@ -38,8 +38,8 @@ Reference: `docs/directory_structure.md`
 
 ## Development Philosophy
 
-1. **Everything is a Resource** — Schedules, inbox items are equal resources.
-2. **Form follows function / Cognitive load minimization** — No decorative animation; maximize information density and speed; minimize modals and clicks.
+1. **Schedules-centered Personal OS** — Schedules is the primary surface; Inbox is a companion panel on that page (not a peer route). Projects and Reports are separate resources with their own routes.
+2. **Form follows function / Cognitive load minimization** — No decorative animation; maximize information density and speed; minimize clicks.
 3. **Focus on app logic** — Use `@supabase/ssr` fully; keep boilerplate minimal.
 4. **Prioritize development speed above all** — In this solo, small-scale project, default decisions should favor faster implementation and iteration unless they introduce major product risk.
 
@@ -50,8 +50,7 @@ Reference: `README.md` (Technology Stack, Development Philosophy)
 ## Screen Layout (PIM)
 
 - **Navigation:** Left-edge, minimal width; **hover to reveal** sidebar on desktop (no always-visible nav). Mobile may use a compact FAB / drawer when hover is unavailable.
-- **Detail / edit:** Prefer **center focus modal** (blurred backdrop, close with `Esc` or click outside) when viewing/editing a single item; inline editing on list pages is fine when that is denser.
-- Apply this layout by default; deviate only when standard harms usability. Source of truth is the React layout components (`src/components/layout/`).
+- **Detail / edit:** Prefer **inline editing** on the page. Source of truth is the React layout components (`src/components/layout/`).
 
 ---
 
@@ -69,13 +68,13 @@ Reference: `README.md` (development rules), `docs/directory_structure.md` (codin
 
 ## Design System
 
-**Source of truth:** `README-design.md` (palette, typography, spacing, radius, Button rules, z-index, checklist).
+**Source of truth:** `README-design.md` (palette, typography, spacing, radius, Button/Input/Textarea rules, z-index, checklist).
 
 Do not duplicate those rules here. Quick pointers for agents:
 
 - Neutral + Amber (+ Red only for destructive/fatal); always `dark:` where applicable.
 - No `shadow-*`; no arbitrary Tailwind `[…]` values; radius only `rounded-sm` / `rounded` (or `rounded-full` for circles).
-- Use `src/components/ui/Button.tsx` for standard buttons (`color` / `size` props; layout-only `className`).
+- Use `src/components/ui/Button.tsx`, `Input.tsx`, and `Textarea.tsx` for standard controls (`color`/`size`/`variant` props; layout-only `className`).
 - Before submitting UI: run the self-check list in `README-design.md` §10.
 
 ---
