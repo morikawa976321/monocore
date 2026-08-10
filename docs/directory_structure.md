@@ -13,19 +13,18 @@ monocore
 │   │       └── layout.tsx    # (任意) その機能グループ専用のレイアウト
 │   ├── components/           # 【UI Parts】再利用可能な部品
 │   │   ├── layout/           # Sidebar, Header など、app/layout で呼び出す部品
-│   │   ├── ui/               # Button, Input など、汎用的な最小パーツ
-│   │   └── [feature]/        # ScheduleGrid, InboxView など、特定の機能に紐づくパーツ
+│   │   ├── ui/               # Button など、汎用的な最小パーツ
+│   │   └── [feature]/        # DaySection, InboxPanel など、特定の機能に紐づくパーツ
 │   ├── hooks/                # 【Logic】Reactの状態管理ロジック（useSchedules等）
 │   ├── lib/                  # 【Infrastructure】外部接続と汎用関数
 │   │   ├── supabase/
 │   │   │   ├── client.ts     # クライアントコンポーネント用接続設定
 │   │   │   ├── server.ts     # サーバーコンポーネント用接続設定
 │   │   │   └── queries/      # テーブルごとのDB操作関数（schedules.ts, inboxes.ts等）
-│   │   └── utils.ts          # DBに関係ない汎用ユーティリティ
-│   ├── middleware.ts         # 【Security】認証チェック・リダイレクト処理
+│   │   └── date.ts 等        # DBに関係ない汎用ユーティリティ
+│   ├── proxy.ts              # 【Security】認証チェック・リダイレクト処理（Next.js proxy）
 │   └── types/                # 【Definition】TypeScriptの型定義
-│       ├── database.types.ts # Supabaseから自動生成された型
-│       └── index.ts          # アプリ独自の型定義
+│       └── database.types.ts # Supabaseから自動生成された型
 ├── supabase/                 # 【Backend】Supabaseローカル環境の設定
 │   ├── config.toml           # ローカル環境の構成設定（ポート、Auth設定等）
 │   ├── seed.sql              # 開発用テストデータ（初期投入データ）
@@ -66,7 +65,7 @@ UIを構成するパーツです。機能ごとにサブフォルダを作りま
 ### 📂 `src/lib/` (Infrastructure & Logic)
 「どうやってデータを取るか」や「どう計算するか」を定義します。
 * **`supabase/queries/`**: **【重要】** テーブルごとにファイルを作成（`schedules.ts` 等）。DB操作関数（CRUD）をここに集約します。
-* **`utils.ts`**: 日付のフォーマットやクラス名の結合など、DB操作を含まない短い関数。
+* **`date.ts` 等**: 日付のフォーマットなど、DB操作を含まない短い関数。
 
 ### 📂 `src/hooks/` (Shared State)
 「データの取得状態」や「特定のUIの振る舞い」をカプセル化します。
