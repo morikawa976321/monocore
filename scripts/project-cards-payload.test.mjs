@@ -39,8 +39,8 @@ describe('validateCards', () => {
     it('passes a well-formed batch', () => {
         expect(
             validateCards([
-                validCard({ goal_slug: 'monodukuri', collapsed: true }),
-                validCard({ slug: 'other', goal_slug: 'health', collapsed: false }),
+                validCard({ goal_slug: 'monodukuri' }),
+                validCard({ slug: 'other', goal_slug: 'health' }),
             ])
         ).toEqual([])
         expect(ALLOWED_GOAL_SLUGS.size).toBe(5)
@@ -84,12 +84,6 @@ describe('validateCards', () => {
         expect(validateCards([validCard()])).toEqual([])
     })
 
-    it('rejects a non-boolean collapsed value', () => {
-        const errors = validateCards([validCard({ collapsed: 'true' })])
-        expect(errors).toHaveLength(1)
-        expect(errors[0]).toContain('"collapsed"')
-    })
-
     it('reports EVERY bad card in the batch, not just the first', () => {
         // 「1件でも不正なら1行も書かない」を成立させるため、
         // 検証は途中で打ち切らず全件を走査する必要がある。
@@ -118,12 +112,10 @@ describe('buildRow', () => {
             deadline_note: null,
             definition_of_done: '',
             goal_slug: null,
-            collapsed: false,
             your_turn: '',
             ai_recent: {},
             decisions: [],
             ai_next: [],
-            sources: [],
             sort_order: 0,
         })
     })
@@ -140,16 +132,14 @@ describe('buildRow', () => {
         expect(row.title).toBe('題')
     })
 
-    it('returns goal_slug and collapsed', () => {
-        const row = buildRow(validCard({ goal_slug: 'ai-collab', collapsed: true }))
+    it('returns goal_slug', () => {
+        const row = buildRow(validCard({ goal_slug: 'ai-collab' }))
         expect(row.goal_slug).toBe('ai-collab')
-        expect(row.collapsed).toBe(true)
     })
 
     it('drops non-string entries from string array columns', () => {
-        const row = buildRow(validCard({ ai_next: ['ok', 42, null], sources: ['a.md', {}] }))
+        const row = buildRow(validCard({ ai_next: ['ok', 42, null] }))
         expect(row.ai_next).toEqual(['ok'])
-        expect(row.sources).toEqual(['a.md'])
     })
 
     it('produces only known project_cards columns', () => {
@@ -158,7 +148,6 @@ describe('buildRow', () => {
             [
                 'ai_next',
                 'ai_recent',
-                'collapsed',
                 'deadline',
                 'deadline_note',
                 'decisions',
@@ -166,7 +155,6 @@ describe('buildRow', () => {
                 'goal_slug',
                 'slug',
                 'sort_order',
-                'sources',
                 'status',
                 'title',
                 'your_turn',

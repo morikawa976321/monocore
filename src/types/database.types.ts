@@ -83,7 +83,6 @@ export type Database = {
         Row: {
           ai_next: Json
           ai_recent: Json
-          collapsed: boolean
           created_at: string | null
           deadline: string | null
           deadline_note: string | null
@@ -92,7 +91,6 @@ export type Database = {
           goal_slug: string | null
           slug: string
           sort_order: number
-          sources: string[]
           status: string
           title: string
           updated_at: string | null
@@ -101,7 +99,6 @@ export type Database = {
         Insert: {
           ai_next?: Json
           ai_recent?: Json
-          collapsed?: boolean
           created_at?: string | null
           deadline?: string | null
           deadline_note?: string | null
@@ -110,7 +107,6 @@ export type Database = {
           goal_slug?: string | null
           slug: string
           sort_order?: number
-          sources?: string[]
           status?: string
           title: string
           updated_at?: string | null
@@ -119,7 +115,6 @@ export type Database = {
         Update: {
           ai_next?: Json
           ai_recent?: Json
-          collapsed?: boolean
           created_at?: string | null
           deadline?: string | null
           deadline_note?: string | null
@@ -128,7 +123,6 @@ export type Database = {
           goal_slug?: string | null
           slug?: string
           sort_order?: number
-          sources?: string[]
           status?: string
           title?: string
           updated_at?: string | null

@@ -25,9 +25,6 @@
         "UIのスナップショット確認",
         "読み込み失敗時の文言調整"
       ],
-      "sources": [
-        "https://example.com/spec/project-board"
-      ],
       "sort_order": 10
     },
     {
@@ -57,9 +54,6 @@
       "ai_next": [
         "モバイル表示の文言幅チェック"
       ],
-      "sources": [
-        "https://example.com/task/inbox-merge"
-      ],
       "sort_order": 20
     },
     {
@@ -78,7 +72,6 @@
       "ai_next": [
         "再開時にタスクを再分割"
       ],
-      "sources": [],
       "sort_order": 30
     }
   ]

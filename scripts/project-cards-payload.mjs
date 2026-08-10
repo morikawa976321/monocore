@@ -103,10 +103,6 @@ export function validateCards(cards) {
             )
         }
 
-        if (card.collapsed !== undefined && typeof card.collapsed !== 'boolean') {
-            errors.push(`Card ${tag}: field "collapsed" must be a boolean`)
-        }
-
         errors.push(...validateDecisions(card.decisions, tag))
     }
 
@@ -170,14 +166,12 @@ export function buildRow(card) {
             typeof card.definition_of_done === 'string' ? card.definition_of_done : '',
         status: card.status,
         goal_slug: card.goal_slug ?? null,
-        collapsed: typeof card.collapsed === 'boolean' ? card.collapsed : false,
         deadline: card.deadline ?? null,
         deadline_note: typeof card.deadline_note === 'string' ? card.deadline_note : null,
         ai_recent: isPlainObject(card.ai_recent) ? card.ai_recent : {},
         your_turn: typeof card.your_turn === 'string' ? card.your_turn : '',
         decisions: Array.isArray(card.decisions) ? card.decisions : [],
         ai_next: toStringArray(card.ai_next),
-        sources: toStringArray(card.sources),
         sort_order: Number.isInteger(card.sort_order) ? card.sort_order : 0,
     }
 }
