@@ -95,10 +95,9 @@ export default function ProjectsPage() {
             unclassifiedCards.push(card)
         }
     }
+    // done は getProjectCards の取得段階で除外済み（アクセス経路自体をなくす対象。
+    // 2026-08-10・本人指示）。ここで扱うのは dormant の畳みだけ。
     const dormantCards = projectCards.filter((card) => card.status === 'dormant')
-    const doneCards = projectCards.filter((card) => card.status === 'done')
-    // 「寝ている」と「完了」は畳む点は同じだが意味が違うので件数を分けて出す。
-    const collapsedCount = dormantCards.length + doneCards.length
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             <PageHeader
@@ -158,7 +157,7 @@ export default function ProjectsPage() {
                                 />
                             ))}
 
-                            {collapsedCount > 0 && (
+                            {dormantCards.length > 0 && (
                                 <section className="space-y-2 sm:space-y-4">
                                     <Button
                                         color="surface"
@@ -167,25 +166,16 @@ export default function ProjectsPage() {
                                         aria-expanded={showDormant}
                                         className="leading-6"
                                     >
-                                        休止中{dormantCards.length}件・完了{doneCards.length}件
+                                        休止中{dormantCards.length}件
                                     </Button>
                                     {showDormant && (
-                                        <>
-                                            <ProjectSection
-                                                title="休止中"
-                                                cards={dormantCards}
-                                                today={todayStr}
-                                                notesByCard={notesByCard}
-                                                onNoteSaved={handleNoteSaved}
-                                            />
-                                            <ProjectSection
-                                                title="完了"
-                                                cards={doneCards}
-                                                today={todayStr}
-                                                notesByCard={notesByCard}
-                                                onNoteSaved={handleNoteSaved}
-                                            />
-                                        </>
+                                        <ProjectSection
+                                            title="休止中"
+                                            cards={dormantCards}
+                                            today={todayStr}
+                                            notesByCard={notesByCard}
+                                            onNoteSaved={handleNoteSaved}
+                                        />
                                     )}
                                 </section>
                             )}

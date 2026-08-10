@@ -27,7 +27,7 @@ describe('getProjectCards', () => {
         }
         const { supabase, query } = createSupabaseQueryStub(
             'project_cards',
-            ['select', 'order', 'order'],
+            ['select', 'neq', 'order', 'order'],
             response,
         )
 
@@ -35,6 +35,7 @@ describe('getProjectCards', () => {
 
         expect(supabase.from).toHaveBeenCalledWith('project_cards')
         expect(query.select).toHaveBeenCalledWith('*')
+        expect(query.neq).toHaveBeenCalledWith('status', 'done')
         expect(query.order).toHaveBeenNthCalledWith(
             1,
             'sort_order',
@@ -54,7 +55,7 @@ describe('getProjectCards', () => {
         }
         const { supabase, query } = createSupabaseQueryStub(
             'project_cards',
-            ['select', 'order', 'order'],
+            ['select', 'neq', 'order', 'order'],
             response,
         )
 
@@ -62,6 +63,7 @@ describe('getProjectCards', () => {
 
         expect(supabase.from).toHaveBeenCalledWith('project_cards')
         expect(query.select).toHaveBeenCalledWith('*')
+        expect(query.neq).toHaveBeenCalledWith('status', 'done')
         expect(query.order).toHaveBeenNthCalledWith(
             1,
             'sort_order',
@@ -86,7 +88,7 @@ describe('getProjectCards', () => {
         }
         const { supabase, query } = createSupabaseQueryStub(
             'project_cards',
-            ['select', 'order', 'order'],
+            ['select', 'neq', 'order', 'order'],
             response,
         )
 
@@ -94,6 +96,7 @@ describe('getProjectCards', () => {
 
         expect(supabase.from).toHaveBeenCalledWith('project_cards')
         expect(query.select).toHaveBeenCalledWith('*')
+        expect(query.neq).toHaveBeenCalledWith('status', 'done')
         expect(query.order).toHaveBeenNthCalledWith(
             1,
             'sort_order',
@@ -104,5 +107,21 @@ describe('getProjectCards', () => {
             'slug',
             { ascending: true },
         )
+    })
+
+    it('done ステータスのカードは取得対象から除外する（アクセス経路自体をなくす対象のため）', async () => {
+        const response = {
+            data: [] satisfies ProjectCardRow[],
+            error: null,
+        }
+        const { supabase, query } = createSupabaseQueryStub(
+            'project_cards',
+            ['select', 'neq', 'order', 'order'],
+            response,
+        )
+
+        await getProjectCards(supabase)
+
+        expect(query.neq).toHaveBeenCalledWith('status', 'done')
     })
 })

@@ -23,7 +23,7 @@
 
 ### Projects（`/projects`）
 
-- カードは status（`active` / `waiting_user` / `waiting_other` / `dormant`）+ 完了ごとにセクション表示。休止中・完了は折りたたみ。
+- カードは status（`active` / `waiting_user` / `waiting_other` / `dormant` / `done` の5値。DB上の定義）のうち、`done` は板から**アクセス経路自体を持たない**（取得段階で除外。開閉バー・件数・リンクいずれも無し。DBの行は残る）。`active` / `waiting_user` / `waiting_other` はそのまま表示、`dormant` は折りたたみ表示（2026-08-10・本人指示）。
 - `project_cards` は画面からの手入力は不可（SELECT のみ）。正は context-engine / taskbox 側にあり、`scripts/upsert-project-cards.mjs` が service_role で slug 単位 upsert する。
 - カードへの書き込みは自由記述メモ（`project_notes`、カード単位と板全体）。**追記専用**で、taskbox 側が回収したら `consumed_at` を埋める。選択肢式の `project_card_decision_answers` は 2026-08-05 に置き換え、2026-08-09 に drop した。
 
