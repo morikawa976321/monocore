@@ -140,7 +140,6 @@ export default function ProjectsPage() {
                                     today={todayStr}
                                     notesByCard={notesByCard}
                                     onNoteSaved={handleNoteSaved}
-                                    collapseCards
                                     tone="warning"
                                 />
                             )}
@@ -153,7 +152,6 @@ export default function ProjectsPage() {
                                     notesByCard={notesByCard}
                                     onNoteSaved={handleNoteSaved}
                                     showWhenEmpty
-                                    collapseCards
                                 />
                             ))}
 
