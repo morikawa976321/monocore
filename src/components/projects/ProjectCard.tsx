@@ -62,7 +62,7 @@ export function ProjectCard({ card, today, latestNote, onNoteSaved }: ProjectCar
                     id={panelId}
                     className="rounded border-2 border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900 overflow-hidden"
                 >
-                    <div className="flex flex-col gap-4 p-1 sm:p-4 text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100">
+                    <div className="flex flex-col gap-4 p-1 sm:p-4 text-neutral-900 dark:text-neutral-100">
                         <p>{card.definition_of_done}</p>
 
                         {card.deadline && (

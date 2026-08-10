@@ -198,7 +198,7 @@ export default function ReportDetailPage() {
                     <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4">
                         <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
-                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100">
+                                <p className="text-neutral-900 dark:text-neutral-100">
                                     レポートが見つかりません。
                                 </p>
                             </div>
@@ -210,7 +210,7 @@ export default function ReportDetailPage() {
                     <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4">
                         <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
-                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-amber-600 dark:text-amber-400">
+                                <p className="text-amber-600 dark:text-amber-400">
                                     {errorMessage}
                                 </p>
                             </div>

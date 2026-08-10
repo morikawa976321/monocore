@@ -17,10 +17,10 @@
    任意値[]禁止、パレットはneutral/amber/red/transparentのみ)に厳密に従う。
    見出しの階層は数の少ないサイズしか使えないため、mt(区切りの大きさ)と
    h2のborder-bで差をつける。
-   本文の基準タイポは schedules / projects のカード本文と同じ
-   text-sm leading-6 sm:text-base sm:leading-7 / dark:text-neutral-100。 */
+   本文サイズ・行高は body（text-sm sm:text-base leading-6 sm:leading-7）を継承し、
+   ここでは色だけ指定する。 */
 .report-body {
-  @apply text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100;
+  @apply text-neutral-900 dark:text-neutral-100;
 }
 
 .report-body :where(h1, h2, h3, h4, h5, h6) {

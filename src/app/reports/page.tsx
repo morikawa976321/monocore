@@ -102,7 +102,7 @@ export default function ReportsPage() {
                     {!isInitialLoading && reports.length === 0 && (
                         <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
-                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100">
+                                <p className="text-neutral-900 dark:text-neutral-100">
                                     表示できるレポートはありません。
                                 </p>
                             </div>
@@ -112,7 +112,7 @@ export default function ReportsPage() {
                     {!isInitialLoading && reports.length > 0 && filteredReports.length === 0 && (
                         <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
-                                <p className="text-sm leading-6 sm:text-base sm:leading-7 text-neutral-900 dark:text-neutral-100">
+                                <p className="text-neutral-900 dark:text-neutral-100">
                                     「{query}」に一致するレポートはありません。
                                 </p>
                             </div>
