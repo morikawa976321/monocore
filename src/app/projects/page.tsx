@@ -29,7 +29,6 @@ export default function ProjectsPage() {
     const [isInitialLoading, setIsInitialLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
-    const [showDormant, setShowDormant] = useState(false)
     const [isBoardNoteOpen, setIsBoardNoteOpen] = useState(false)
     const boardNotePanelId = useId()
 
@@ -99,7 +98,7 @@ export default function ProjectsPage() {
         }
     }
     // done は getProjectCards の取得段階で除外済み（アクセス経路自体をなくす対象。
-    // 2026-08-10・本人指示）。ここで扱うのは dormant の畳みだけ。
+    // 2026-08-10・本人指示）。dormant は目標セクションと同じ見出しで常時表示する。
     const dormantCards = projectCards.filter((card) => card.status === 'dormant')
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
@@ -158,28 +157,13 @@ export default function ProjectsPage() {
                                 />
                             ))}
 
-                            {dormantCards.length > 0 && (
-                                <section className="space-y-2 sm:space-y-4">
-                                    <Button
-                                        color="surface"
-                                        size="bar"
-                                        onClick={() => setShowDormant((prev) => !prev)}
-                                        aria-expanded={showDormant}
-                                        className="leading-6"
-                                    >
-                                        休止中{dormantCards.length}件
-                                    </Button>
-                                    {showDormant && (
-                                        <ProjectSection
-                                            title="休止中"
-                                            cards={dormantCards}
-                                            today={todayStr}
-                                            notesByCard={notesByCard}
-                                            onNoteSaved={handleNoteSaved}
-                                        />
-                                    )}
-                                </section>
-                            )}
+                            <ProjectSection
+                                title="休止中"
+                                cards={dormantCards}
+                                today={todayStr}
+                                notesByCard={notesByCard}
+                                onNoteSaved={handleNoteSaved}
+                            />
                         </>
                     )}
 
