@@ -128,46 +128,46 @@ export type Database = {
       }
       project_cards: {
         Row: {
-          ai_recent: Json
           created_at: string | null
           deadline: string | null
           deadline_note: string | null
           definition_of_done: string
           goal_slug: string | null
+          next_actions: string
+          progress: Json
           slug: string
           sort_order: number
           status: string
           title: string
           updated_at: string | null
-          your_turn: string
         }
         Insert: {
-          ai_recent?: Json
           created_at?: string | null
           deadline?: string | null
           deadline_note?: string | null
           definition_of_done?: string
           goal_slug?: string | null
+          next_actions?: string
+          progress?: Json
           slug: string
           sort_order?: number
           status?: string
           title: string
           updated_at?: string | null
-          your_turn?: string
         }
         Update: {
-          ai_recent?: Json
           created_at?: string | null
           deadline?: string | null
           deadline_note?: string | null
           definition_of_done?: string
           goal_slug?: string | null
+          next_actions?: string
+          progress?: Json
           slug?: string
           sort_order?: number
           status?: string
           title?: string
           updated_at?: string | null
-          your_turn?: string
         }
         Relationships: [
           {

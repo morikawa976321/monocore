@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Json } from '@/src/types/database.types'
-import { formatDeadlineLabel, parseAiRecent, parseYourTurnLines } from './card'
+import { formatDeadlineLabel, parseNextActionLines, parseProgress } from './card'
 
 describe('formatDeadlineLabel', () => {
     it('formats future, today, overdue, and null deadlines', () => {
@@ -11,22 +11,22 @@ describe('formatDeadlineLabel', () => {
     })
 })
 
-describe('parseYourTurnLines', () => {
+describe('parseNextActionLines', () => {
     it('parses checklist markers, trims, and drops blanks', () => {
-        expect(parseYourTurnLines('[x] 完了\r\n[ ] 未完了\n\n  メモ  ')).toEqual([
+        expect(parseNextActionLines('[x] 完了\r\n[ ] 未完了\n\n  メモ  ')).toEqual([
             { text: '完了', done: true },
             { text: '未完了', done: false },
             { text: 'メモ', done: false },
         ])
-        expect(parseYourTurnLines('')).toEqual([])
+        expect(parseNextActionLines('')).toEqual([])
     })
 })
 
-describe('parseAiRecent', () => {
+describe('parseProgress', () => {
     it('parses text and string links; null for empty', () => {
-        expect(parseAiRecent({})).toBeNull()
+        expect(parseProgress({})).toBeNull()
         expect(
-            parseAiRecent({
+            parseProgress({
                 text: '最新報告',
                 links: ['https://example.com/a', 10, 'https://example.com/b'],
             } as Json)

@@ -111,8 +111,10 @@ export function buildRow(card) {
         goal_slug: card.goal_slug ?? null,
         deadline: card.deadline ?? null,
         deadline_note: typeof card.deadline_note === 'string' ? card.deadline_note : null,
-        ai_recent: isPlainObject(card.ai_recent) ? card.ai_recent : {},
-        your_turn: typeof card.your_turn === 'string' ? card.your_turn : '',
+        // 2欄は主体（AI／本人）ではなく時間軸で切る（2026-08-12）。
+        // progress = 経過（過去）、next_actions = 次の一手（未来）。
+        progress: isPlainObject(card.progress) ? card.progress : {},
+        next_actions: typeof card.next_actions === 'string' ? card.next_actions : '',
         sort_order: Number.isInteger(card.sort_order) ? card.sort_order : 0,
     }
 }

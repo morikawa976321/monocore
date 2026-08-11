@@ -1,12 +1,14 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import type { Json } from '@/src/types/database.types'
 
-type AiRecent = {
+// カードの2欄は主体（AI／本人）ではなく時間軸で切る（2026-08-12）。
+// progress = 経過（過去）／ next_actions = 次の一手（未来）。
+type Progress = {
     text: string
     links: string[]
 }
 
-export type YourTurnLine = {
+export type NextActionLine = {
     text: string
     done: boolean
 }
@@ -28,7 +30,7 @@ export function formatDeadlineLabel(deadline: string | null, today: string): str
     return `${Math.abs(remainingDays)}日超過`
 }
 
-export function parseYourTurnLines(value: string): YourTurnLine[] {
+export function parseNextActionLines(value: string): NextActionLine[] {
     return value
         .split(/\r?\n/)
         .map((line) => line.trim())
@@ -48,7 +50,7 @@ export function parseYourTurnLines(value: string): YourTurnLine[] {
         })
 }
 
-export function parseAiRecent(value: Json): AiRecent | null {
+export function parseProgress(value: Json): Progress | null {
     if (!isRecord(value)) return null
     const text = value.text
     if (typeof text !== 'string' || text.trim().length === 0) return null

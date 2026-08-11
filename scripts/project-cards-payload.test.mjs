@@ -69,34 +69,44 @@ describe('buildRow', () => {
         expect(row.deadline).toBeNull()
         expect(Object.keys(row).sort()).toEqual(
             [
-                'ai_recent',
                 'deadline',
                 'deadline_note',
                 'definition_of_done',
                 'goal_slug',
+                'next_actions',
+                'progress',
                 'slug',
                 'sort_order',
                 'status',
                 'title',
-                'your_turn',
             ].sort()
         )
     })
 
     it('drops columns that no longer exist even if the input still carries them', () => {
-        // 2026-08-11に decisions・ai_next を列ごと廃止した。古い project_cards.json が
-        // 残っていても、これらが行に混ざると upsert が列不在で落ちる。
-        const row = buildRow(validCard({ decisions: [{ id: 'd1' }], ai_next: ['なにか'] }))
+        // 2026-08-11に decisions・ai_next を列ごと廃止し、2026-08-12に ai_recent・your_turn を
+        // progress・next_actions へ改名した。古い project_cards.json が残っていても、
+        // 旧名が行に混ざると upsert が列不在で落ちる。
+        const row = buildRow(
+            validCard({
+                decisions: [{ id: 'd1' }],
+                ai_next: ['なにか'],
+                ai_recent: { text: '旧欄' },
+                your_turn: '旧欄',
+            })
+        )
         expect(row).not.toHaveProperty('decisions')
         expect(row).not.toHaveProperty('ai_next')
+        expect(row).not.toHaveProperty('ai_recent')
+        expect(row).not.toHaveProperty('your_turn')
     })
 
     it('fills defaults for omitted optional fields', () => {
         const row = buildRow(validCard())
         expect(row).toMatchObject({
             goal_slug: null,
-            your_turn: '',
-            ai_recent: {},
+            next_actions: '',
+            progress: {},
             definition_of_done: '',
             deadline_note: null,
             sort_order: 0,

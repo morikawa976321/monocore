@@ -7,8 +7,8 @@
       "status": "active",
       "deadline": "2026-08-20",
       "deadline_note": "先に一覧表示だけ出す",
-      "ai_recent": {},
-      "your_turn": "折りたたみ仕様の最終確認",
+      "progress": {},
+      "next_actions": "折りたたみ仕様の最終確認",
       "sort_order": 10
     },
     {
@@ -18,13 +18,13 @@
       "status": "waiting",
       "deadline": null,
       "deadline_note": null,
-      "ai_recent": {
+      "progress": {
         "text": "Sidebar の導線候補を比較して推奨案を作成",
         "links": [
           "https://example.com/docs/nav-options"
         ]
       },
-      "your_turn": "導線ラベルを確定する",
+      "next_actions": "導線ラベルを確定する",
       "sort_order": 20
     },
     {
@@ -34,11 +34,11 @@
       "status": "dormant",
       "deadline": "2026-09-10",
       "deadline_note": "再開時に再見積もり",
-      "ai_recent": {
+      "progress": {
         "text": "依存関係メモを更新",
         "links": []
       },
-      "your_turn": "",
+      "next_actions": "",
       "sort_order": 30
     }
   ]

@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useId, useState } from 'react'
 import { Button } from '@/src/components/ui/Button'
 import type { ProjectCardRow } from '@/src/lib/supabase/queries/project-cards'
-import { formatDeadlineLabel, parseAiRecent, parseYourTurnLines } from '@/src/lib/projects/card'
+import { formatDeadlineLabel, parseNextActionLines, parseProgress } from '@/src/lib/projects/card'
 
 type ProjectCardProps = {
     card: ProjectCardRow
@@ -15,8 +15,8 @@ export function ProjectCard({ card, today }: ProjectCardProps) {
     const [isOpen, setIsOpen] = useState(false)
     const panelId = useId()
     const deadlineLabel = formatDeadlineLabel(card.deadline, today)
-    const aiRecent = parseAiRecent(card.ai_recent)
-    const yourTurnLines = parseYourTurnLines(card.your_turn)
+    const progress = parseProgress(card.progress)
+    const nextActionLines = parseNextActionLines(card.next_actions)
 
     return (
         <div className="rounded border border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900 overflow-hidden">
@@ -73,15 +73,15 @@ export function ProjectCard({ card, today }: ProjectCardProps) {
                         </section>
                     )}
 
-                    {aiRecent && (
+                    {progress && (
                         <section className="flex flex-col gap-2">
                             <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
-                                AIがやったこと
+                                経過
                             </h4>
-                            <p>{aiRecent.text}</p>
-                            {aiRecent.links.length > 0 && (
+                            <p>{progress.text}</p>
+                            {progress.links.length > 0 && (
                                 <ul className="flex flex-col gap-1">
-                                    {aiRecent.links.map((link) => (
+                                    {progress.links.map((link) => (
                                         <li key={link}>
                                             <a
                                                 href={link}
@@ -98,15 +98,15 @@ export function ProjectCard({ card, today }: ProjectCardProps) {
                         </section>
                     )}
 
-                    {yourTurnLines.length > 0 && (
+                    {nextActionLines.length > 0 && (
                         <section className="flex flex-col gap-2">
                             <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
-                                あなたの番
+                                次の一手
                             </h4>
                             <ul className="flex flex-col gap-1">
-                                {yourTurnLines.map((line, index) => (
+                                {nextActionLines.map((line, index) => (
                                     <li
-                                        key={`${card.slug}-your-turn-${index}`}
+                                        key={`${card.slug}-next-action-${index}`}
                                         className={`flex gap-2 ${
                                             line.done
                                                 ? 'text-neutral-700 dark:text-neutral-300'
