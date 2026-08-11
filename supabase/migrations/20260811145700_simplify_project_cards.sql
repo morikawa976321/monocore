@@ -1,5 +1,6 @@
 -- プロジェクトカードを「①状態 ②どこまで進んだか ③次に本人がやること」の3点へ絞る。
--- 計画書: docs/project-cards-simplification-plan.md（2026-08-11・本人承認済み）
+-- 判断ログ: context-engine の board-decision-io-abolished /
+--            actor-distinction-useless-when-user-is-the-bottleneck（2026-08-11・本人承認済み）
 --
 -- 判断の入出力（decisions と project_notes）をやめる理由: 反映が1日4回・非同期という
 -- 制約のもとでは、板で判断を返すよりセッションを開いた方が速いと本人が判断した。
