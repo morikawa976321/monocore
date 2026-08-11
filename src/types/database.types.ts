@@ -39,6 +39,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      drain_runs: {
+        Row: {
+          created_at: string
+          effort: string | null
+          ended_at: string | null
+          exit_code: number | null
+          model: string | null
+          outcome: string
+          report_text: string | null
+          started_at: string
+          steps: Json
+          tasks: Json
+          trigger_reasons: Json
+        }
+        Insert: {
+          created_at?: string
+          effort?: string | null
+          ended_at?: string | null
+          exit_code?: number | null
+          model?: string | null
+          outcome: string
+          report_text?: string | null
+          started_at: string
+          steps?: Json
+          tasks?: Json
+          trigger_reasons?: Json
+        }
+        Update: {
+          created_at?: string
+          effort?: string | null
+          ended_at?: string | null
+          exit_code?: number | null
+          model?: string | null
+          outcome?: string
+          report_text?: string | null
+          started_at?: string
+          steps?: Json
+          tasks?: Json
+          trigger_reasons?: Json
+        }
+        Relationships: []
+      }
       goals: {
         Row: {
           created_at: string | null

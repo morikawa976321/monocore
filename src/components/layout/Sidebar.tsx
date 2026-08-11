@@ -6,6 +6,7 @@ import {
     Clock,
     FileText,
     LayoutGrid,
+    ListChecks,
     Menu,
     LogOut,
 } from "lucide-react";
@@ -17,6 +18,7 @@ const MENU_ITEMS = [
     { href: "/schedules", icon: Clock, label: "Schedule" },
     { href: "/projects", icon: LayoutGrid, label: "Projects" },
     { href: "/reports", icon: FileText, label: "Reports" },
+    { href: "/drain", icon: ListChecks, label: "Drain" },
 ] as const;
 
 export function Sidebar() {

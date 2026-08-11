@@ -12,6 +12,8 @@
 | :--- | :--- |
 | `/schedules` | 予定の一覧・編集。日別メモ欄と inbox パネルを同居 |
 | `/projects` | プロジェクト板（目標別カード。読み取り専用） |
+| `/reports` | `mf/reports/` の読み取り専用ミラー |
+| `/drain` | taskbox drain の実行記録（1枠=1カード。読み取り専用） |
 
 実装が守る設計制約と、未決の論点は `docs/design.md`。
 
@@ -27,6 +29,13 @@
 - `project_cards` は画面からの手入力は不可（SELECT のみ）。正は context-engine / taskbox 側にあり、`scripts/upsert-project-cards.mjs` が service_role で slug 単位 upsert する。
 - **板は読むだけの面である**（2026-08-11確定）。カードが伝えるのは ①状態 ②どこまで進んだか（`ai_recent`）③次に本人がやること（`your_turn`）の3点だけ。判断の問い（`decisions`）・AIの次の一手（`ai_next`）・自由記述メモ（`project_notes`）は同日に廃止した — 反映が1日4回・非同期という制約のもとでは、板で判断を返すより**セッションを開いた方が速い**と本人が判断したため。`waiting_user` / `waiting_other` を `waiting` に統合したのも同根で、実質のボトルネックは常に本人なので「誰を待っているか」の区別が行動を変えない。
   - 判断ログは context-engine の `board-decision-io-abolished` / `actor-distinction-useless-when-user-is-the-bottleneck`（決定の理由と一般則）。実施内容はこのリポジトリの `20260811145700_simplify_project_cards.sql` とその周辺コミット。選択肢式の `project_card_decision_answers` は 2026-08-05 に自由記述へ置き換え、2026-08-09 に drop 済み。
+
+### Drain（`/drain`）
+
+- taskbox の drain は 1 日 4 枠（01/07/13/19 時）で無人稼働している。その結果を**尋ねずに**読むための面。1 枠 = 1 カードで、各カードは「何をして／どうなったか」の組を並べる。
+- **起動しなかった枠・使用量制限で死んだ枠も 1 行残る。** 「静かだったのか、動かなかっただけなのか」が一覧で判別できることがこの面の要件（drain.log は 7 日で消えるため、ここが実質のアーカイブになる）。
+- **投入は `taskbox/drain.ps1` が直接行う（LLM の自己申告を経由しない）**。組の材料は 3 つとも既にあるものだけを使う: ①ラッパーが持つ機械値（起動理由・exit・マーカー・バックアップ・件数の前後差）②`taskbox/traces/<task-id>.json` の `steps[]`（`desc`=何をして / `note`=どうなったか）③セッションの最終報告の全文（カードを開いたときだけ取得）。
+- 投入スクリプトは `scripts/upsert-drain-run.mjs`（検証・整形の純関数は `scripts/drain-run-payload.mjs`）。キーは `started_at` で slug 単位 upsert と同じく行を消さない。
 
 ---
 
@@ -111,6 +120,7 @@ monocore は AI 活用基盤（context-engine / taskbox）の**人間向け窓�
 | `schedule_day_notes` / `schedule_day_revisions` | 画面 | monocore |
 | `inboxes` | 画面（単一 TEXT blob） | monocore |
 | `project_cards` | `service_role` のみ（投入スクリプト） | **context-engine / taskbox** |
+| `drain_runs` | `service_role` のみ（`drain.ps1` が毎run投入） | **taskbox** |
 
 - **導出物に手入力欄を作らない。** `project_cards` は消えても再生成できるものとして扱う。
 - **`replace_*` 系 RPC を新規に使わない。** 空配列で実データを消した事故があるため、投入は slug 単位の upsert にする。既存の `replace_schedules_for_day` / `replace_schedules_for_day_as` は日単位の全置換なので、呼ぶ前にローカルバックアップを取る。
