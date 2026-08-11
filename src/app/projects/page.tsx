@@ -10,18 +10,12 @@ import { getDefaultTimezone } from '@/src/lib/date'
 import { createClient } from '@/src/lib/supabase/client'
 import { getGoals, type GoalRow } from '@/src/lib/supabase/queries/goals'
 import { getProjectCards, type ProjectCardRow } from '@/src/lib/supabase/queries/project-cards'
-import {
-    getProjectNotes,
-    latestNoteByCard,
-    type ProjectNoteRow,
-} from '@/src/lib/supabase/queries/project-notes'
 
 export default function ProjectsPage() {
     const supabase = useMemo(() => createClient(), [])
     const timezone = useMemo(() => getDefaultTimezone(), [])
     const [goals, setGoals] = useState<GoalRow[]>([])
     const [projectCards, setProjectCards] = useState<ProjectCardRow[]>([])
-    const [projectNotes, setProjectNotes] = useState<ProjectNoteRow[]>([])
     const [todayStr, setTodayStr] = useState<string | null>(null)
     const [isInitialLoading, setIsInitialLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
@@ -34,17 +28,10 @@ export default function ProjectsPage() {
             setIsInitialLoading(true)
         }
 
-        const [
-            { data: cards, error: cardsError },
-            { data: notes, error: notesError },
-            { data: loadedGoals, error: goalsError },
-        ] = await Promise.all([
-            getProjectCards(supabase),
-            getProjectNotes(supabase),
-            getGoals(supabase),
-        ])
+        const [{ data: cards, error: cardsError }, { data: loadedGoals, error: goalsError }] =
+            await Promise.all([getProjectCards(supabase), getGoals(supabase)])
 
-        if (cardsError || notesError || goalsError) {
+        if (cardsError || goalsError) {
             setErrorMessage('プロジェクトカードの読み込みに失敗しました。')
             setIsInitialLoading(false)
             setIsRefreshing(false)
@@ -52,7 +39,6 @@ export default function ProjectsPage() {
         }
 
         setProjectCards(cards ?? [])
-        setProjectNotes(notes ?? [])
         setGoals(loadedGoals ?? [])
         setErrorMessage(null)
         setIsInitialLoading(false)
@@ -67,17 +53,11 @@ export default function ProjectsPage() {
         void loadProjectData('initial')
     }, [loadProjectData])
 
-    const notesByCard = useMemo(() => latestNoteByCard(projectNotes), [projectNotes])
-
-    function handleNoteSaved(row: ProjectNoteRow) {
-        setProjectNotes((prev) => [row, ...prev])
-    }
-
+    // waiting は「トリガー待ち」の1状態。誰が待たれているかで分けていた
+    // waiting_user / waiting_other は2026-08-11に統合した（実質のボトルネックは
+    // 常に本人なので、区別しても行動が変わらない）。
     const visibleCards = projectCards.filter(
-        (card) =>
-            card.status === 'active' ||
-            card.status === 'waiting_user' ||
-            card.status === 'waiting_other'
+        (card) => card.status === 'active' || card.status === 'waiting'
     )
     const cardsByGoal = new Map<string, ProjectCardRow[]>()
     for (const goal of goals) {
@@ -135,8 +115,6 @@ export default function ProjectsPage() {
                                     description="目標が未設定です。撤退候補か、目標定義の宿題です。"
                                     cards={unclassifiedCards}
                                     today={todayStr}
-                                    notesByCard={notesByCard}
-                                    onNoteSaved={handleNoteSaved}
                                     tone="warning"
                                 />
                             )}
@@ -146,19 +124,11 @@ export default function ProjectsPage() {
                                     title={goal.title}
                                     cards={cardsByGoal.get(goal.slug) ?? []}
                                     today={todayStr}
-                                    notesByCard={notesByCard}
-                                    onNoteSaved={handleNoteSaved}
                                     showWhenEmpty
                                 />
                             ))}
 
-                            <ProjectSection
-                                title="休止中"
-                                cards={dormantCards}
-                                today={todayStr}
-                                notesByCard={notesByCard}
-                                onNoteSaved={handleNoteSaved}
-                            />
+                            <ProjectSection title="休止中" cards={dormantCards} today={todayStr} />
                         </>
                     )}
                 </div>

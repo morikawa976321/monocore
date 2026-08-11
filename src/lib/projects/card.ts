@@ -1,15 +1,6 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import type { Json } from '@/src/types/database.types'
 
-export type Decision = {
-    id: string
-    question: string
-    recommendation: string
-    first_raised: string
-    times_shown: number
-    blocks: string[]
-}
-
 type AiRecent = {
     text: string
     links: string[]
@@ -70,56 +61,4 @@ export function parseAiRecent(value: Json): AiRecent | null {
         text: text.trim(),
         links,
     }
-}
-
-export function parseDecisions(value: Json): Decision[] {
-    if (!Array.isArray(value)) return []
-
-    const parsed: Decision[] = []
-    for (const item of value) {
-        if (!isRecord(item)) continue
-
-        const id = item.id
-        const question = item.question
-        const recommendation = item.recommendation
-        const firstRaised = item.first_raised
-        const timesShown = item.times_shown
-        const blocks = item.blocks
-
-        // 必須は「判断として成立するために画面へ出す3つ」だけに限る。
-        // 補助情報(first_raised / times_shown / blocks)が欠けても判断ごと捨てない。
-        // かつて blocks を必須にしていた結果、2026-08-04に全20件の判断が
-        // 「判断」セクションごと消え、回答ボタンが1つも出ない状態で
-        // DB投入もテストもQAも通過した。表示に使わない項目で描画を止めないこと。
-        if (typeof id !== 'string' || id.trim().length === 0) continue
-        if (typeof question !== 'string' || question.trim().length === 0) continue
-        if (typeof recommendation !== 'string' || recommendation.trim().length === 0) continue
-
-        const parsedFirstRaised = typeof firstRaised === 'string' ? firstRaised.trim() : ''
-        const parsedTimesShown =
-            typeof timesShown === 'number' && Number.isInteger(timesShown) && timesShown > 0
-                ? timesShown
-                : 0
-        const parsedBlocks = Array.isArray(blocks)
-            ? blocks.filter(
-                  (block): block is string => typeof block === 'string' && block.trim().length > 0
-              )
-            : []
-
-        parsed.push({
-            id,
-            question,
-            recommendation,
-            first_raised: parsedFirstRaised,
-            times_shown: parsedTimesShown,
-            blocks: parsedBlocks,
-        })
-    }
-
-    return parsed
-}
-
-export function parseAiNext(value: Json): string[] {
-    if (!Array.isArray(value)) return []
-    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
 }

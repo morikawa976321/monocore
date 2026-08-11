@@ -9,29 +9,13 @@
       "deadline_note": "先に一覧表示だけ出す",
       "ai_recent": {},
       "your_turn": "折りたたみ仕様の最終確認",
-      "decisions": [
-        {
-          "id": "dec-001",
-          "question": "dormant を初期表示するか",
-          "recommendation": "初期は折りたたみ",
-          "first_raised": "2026-08-01",
-          "times_shown": 17,
-          "blocks": [
-            "render-cost"
-          ]
-        }
-      ],
-      "ai_next": [
-        "UIのスナップショット確認",
-        "読み込み失敗時の文言調整"
-      ],
       "sort_order": 10
     },
     {
       "slug": "inbox-merge",
       "title": "Inbox統合導線",
       "definition_of_done": "Projects から Inbox 関連カードを追跡できる",
-      "status": "waiting_user",
+      "status": "waiting",
       "deadline": null,
       "deadline_note": null,
       "ai_recent": {
@@ -41,19 +25,6 @@
         ]
       },
       "your_turn": "導線ラベルを確定する",
-      "decisions": [
-        {
-          "id": "dec-002",
-          "question": "ラベルを Projects に統一するか",
-          "recommendation": "英語ラベルを維持",
-          "first_raised": "2026-08-02",
-          "times_shown": 4,
-          "blocks": []
-        }
-      ],
-      "ai_next": [
-        "モバイル表示の文言幅チェック"
-      ],
       "sort_order": 20
     },
     {
@@ -68,10 +39,6 @@
         "links": []
       },
       "your_turn": "",
-      "decisions": [],
-      "ai_next": [
-        "再開時にタスクを再分割"
-      ],
       "sort_order": 30
     }
   ]

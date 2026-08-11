@@ -23,9 +23,10 @@
 
 ### Projects（`/projects`）
 
-- カードは status（`active` / `waiting_user` / `waiting_other` / `dormant` / `done` の5値。DB上の定義）のうち、`done` は板から**アクセス経路自体を持たない**（取得段階で除外。開閉バー・件数・リンクいずれも無し。DBの行は残る）。`active` / `waiting_user` / `waiting_other` はそのまま表示、`dormant` は折りたたみ表示（2026-08-10・本人指示）。
+- カードは status（`active` / `waiting`（トリガー待ち）/ `dormant` / `done` の4値。DB上の定義）のうち、`done` は板から**アクセス経路自体を持たない**（取得段階で除外。開閉バー・件数・リンクいずれも無し。DBの行は残る）。`active` / `waiting` はそのまま表示、`dormant` は折りたたみ表示（2026-08-10・本人指示）。
 - `project_cards` は画面からの手入力は不可（SELECT のみ）。正は context-engine / taskbox 側にあり、`scripts/upsert-project-cards.mjs` が service_role で slug 単位 upsert する。
-- カードへの書き込みは自由記述メモ（`project_notes`、カード単位のみ。`card_slug` 必須）。**追記専用**で、taskbox 側が回収したら `consumed_at` を埋める。板全体メモは 2026-08-11 に廃止。選択肢式の `project_card_decision_answers` は 2026-08-05 に置き換え、2026-08-09 に drop した。
+- **板は読むだけの面である**（2026-08-11確定）。カードが伝えるのは ①状態 ②どこまで進んだか（`ai_recent`）③次に本人がやること（`your_turn`）の3点だけ。判断の問い（`decisions`）・AIの次の一手（`ai_next`）・自由記述メモ（`project_notes`）は同日に廃止した — 反映が1日4回・非同期という制約のもとでは、板で判断を返すより**セッションを開いた方が速い**と本人が判断したため。`waiting_user` / `waiting_other` を `waiting` に統合したのも同根で、実質のボトルネックは常に本人なので「誰を待っているか」の区別が行動を変えない。
+  - 廃止の経緯と判断ログは `docs/project-cards-simplification-plan.md`。選択肢式の `project_card_decision_answers` は 2026-08-05 に自由記述へ置き換え、2026-08-09 に drop 済み。
 
 ---
 
@@ -110,7 +111,6 @@ monocore は AI 活用基盤（context-engine / taskbox）の**人間向け窓�
 | `schedule_day_notes` / `schedule_day_revisions` | 画面 | monocore |
 | `inboxes` | 画面（単一 TEXT blob） | monocore |
 | `project_cards` | `service_role` のみ（投入スクリプト） | **context-engine / taskbox** |
-| `project_notes` | `authenticated` のみ（追記専用） | monocore → taskbox が回収 |
 
 - **導出物に手入力欄を作らない。** `project_cards` は消えても再生成できるものとして扱う。
 - **`replace_*` 系 RPC を新規に使わない。** 空配列で実データを消した事故があるため、投入は slug 単位の upsert にする。既存の `replace_schedules_for_day` / `replace_schedules_for_day_as` は日単位の全置換なので、呼ぶ前にローカルバックアップを取る。

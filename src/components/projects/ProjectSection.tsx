@@ -1,14 +1,11 @@
 import { ProjectCard } from '@/src/components/projects/ProjectCard'
 import type { ProjectCardRow } from '@/src/lib/supabase/queries/project-cards'
-import type { ProjectNoteRow } from '@/src/lib/supabase/queries/project-notes'
 
 type ProjectSectionProps = {
     title: string
     description?: string
     cards: ProjectCardRow[]
     today: string
-    notesByCard: Map<string, ProjectNoteRow>
-    onNoteSaved: (row: ProjectNoteRow) => void
     showWhenEmpty?: boolean
     tone?: 'default' | 'warning'
 }
@@ -18,8 +15,6 @@ export function ProjectSection({
     description,
     cards,
     today,
-    notesByCard,
-    onNoteSaved,
     showWhenEmpty = false,
     tone = 'default',
 }: ProjectSectionProps) {
@@ -52,13 +47,7 @@ export function ProjectSection({
             {cards.length > 0 && (
                 <div className="space-y-2 sm:space-y-4">
                     {cards.map((card) => (
-                        <ProjectCard
-                            key={card.slug}
-                            card={card}
-                            today={today}
-                            latestNote={notesByCard.get(card.slug) ?? null}
-                            onNoteSaved={onNoteSaved}
-                        />
+                        <ProjectCard key={card.slug} card={card} today={today} />
                     ))}
                 </div>
             )}

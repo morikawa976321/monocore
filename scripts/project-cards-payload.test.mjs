@@ -37,6 +37,11 @@ describe('validateCards', () => {
 
     it('rejects bad status, slug, deadline, and goal_slug', () => {
         expect(validateCards([validCard({ status: 'nonsense' })])[0]).toContain('"status"')
+        // waiting_user / waiting_other は2026-08-11に waiting へ統合済み。
+        // DBのCHECK制約から外れた値なので、投入前にここで弾く。
+        expect(validateCards([validCard({ status: 'waiting_user' })])[0]).toContain('"status"')
+        expect(validateCards([validCard({ status: 'waiting_other' })])[0]).toContain('"status"')
+        expect(validateCards([validCard({ status: 'waiting' })])).toEqual([])
         expect(validateCards([validCard({ slug: '   ' })])[0]).toContain('index=0')
         expect(validateCards([validCard({ deadline: '2026/09/30' })])).toHaveLength(1)
         expect(validateCards([validCard({ goal_slug: 'unknown' })])[0]).toContain(
@@ -64,11 +69,9 @@ describe('buildRow', () => {
         expect(row.deadline).toBeNull()
         expect(Object.keys(row).sort()).toEqual(
             [
-                'ai_next',
                 'ai_recent',
                 'deadline',
                 'deadline_note',
-                'decisions',
                 'definition_of_done',
                 'goal_slug',
                 'slug',
@@ -80,14 +83,22 @@ describe('buildRow', () => {
         )
     })
 
-    it('fills defaults and drops non-string array entries', () => {
-        const row = buildRow(validCard({ ai_next: ['ok', 42, null] }))
+    it('drops columns that no longer exist even if the input still carries them', () => {
+        // 2026-08-11に decisions・ai_next を列ごと廃止した。古い project_cards.json が
+        // 残っていても、これらが行に混ざると upsert が列不在で落ちる。
+        const row = buildRow(validCard({ decisions: [{ id: 'd1' }], ai_next: ['なにか'] }))
+        expect(row).not.toHaveProperty('decisions')
+        expect(row).not.toHaveProperty('ai_next')
+    })
+
+    it('fills defaults for omitted optional fields', () => {
+        const row = buildRow(validCard())
         expect(row).toMatchObject({
             goal_slug: null,
             your_turn: '',
             ai_recent: {},
-            decisions: [],
-            ai_next: ['ok'],
+            definition_of_done: '',
+            deadline_note: null,
             sort_order: 0,
         })
     })
