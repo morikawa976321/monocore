@@ -11,7 +11,7 @@
 | ルート | 役割 |
 | :--- | :--- |
 | `/schedules` | 予定の一覧・編集。日別メモ欄と inbox パネルを同居 |
-| `/projects` | プロジェクト板（ステータス別カード。自由記述メモ） |
+| `/projects` | プロジェクト板（目標別カード。読み取り専用） |
 
 実装が守る設計制約と、未決の論点は `docs/design.md`。
 
@@ -152,9 +152,15 @@ npx supabase db push
 npx supabase db reset
 ```
 
-### 本番データの手動ダンプ
+### 本番データの手動ダンプ / ローカル同期
 
-手順は `docs/supabase-backup.md` を参照。
+本番 → ローカルのワンショット同期（取得・適用・検証）:
+
+```powershell
+.\scripts\backup\supabase_sync_prod_to_local.ps1
+```
+
+詳細は `docs/supabase-backup.md` を参照。
 
 ---
 

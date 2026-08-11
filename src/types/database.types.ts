@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -81,12 +86,10 @@ export type Database = {
       }
       project_cards: {
         Row: {
-          ai_next: Json
           ai_recent: Json
           created_at: string | null
           deadline: string | null
           deadline_note: string | null
-          decisions: Json
           definition_of_done: string
           goal_slug: string | null
           slug: string
@@ -97,12 +100,10 @@ export type Database = {
           your_turn: string
         }
         Insert: {
-          ai_next?: Json
           ai_recent?: Json
           created_at?: string | null
           deadline?: string | null
           deadline_note?: string | null
-          decisions?: Json
           definition_of_done?: string
           goal_slug?: string | null
           slug: string
@@ -113,12 +114,10 @@ export type Database = {
           your_turn?: string
         }
         Update: {
-          ai_next?: Json
           ai_recent?: Json
           created_at?: string | null
           deadline?: string | null
           deadline_note?: string | null
-          decisions?: Json
           definition_of_done?: string
           goal_slug?: string | null
           slug?: string
@@ -137,30 +136,6 @@ export type Database = {
             referencedColumns: ["slug"]
           },
         ]
-      }
-      project_notes: {
-        Row: {
-          body: string
-          card_slug: string
-          consumed_at: string | null
-          created_at: string
-          id: string
-        }
-        Insert: {
-          body: string
-          card_slug: string
-          consumed_at?: string | null
-          created_at?: string
-          id?: string
-        }
-        Update: {
-          body?: string
-          card_slug?: string
-          consumed_at?: string | null
-          created_at?: string
-          id?: string
-        }
-        Relationships: []
       }
       reports: {
         Row: {
@@ -423,4 +398,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
