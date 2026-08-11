@@ -26,9 +26,7 @@ export function ProjectCard({ card, today }: ProjectCardProps) {
                 onClick={() => setIsOpen((prev) => !prev)}
                 aria-expanded={isOpen}
                 aria-controls={panelId}
-                className={`justify-start leading-6 rounded-none text-neutral-900 dark:text-neutral-50 ${
-                    isOpen ? 'border-b border-neutral-200 dark:border-neutral-800' : ''
-                }`}
+                className="justify-start leading-6 rounded-none text-neutral-900 dark:text-neutral-50"
             >
                 <span className="flex w-full min-w-0 items-center justify-between gap-2">
                     <span className="min-w-0 truncate">{card.title}</span>
@@ -50,7 +48,7 @@ export function ProjectCard({ card, today }: ProjectCardProps) {
             {isOpen && (
                 <div
                     id={panelId}
-                    className="flex flex-col gap-4 p-1 sm:p-4 text-neutral-900 dark:text-neutral-100"
+                    className="flex flex-col gap-4 border-t border-neutral-200 p-1 sm:p-4 text-neutral-900 dark:border-neutral-800 dark:text-neutral-100"
                 >
                     <p>{card.definition_of_done}</p>
 
