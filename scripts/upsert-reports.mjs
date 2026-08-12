@@ -47,9 +47,16 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 // scripts/ の2つ上 = mf/。reportsとmonocoreは兄弟ディレクトリ。
 const DEFAULT_REPORTS_DIR = resolve(scriptDir, '..', '..', 'reports')
 
+/**
+ * process.exit() は使わない。2026-08-12から taskbox/sync-reports.ps1（drainの工程）が
+ * 出力をパイプで受けて呼ぶようになったため、保留中のstdioハンドルを抱えたまま即時終了すると
+ * Windowsのlibuvが "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)" を吐き、
+ * 本当の失敗理由の隣に並んで原因の切り分けを鈍らせる（upsert-drain-run.mjs と同じ対処）。
+ */
+class ReportSyncError extends Error {}
+
 function fail(message) {
-    console.error(`Error: ${message}`)
-    process.exit(1)
+    throw new ReportSyncError(message)
 }
 
 /**
@@ -208,4 +215,9 @@ async function main() {
     }
 }
 
-await main()
+try {
+    await main()
+} catch (error) {
+    console.error(`Error: ${error.message}`)
+    process.exitCode = 1
+}
