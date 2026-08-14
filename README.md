@@ -13,6 +13,7 @@
 | `/schedules` | 予定の一覧・編集。日別メモ欄と inbox パネルを同居 |
 | `/projects` | プロジェクト板（目標別カード。読み取り専用） |
 | `/reports` | `mf/reports/` の読み取り専用ミラー |
+| `/news` | RSS で集めた記事の一覧（ソース別。読み取り専用） |
 | `/drain` | taskbox drain の実行記録（1枠=1カード。読み取り専用） |
 
 実装が守る設計制約と、未決の論点は `docs/design.md`。
@@ -30,6 +31,13 @@
 - **板は読むだけの面である**（2026-08-11確定）。カードが伝えるのは ①状態 ②経過（`progress`）③次の一手（`next_actions`）の3点だけ。
   - **②③は主体ではなく時間軸で切る**（2026-08-12・本人指示）。見出しは「AIがやったこと」「あなたの番」から「経過」「次の一手」へ、列名は `ai_recent` / `your_turn` から改名した。行為主体が誰かは本質的な情報ではなく、実際 `ai_recent` には本人の行為（購入の実行など）が書かれていた。ただし**次の一手に載せるのは本人の行動になるものだけ**という基準は残る（AIの作業予定を書く欄ではない。それは2026-08-11に `ai_next` として廃止した）。判断ログは context-engine の `card-fields-time-axis-not-actor`。判断の問い（`decisions`）・AIの次の一手（`ai_next`）・自由記述メモ（`project_notes`）は同日に廃止した — 反映が1日4回・非同期という制約のもとでは、板で判断を返すより**セッションを開いた方が速い**と本人が判断したため。`waiting_user` / `waiting_other` を `waiting` に統合したのも同根で、実質のボトルネックは常に本人なので「誰を待っているか」の区別が行動を変えない。
   - 判断ログは context-engine の `board-decision-io-abolished` / `actor-distinction-useless-when-user-is-the-bottleneck`（決定の理由と一般則）。実施内容はこのリポジトリの `20260811145700_simplify_project_cards.sql` とその周辺コミット。選択肢式の `project_card_decision_answers` は 2026-08-05 に自由記述へ置き換え、2026-08-09 に drop 済み。
+
+### News（`/news`）
+
+- RSS で集めた記事を `published` の新しい順に並べ、ソース別に絞り込んで読む面。記事のリンクは別タブで開く。
+- 収集は**このリポジトリの `scraper/`（Python）**が行う。タスクスケジューラが `pythonw.exe` で毎時 `run_once.py` を実行し、`link` 単位で upsert したあと保持期間（`scraper/config.json` の `max_age_days` = 8日）を過ぎた行を消す。取得先とブラックリストも `scraper/config.json`。
+- 2026-08-14 に別リポジトリ `mf/news_scraping`（JSONL 保存 + LAN 内 Flask）から移設した（**移設元はローカル・GitHub とも削除済み**。以降このリポジトリ内の記述にある「旧 news_scraping」は、コードがそう書かれている理由の説明であって、参照先ではない）。**`articles` は既存の導出物3つと違い、消えても再生成できない**（RSS は過去記事を配らない）。詳細は「データの正と書き込み規約」。
+- **スクレーパーは `service_role` キーを持つ。** 認証情報はリポジトリではなく `~/.monocore/config.json` の `envs.remote` から読む。
 
 ### Drain（`/drain`）
 
@@ -108,6 +116,7 @@ npm run dev
 - **型:** `src/types/database.types.ts`（Supabase 生成型）を使う。`any` は避ける
 - **認証ゲート:** `src/proxy.ts`（セッション更新・未ログイン時のリダイレクト）
 - **Projects UI:** `src/app/projects/page.tsx` + `src/components/projects/`。カード投入は `scripts/upsert-project-cards.mjs`
+- **`scraper/` だけ Python**（RSS 収集。Next.js のビルドには含まれない）。`requirements.txt` をリポジトリのルートに置かないこと — ルートの `requirements.txt` と `api/*.py` は Vercel の Python ランタイム自動検出の対象になる
 
 詳細は `docs/directory_structure.md` を参照。
 
@@ -122,7 +131,9 @@ monocore は AI 活用基盤（context-engine / taskbox）の**人間向け窓�
 | `inboxes` | 画面（単一 TEXT blob） | monocore |
 | `project_cards` | `service_role` のみ（投入スクリプト） | **context-engine / taskbox** |
 | `drain_runs` | `service_role` のみ（`drain.ps1` が毎run投入） | **taskbox** |
+| `articles` | `service_role` のみ（`scraper/` が毎時投入） | **このDB自身** |
 
+- **`articles` だけは「人間が書いたもの」でも「再生成できる導出物」でもない。** RSS は過去記事を配らないので、消えた記事は戻らない。保持は8日と決めたので失われうる最大値は「8日以内に読み逃した記事」であり、バックアップは持たない（2026-08-14・本人判断）。この分類がもう1つ増えるなら、そのとき改めて考える。
 - **導出物に手入力欄を作らない。** `project_cards` は消えても再生成できるものとして扱う。
 - **`replace_*` 系 RPC を新規に使わない。** 空配列で実データを消した事故があるため、投入は slug 単位の upsert にする。既存の `replace_schedules_for_day` / `replace_schedules_for_day_as` は日単位の全置換なので、呼ぶ前にローカルバックアップを取る。
 - **AI が書いた行は `updated_by = 'agent'`** で識別する（現状 schedules のみ。UI 表示は未実装）。
@@ -181,6 +192,12 @@ npx supabase db reset
 
 - **命名:** `filename.test.ts` / `filename.test.tsx`
 - **例:** `src/lib/date.ts` → `src/lib/date.test.ts`
+
+**`scraper/` は pytest で別に回す。** `npm test`（Vitest）は Python のテストを拾いません。
+
+```bash
+cd scraper && .venv\Scripts\python.exe -m pytest -q
+```
 
 ### 方針（小規模個人開発）
 
