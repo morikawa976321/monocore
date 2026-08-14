@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isDevAuthBypassEnabled } from '@/src/lib/auth/dev-bypass'
 
 /**
  * セッション情報を最新状態に更新するための処理です。
@@ -52,6 +53,16 @@ export async function updateSession(request: NextRequest) {
         return redirectResponse
     }
 
+    // 開発サーバーではログイン画面を出さない。RLS を通すため、
+    // DEV_AUTH_EMAIL / DEV_AUTH_PASSWORD があればそのユーザーで入る。
+    if (!isAuthenticated && isDevAuthBypassEnabled()) {
+        await tryDevPasswordSignIn(supabase)
+        if (pathname.startsWith('/login')) {
+            return redirectWithSessionCookies('/')
+        }
+        return supabaseResponse
+    }
+
     // 未認証ユーザーを /login にリダイレクトする（/login, /auth/callback は除外）
     if (!isAuthenticated && !pathname.startsWith('/login') && !pathname.startsWith('/auth/callback')) {
         return redirectWithSessionCookies('/login')
@@ -63,6 +74,16 @@ export async function updateSession(request: NextRequest) {
     }
 
     return supabaseResponse
+}
+
+async function tryDevPasswordSignIn(
+    supabase: ReturnType<typeof createServerClient>,
+): Promise<boolean> {
+    const email = process.env.DEV_AUTH_EMAIL
+    const password = process.env.DEV_AUTH_PASSWORD
+    if (!email || !password) return false
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    return !error
 }
 
 export async function proxy(request: NextRequest) {

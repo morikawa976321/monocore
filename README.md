@@ -55,6 +55,8 @@ npm install
 npm run dev
 ```
 
+`npm run dev` ではログイン画面を出さない。RLS でデータを読むには `.env.local` に `DEV_AUTH_EMAIL` と `DEV_AUTH_PASSWORD` を置く（そのユーザーで自動ログインする）。ログイン画面を確認したいときは `DEV_AUTH_BYPASS=0`。本番は従来どおりログイン必須。
+
 その他のスクリプト:
 
 | コマンド | 内容 |
