@@ -39,6 +39,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      articles: {
+        Row: {
+          collected_at: string
+          image_url: string | null
+          link: string
+          published: string | null
+          source: string
+          title: string
+        }
+        Insert: {
+          collected_at?: string
+          image_url?: string | null
+          link: string
+          published?: string | null
+          source: string
+          title: string
+        }
+        Update: {
+          collected_at?: string
+          image_url?: string | null
+          link?: string
+          published?: string | null
+          source?: string
+          title?: string
+        }
+        Relationships: []
+      }
       drain_runs: {
         Row: {
           created_at: string
