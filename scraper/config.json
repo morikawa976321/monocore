@@ -1,0 +1,19 @@
+{
+  "rss_sites": {
+    "PC Watch": "https://pc.watch.impress.co.jp/data/rss/1.0/pcw/feed.rdf",
+    "AV Watch": "https://av.watch.impress.co.jp/data/rss/1.0/avw/feed.rdf",
+    "Kaden Watch": "https://kaden.watch.impress.co.jp/data/rss/1.0/kdw/feed.rdf",
+    "GAZ:Log": "https://gazlog.com/feed/",
+    "Gigazine": "https://gigazine.net/news/rss_2.0/",
+    "hermitage": "https://www.gdm.or.jp/feed"
+  },
+  "_disabled_rss_sites": {
+    "inajob": "https://inajob.github.io/iroiro-review/index.xml",
+    "もでぃふぁいど！": "https://modified.jp/feed"
+  },
+  "blacklist_prefixes": [
+    "https://www.gdm.or.jp/specialprice/",
+    "https://www.gdm.or.jp/price/"
+  ],
+  "max_age_days": 8
+}
