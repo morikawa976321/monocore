@@ -59,18 +59,17 @@ export default function ProjectsPage() {
     const visibleCards = projectCards.filter(
         (card) => card.status === 'active' || card.status === 'waiting'
     )
+    // 生存中(active/waiting)のカードは必ずいずれかの目標に属する前提（2026-08-14決定）。
+    // 「未分類」でのはみ出し表示は撤去済み — この機構は本人が依頼していないカードを
+    // 可視化しただけで終わった（新規カード作成を本人の明示的指示に限定したため、
+    // 目標未定のカードが生まれる経路自体を塞いだ）。
     const cardsByGoal = new Map<string, ProjectCardRow[]>()
     for (const goal of goals) {
         cardsByGoal.set(goal.slug, [])
     }
-    const unclassifiedCards: ProjectCardRow[] = []
     for (const card of visibleCards) {
         const goalCards = card.goal_slug ? cardsByGoal.get(card.goal_slug) : undefined
-        if (goalCards) {
-            goalCards.push(card)
-        } else {
-            unclassifiedCards.push(card)
-        }
+        goalCards?.push(card)
     }
     // done は getProjectCards の取得段階で除外済み（アクセス経路自体をなくす対象。
     // 2026-08-10・本人指示）。dormant は目標セクションと同じ見出しで常時表示する。
@@ -109,15 +108,6 @@ export default function ProjectsPage() {
                         カードの有無で消える面ではない）。 */}
                     {!isInitialLoading && todayStr !== null && (
                         <>
-                            {unclassifiedCards.length > 0 && (
-                                <ProjectSection
-                                    title="未分類"
-                                    description="目標が未設定です。撤退候補か、目標定義の宿題です。"
-                                    cards={unclassifiedCards}
-                                    today={todayStr}
-                                    tone="warning"
-                                />
-                            )}
                             {goals.map((goal) => (
                                 <ProjectSection
                                     key={goal.slug}
