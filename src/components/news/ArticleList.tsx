@@ -22,7 +22,7 @@ function Thumbnail({ src, alt }: { src: string | null; alt: string }) {
 
     if (!isUsable) {
         return (
-            <div className="flex w-24 h-16 shrink-0 items-center justify-center border border-neutral-400 dark:border-neutral-600 bg-neutral-100 dark:bg-neutral-950">
+            <div className="flex w-32 h-20 shrink-0 items-center justify-center border border-neutral-400 dark:border-neutral-600 bg-neutral-100 dark:bg-neutral-950">
                 <span className="text-sm text-neutral-700 dark:text-neutral-300">画像なし</span>
             </div>
         )
@@ -37,7 +37,7 @@ function Thumbnail({ src, alt }: { src: string | null; alt: string }) {
             alt={alt}
             loading="lazy"
             onError={() => setHasFailed(true)}
-            className="w-24 h-16 shrink-0 border border-neutral-400 dark:border-neutral-600 object-cover"
+            className="w-32 h-20 shrink-0 border border-neutral-400 dark:border-neutral-600 object-cover"
         />
     )
 }
