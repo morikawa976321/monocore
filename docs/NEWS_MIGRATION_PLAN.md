@@ -92,7 +92,16 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.articles TO service_role;
 
 **完了条件**: リモートに `articles` があり、`database.types.ts` に型が出ている。
 
-### Phase 2 — scraper の移設と Supabase 書き込み化（2〜3時間）
+### Phase 2 — scraper の移設と Supabase 書き込み化（2〜3時間）✅ 2026-08-14 実施
+
+実施結果と、計画からの逸脱:
+
+- **実機で確認できたこと**: ローカルSupabaseに対する `run_once` の1巡（新規96件・36秒）→ 2巡目は新規0件で件数不変（冪等）→ 日本語が壊れずに往復すること → 古い行（`published` が古い / `published` NULL で `collected_at` が古い）が `store.delete_expired` で2件とも消えること。本番へは旧 JSONL の503件を投入し、毎時タスクを登録して1回実行（`LastTaskResult=0`・ウィンドウ無し・ログ出力あり）。テストは26件。
+- `log_config.py` は**無改修ではなく1行変更**。`LOG_DIR` が「`scraper/` の親」基準だったので、そのままだと monocore のルートに `logs/` を作る。
+- `tests/test_scheduler_runner.py` は**生かせず `tests/test_run_once.py` として書き直した**。旧テストの対象（`load_existing_links` と `record_rss_articles`）が保存先の変更で両方消えたため、残るのはフィクスチャの作法だけだった。
+- **旧 `NewsScraping_Scraper` は解除せず Phase 4 まで残す**（計画では 2-8 で解除するつもりだった）。書き込み先が違うので競合せず、残しておくと `articles.jsonl` がロールバック材料として鮮度ごと維持される。代償は RSS を毎時2回取りに行くことだけ。
+- `~/.monocore/config.json` に **`envs.local` が無い**ため、ローカル検証は使い捨てスクリプトで接続を組んだ（設定ファイルには触っていない）。`--env local` は `envs.local` を足せばそのまま使える。
+- 追加したファイル: `conftest.py`（tests から scraper/ を import するため）、`requirements-dev.txt`、`register-task.ps1`、`import_jsonl_once.py`。
 
 1. **移設（コピー）**: `fetch_rss.py` / `log_config.py` / `config.py` / `config.json` / `tests/` を `monocore/scraper/` へ。
 2. **`config.py` の修正**: 現行は `CONFIG_PATH` を「`scraper/` の親」に取るので、そのまま移すと monocore のルートに `config.json` を探しに行く。`SCRIPT_DIR` 基準に変える。`get_articles_path` は削除、`config.json` から `articles_file` キーを削除。
@@ -106,7 +115,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.articles TO service_role;
 
 **完了条件**: 手動1回の実行で新着が Supabase に入り、8日より古い行が消え、2回目で重複が増えない。毎時タスクがウィンドウを出さずに動く。`logs/scraper.log` にキーが出ていない。
 
-### Phase 3 — monocore `/news`（2〜3時間）
+### Phase 3 — monocore `/news`（2〜3時間）✅ 2026-08-14 実装（目視確認だけ未了）
+
+- **確認できたこと**: `tsc --noEmit` / `npm run lint` / `npm test`（68件・うち `group.test.ts` 11件）/ `npm run build`（`/news` がルート表に出る）。一覧が発行するクエリ（`select` 5列 + `published.desc.nullslast` + `limit`）をローカルDBの実データ96件に対して直接叩き、列・並び順・件数を確認。
+- **未了**: ログイン状態のブラウザでの目視確認。認証が要るのでこちらでは開けない（`npm run dev` → `/news`）。`.env.local` はローカルSupabaseを指しているので、dev で見えるのはローカルの96件。
+- ソース別の絞り込みは `role="tab"` ではなく `aria-pressed` のトグルにした。tab は tabpanel と対であることを支援技術が前提にするが、ここは一覧を絞り込むだけで tabpanel が無いため。
+- `eslint.config.mjs` に `supabase/.temp/**` の除外を追加した（Phase 3 の作業ではないが、`supabase start` を打つと生成され、`npm run lint` が Supabase CLI 由来のミニファイ済みコードで150件以上落ちるため）。
 
 - `src/lib/supabase/queries/articles.ts` — `select('link,source,title,published,image_url')` を `published desc nulls last` で。`select('*')` は使わない（`reports.ts` と同じ規律）。
 - `src/app/news/page.tsx` — `src/app/reports/page.tsx` と同型（`'use client'` + `PageHeader` の更新ボタン + 初回ローディング）。
@@ -154,6 +168,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.articles TO service_role;
 10. **`npm test`（vitest）は `scraper/` の Python テストを拾わない。** pytest は `scraper/` を作業ディレクトリにして別途回す。両方回すことを README に書く。
 11. **PostgREST の一括 INSERT は、配列内の全オブジェクトのキー集合が完全一致していないと `PGRST102 All object keys must match` で 400**（2026-08-14 に実測）。「画像が取れなかった記事では `image_url` キーごと落とす」という自然な書き方がそのまま地雷になる。**省略可能な列は `null` を明示して全行で同じキー集合にする。** 巡回した記事にたまたま全部 OGP 画像があった回は成功し、1本でも無い回だけ全滅するので、**キー集合が揃っていない配列をテストに1本固定しておく**こと。`collected_at` のような DEFAULT 付きの列も同じ。
 12. **`supabase gen types` は `__InternalSupabase`（`PostgrestVersion`）ブロックを出力しない**（CLI 2.114.0 で実測）。生成物でファイルを丸ごと置き換えると既存の記述が黙って消える。**一時ファイルに出して diff を取り、必要な差分だけを手で入れる。** PowerShell の `>` は CRLF で書き出すので、その意味でも全置換は避ける。
+13. **日本語を含む `.ps1` は UTF-8 BOM 付きで保存する。** BOM が無いと Windows PowerShell 5.1 が cp932 として読み、コメントが化けて `param()` ごと壊れる（`register-task.ps1` で実発）。context-engine の `powershell-script-needs-utf8-bom` に既出。エディタやツールが BOM 無しで書くので、**書いた後に BOM を付け直す**こと。
 
 ## 7. ロールバック
 

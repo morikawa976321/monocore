@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // `supabase start` が生成する作業ディレクトリ。中身は Supabase CLI が置いた
+    // ミニファイ済みの edge runtime で、我々のコードではない（lint すると
+    // prefer-const 等で150件以上落ちる）。git は supabase/.gitignore で無視済み。
+    "supabase/.temp/**",
   ]),
   {
     // 選択ID変更に伴う詳細リセット・モーダル開閉の pending 同期など、

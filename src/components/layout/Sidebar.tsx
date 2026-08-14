@@ -8,6 +8,7 @@ import {
     LayoutGrid,
     ListChecks,
     Menu,
+    Newspaper,
     LogOut,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
@@ -18,6 +19,7 @@ const MENU_ITEMS = [
     { href: "/schedules", icon: Clock, label: "Schedule" },
     { href: "/projects", icon: LayoutGrid, label: "Projects" },
     { href: "/reports", icon: FileText, label: "Reports" },
+    { href: "/news", icon: Newspaper, label: "News" },
     { href: "/drain", icon: ListChecks, label: "Drain" },
 ] as const;
 
