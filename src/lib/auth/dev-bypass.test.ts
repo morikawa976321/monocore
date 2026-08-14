@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isDevAuthBypassEnabled } from './dev-bypass'
+import {
+    getDevAuthCredentials,
+    isDevAuthBypassEnabled,
+    isLocalSupabaseUrl,
+} from './dev-bypass'
 
 describe('isDevAuthBypassEnabled', () => {
     it('development だけ true', () => {
@@ -13,5 +17,35 @@ describe('isDevAuthBypassEnabled', () => {
         expect(isDevAuthBypassEnabled('development', '0')).toBe(false)
         expect(isDevAuthBypassEnabled('development', 'false')).toBe(false)
         expect(isDevAuthBypassEnabled('development', '1')).toBe(true)
+    })
+})
+
+describe('isLocalSupabaseUrl', () => {
+    it('127.0.0.1 と localhost だけ true', () => {
+        expect(isLocalSupabaseUrl('http://127.0.0.1:54321')).toBe(true)
+        expect(isLocalSupabaseUrl('http://localhost:54321')).toBe(true)
+        expect(isLocalSupabaseUrl('https://example.supabase.co')).toBe(false)
+        expect(isLocalSupabaseUrl(undefined)).toBe(false)
+        expect(isLocalSupabaseUrl('not-a-url')).toBe(false)
+    })
+})
+
+describe('getDevAuthCredentials', () => {
+    it('明示した email/password を優先する', () => {
+        expect(
+            getDevAuthCredentials('http://127.0.0.1:54321', 'me@example.com', 'secret'),
+        ).toEqual({ email: 'me@example.com', password: 'secret', canSignUp: false })
+    })
+
+    it('ローカル URL なら開発ユーザーを返す', () => {
+        expect(getDevAuthCredentials('http://127.0.0.1:54321')).toEqual({
+            email: 'dev@localhost',
+            password: 'local-dev-password',
+            canSignUp: true,
+        })
+    })
+
+    it('リモート URL で資格情報が無ければ null', () => {
+        expect(getDevAuthCredentials('https://example.supabase.co')).toBeNull()
     })
 })

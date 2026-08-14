@@ -11,3 +11,31 @@ export function isDevAuthBypassEnabled(
     if (flag === '0' || flag === 'false') return false
     return true
 }
+
+export function isLocalSupabaseUrl(url: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL): boolean {
+    if (!url) return false
+    try {
+        const host = new URL(url).hostname
+        return host === '127.0.0.1' || host === 'localhost'
+    } catch {
+        return false
+    }
+}
+
+/** ローカル Supabase 専用。本番では使わない。 */
+const LOCAL_DEV_EMAIL = 'dev@localhost'
+const LOCAL_DEV_PASSWORD = 'local-dev-password'
+
+export function getDevAuthCredentials(
+    supabaseUrl: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL,
+    email: string | undefined = process.env.DEV_AUTH_EMAIL,
+    password: string | undefined = process.env.DEV_AUTH_PASSWORD,
+): { email: string; password: string; canSignUp: boolean } | null {
+    if (email && password) {
+        return { email, password, canSignUp: false }
+    }
+    if (isLocalSupabaseUrl(supabaseUrl)) {
+        return { email: LOCAL_DEV_EMAIL, password: LOCAL_DEV_PASSWORD, canSignUp: true }
+    }
+    return null
+}
