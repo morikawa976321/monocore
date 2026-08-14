@@ -153,6 +153,9 @@ function buildTask(task) {
                 outcome: asString(entry.outcome),
             })),
         qa_rounds: Number.isInteger(task.qa_rounds) ? task.qa_rounds : null,
+        // trace の notes（想定外に発生・発見したこと）。板が載せるべき4点
+        // 「何をやったか / 成否 / 失敗の理由 / 想定外」のうち、これだけ運び先が無かった。
+        notes: asString(task.notes),
     }
 }
 

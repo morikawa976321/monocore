@@ -213,6 +213,19 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
                                     ))}
                                 </ul>
                             )}
+
+                            {/* 想定外に発生・発見したこと。本人が板に求める4点の最後の1つで、
+                                失敗とは限らないが「聞きに来る手がかり」なので注意色で出す。 */}
+                            {task.notes.length > 0 && (
+                                <p className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                                    <span className="shrink-0 sm:w-48 text-amber-600 dark:text-amber-400">
+                                        想定外
+                                    </span>
+                                    <span className="whitespace-pre-line text-neutral-700 dark:text-neutral-300">
+                                        {task.notes}
+                                    </span>
+                                </p>
+                            )}
                         </section>
                     ))}
 

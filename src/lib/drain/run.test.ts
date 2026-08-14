@@ -52,6 +52,7 @@ describe('parseRunTasks', () => {
                     { target: '', calls: 1, outcome: 'ok' },
                 ],
                 qa_rounds: 3,
+                notes: '想定外: 実機のフォントが無かった',
             },
         ])
 
@@ -62,6 +63,7 @@ describe('parseRunTasks', () => {
         expect(tasks[0].failures[0].phase).toBe('QA')
         expect(tasks[0].delegation).toEqual([{ target: 'cursor(auto)', calls: 2, outcome: 'ok' }])
         expect(tasks[0].qaRounds).toBe(3)
+        expect(tasks[0].notes).toBe('想定外: 実機のフォントが無かった')
     })
 
     it('survives missing optional fields', () => {
@@ -76,6 +78,7 @@ describe('parseRunTasks', () => {
             failures: [],
             delegation: [],
             qaRounds: null,
+            notes: '',
         })
     })
 

@@ -48,6 +48,8 @@ export type RunTask = {
     failures: TaskFailure[]
     delegation: TaskDelegation[]
     qaRounds: number | null
+    /** 想定外に発生・発見したこと（trace の notes）。無い回は空文字。 */
+    notes: string
 }
 
 const STEP_STATUSES = new Set<RunStepStatus>(['ok', 'warn', 'error'])
@@ -121,6 +123,7 @@ export function parseRunTasks(value: Json): RunTask[] {
                 }))
                 .filter((entry) => entry.target.length > 0),
             qaRounds: typeof task.qa_rounds === 'number' ? task.qa_rounds : null,
+            notes: asString(task.notes),
         }))
         .filter((task) => task.taskId.length > 0)
 }

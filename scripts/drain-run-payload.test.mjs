@@ -101,6 +101,7 @@ describe('buildRow', () => {
                         steps: [{ n: 1, desc: '実装', status: 'done', note: '緑' }],
                         failures: [{ phase: 'QA', symptom: '赤', resolution: '直した' }],
                         qa_rounds: 2,
+                        notes: '想定外: 依存が古かった',
                         // 一覧の転送量が跳ねるので運ばない項目
                         gate: { checks: [{ name: 'target_dir_exists' }] },
                         artifacts: ['C:\\somewhere'],
@@ -113,6 +114,7 @@ describe('buildRow', () => {
         expect(row.tasks[0].steps).toEqual([{ desc: '実装', status: 'done', note: '緑' }])
         expect(row.tasks[0].failures[0].resolution).toBe('直した')
         expect(row.tasks[0].qa_rounds).toBe(2)
+        expect(row.tasks[0].notes).toBe('想定外: 依存が古かった')
         expect(row.tasks[0]).not.toHaveProperty('gate')
         expect(row.tasks[0]).not.toHaveProperty('artifacts')
     })
