@@ -22,7 +22,7 @@ function Thumbnail({ src, alt }: { src: string | null; alt: string }) {
 
     if (!isUsable) {
         return (
-            <div className="flex w-40 h-24 shrink-0 items-center justify-center border border-neutral-400 dark:border-neutral-600 bg-neutral-100 dark:bg-neutral-950">
+            <div className="flex w-40 shrink-0 aspect-3/2 items-center justify-center self-start bg-neutral-100 dark:bg-neutral-950">
                 <span className="text-sm text-neutral-700 dark:text-neutral-300">画像なし</span>
             </div>
         )
@@ -32,13 +32,15 @@ function Thumbnail({ src, alt }: { src: string | null; alt: string }) {
         // next/image を使わないのは、外部ドメインの許可設定が要るうえに
         // この面に最適化(リサイズ・遅延生成)の必要が無いため。
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-            src={src ?? ''}
-            alt={alt}
-            loading="lazy"
-            onError={() => setHasFailed(true)}
-            className="w-40 h-24 shrink-0 border border-neutral-400 dark:border-neutral-600 object-cover"
-        />
+        <div className="w-40 shrink-0 aspect-3/2 self-start">
+            <img
+                src={src ?? ''}
+                alt={alt}
+                loading="lazy"
+                onError={() => setHasFailed(true)}
+                className="h-full w-full object-cover"
+            />
+        </div>
     )
 }
 
@@ -49,9 +51,9 @@ function ArticleCard({ article, timezone }: { article: ArticleListRow; timezone:
     const body = (
         <>
             <Thumbnail src={article.image_url} alt="" />
-            <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-neutral-900 dark:text-neutral-50">{article.title}</span>
-                <span className="text-sm text-neutral-700 dark:text-neutral-300">
+            <div className="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden py-2 pr-2 pl-4">
+                <span className="line-clamp-2 text-neutral-900 dark:text-neutral-50">{article.title}</span>
+                <span className="shrink-0 truncate text-sm text-neutral-700 dark:text-neutral-300">
                     {article.source}
                     {publishedAt && ` ・ ${publishedAt}`}
                 </span>
@@ -62,7 +64,7 @@ function ArticleCard({ article, timezone }: { article: ArticleListRow; timezone:
     // リンクが http/https でない記事も、読めなくする理由は無いので本文だけ出す。
     if (!isLinkUsable) {
         return (
-            <div className="flex items-start gap-2 rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 p-2">
+            <div className="flex items-start overflow-hidden rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900">
                 {body}
             </div>
         )
@@ -73,7 +75,7 @@ function ArticleCard({ article, timezone }: { article: ArticleListRow; timezone:
             href={article.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-start gap-2 rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 p-2 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-500"
+            className="flex items-start overflow-hidden rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-500"
         >
             {body}
         </a>
