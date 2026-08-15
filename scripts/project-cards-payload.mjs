@@ -29,6 +29,20 @@ export const ALLOWED_GOAL_SLUGS = new Set([
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
+/**
+ * DB上のslug一覧のうち、JSONに存在しないもの（=delete対象）を返す。
+ * 「同期＝集合の一致」の要そのもの。upsertだけだとJSONから消したカードが
+ * DBに残り続け、板に出たままになる（2026-08-16にresearch-collectorで実際に起きた）。
+ *
+ * reports側(reports-payload.mjs)に同名・同内容の関数がある。共有モジュールへ
+ * 括り出さないのは、2つの同期経路を独立に保つため（片方の都合で触った変更が
+ * もう片方のdelete判定を黙って変える方が、3行の重複より危ない）。
+ */
+export function computeStaleSlugs(existingSlugs, localSlugs) {
+    const local = new Set(localSlugs)
+    return existingSlugs.filter((slug) => !local.has(slug))
+}
+
 export function isPlainObject(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     buildRow,
+    computeStaleSlugs,
     normalizeCards,
     validateCards,
 } from './project-cards-payload.mjs'
@@ -22,6 +23,18 @@ describe('normalizeCards', () => {
         expect(normalizeCards(cards)).toEqual(cards)
         expect(normalizeCards({ cards })).toEqual(cards)
         expect(normalizeCards({ nope: [] })).toBeNull()
+    })
+})
+
+describe('computeStaleSlugs', () => {
+    it('returns DB slugs that are absent from the JSON', () => {
+        expect(computeStaleSlugs(['a', 'b', 'c'], ['a', 'c'])).toEqual(['b'])
+        expect(computeStaleSlugs(['a', 'b'], ['a', 'b', 'c'])).toEqual([])
+        expect(computeStaleSlugs(['a', 'b'], [])).toEqual(['a', 'b'])
+    })
+
+    it('accepts a Set as the local side (投入スクリプトが渡す形)', () => {
+        expect(computeStaleSlugs(['a', 'b'], new Set(['a']))).toEqual(['b'])
     })
 })
 
