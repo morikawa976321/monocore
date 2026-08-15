@@ -11,9 +11,12 @@ export type DrainRunListRow = Omit<DrainRunRow, 'report_text' | 'created_at'>
 const LIST_COLUMNS =
     'started_at,ended_at,outcome,trigger_reasons,model,effort,exit_code,steps,tasks'
 
+/** 一覧の件数。投入スクリプトの保持上限も同じ値（scripts/upsert-drain-run.mjs）。 */
+export const DRAIN_RUNS_LIST_LIMIT = 40
+
 export async function getDrainRuns(
     supabase: SupabaseClient<Database>,
-    limit = 40
+    limit = DRAIN_RUNS_LIST_LIMIT
 ): Promise<{ data: DrainRunListRow[] | null; error: PostgrestError | null }> {
     const { data, error } = await supabase
         .from('drain_runs')
