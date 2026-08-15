@@ -1,8 +1,8 @@
 ﻿# scraper を毎時実行するタスクを登録する。
 #
 # ■ 実行方法
-#     powershell -NoProfile -ExecutionPolicy Bypass -File .\register-task.ps1
-#     powershell -NoProfile -ExecutionPolicy Bypass -File .\register-task.ps1 -Unregister
+#     pwsh -NoProfile -ExecutionPolicy Bypass -File .\register-task.ps1
+#     pwsh -NoProfile -ExecutionPolicy Bypass -File .\register-task.ps1 -Unregister
 #
 # ■ このファイルは UTF-8 BOM 付きで保存すること
 #     Windows PowerShell 5.1 は BOM の無い .ps1 を ANSI(cp932) として読むため、

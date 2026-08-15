@@ -53,7 +53,8 @@ async function main() {
 
     let payload
     try {
-        // PowerShell の Out-File -Encoding utf8 は PS5.1 では BOM を付ける。
+        // PowerShell の Out-File -Encoding utf8 は 5.1 が BOM を付け、pwsh 7 は付けない。
+        // 2026-08-15にdrainはpwsh 7へ移行したので実際にはBOMは来なくなったが、剥がす処理は無害なので残す。
         payload = JSON.parse(source.replace(/^﻿/, ''))
     } catch (error) {
         fail(`payload is not valid JSON: ${error.message}`)
