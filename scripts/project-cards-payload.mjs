@@ -19,14 +19,6 @@ export const ALLOWED_STATUSES = new Set([
     'done',
 ])
 
-export const ALLOWED_GOAL_SLUGS = new Set([
-    'monodukuri',
-    'career',
-    'health',
-    'simple-life',
-    'ai-collab',
-])
-
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 /**
@@ -97,18 +89,6 @@ export function validateCards(cards) {
         if (card.deadline != null && !isValidDateString(card.deadline)) {
             errors.push(`Card ${tag}: field "deadline" must be null or yyyy-MM-dd`)
         }
-
-        if (
-            card.goal_slug !== undefined &&
-            card.goal_slug !== null &&
-            (typeof card.goal_slug !== 'string' || !ALLOWED_GOAL_SLUGS.has(card.goal_slug))
-        ) {
-            errors.push(
-                `Card ${tag}: field "goal_slug" must be null or one of ` +
-                    `${Array.from(ALLOWED_GOAL_SLUGS).join(', ')} ` +
-                    `(未知の goal_slug は画面で未分類になるため投入を拒否します)`
-            )
-        }
     }
 
     return errors
@@ -122,7 +102,6 @@ export function buildRow(card) {
         definition_of_done:
             typeof card.definition_of_done === 'string' ? card.definition_of_done : '',
         status: card.status,
-        goal_slug: card.goal_slug ?? null,
         deadline: card.deadline ?? null,
         deadline_note: typeof card.deadline_note === 'string' ? card.deadline_note : null,
         // 2欄は主体（AI／本人）ではなく時間軸で切る（2026-08-12）。

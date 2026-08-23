@@ -8,13 +8,11 @@ import { ProjectSection } from '@/src/components/projects/ProjectSection'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { getDefaultTimezone } from '@/src/lib/date'
 import { createClient } from '@/src/lib/supabase/client'
-import { getGoals, type GoalRow } from '@/src/lib/supabase/queries/goals'
 import { getProjectCards, type ProjectCardRow } from '@/src/lib/supabase/queries/project-cards'
 
 export default function ProjectsPage() {
     const supabase = useMemo(() => createClient(), [])
     const timezone = useMemo(() => getDefaultTimezone(), [])
-    const [goals, setGoals] = useState<GoalRow[]>([])
     const [projectCards, setProjectCards] = useState<ProjectCardRow[]>([])
     const [todayStr, setTodayStr] = useState<string | null>(null)
     const [isInitialLoading, setIsInitialLoading] = useState(true)
@@ -28,10 +26,9 @@ export default function ProjectsPage() {
             setIsInitialLoading(true)
         }
 
-        const [{ data: cards, error: cardsError }, { data: loadedGoals, error: goalsError }] =
-            await Promise.all([getProjectCards(supabase), getGoals(supabase)])
+        const { data: cards, error: cardsError } = await getProjectCards(supabase)
 
-        if (cardsError || goalsError) {
+        if (cardsError) {
             setErrorMessage('プロジェクトカードの読み込みに失敗しました。')
             setIsInitialLoading(false)
             setIsRefreshing(false)
@@ -39,7 +36,6 @@ export default function ProjectsPage() {
         }
 
         setProjectCards(cards ?? [])
-        setGoals(loadedGoals ?? [])
         setErrorMessage(null)
         setIsInitialLoading(false)
         setIsRefreshing(false)
@@ -59,20 +55,8 @@ export default function ProjectsPage() {
     const visibleCards = projectCards.filter(
         (card) => card.status === 'active' || card.status === 'waiting'
     )
-    // 生存中(active/waiting)のカードは必ずいずれかの目標に属する前提（2026-08-14決定）。
-    // 「未分類」でのはみ出し表示は撤去済み — この機構は本人が依頼していないカードを
-    // 可視化しただけで終わった（新規カード作成を本人の明示的指示に限定したため、
-    // 目標未定のカードが生まれる経路自体を塞いだ）。
-    const cardsByGoal = new Map<string, ProjectCardRow[]>()
-    for (const goal of goals) {
-        cardsByGoal.set(goal.slug, [])
-    }
-    for (const card of visibleCards) {
-        const goalCards = card.goal_slug ? cardsByGoal.get(card.goal_slug) : undefined
-        goalCards?.push(card)
-    }
     // done は getProjectCards の取得段階で除外済み（アクセス経路自体をなくす対象。
-    // 2026-08-10・本人指示）。dormant は目標セクションと同じ見出しで常時表示する。
+    // 2026-08-10・本人指示）。
     const dormantCards = projectCards.filter((card) => card.status === 'dormant')
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
@@ -104,20 +88,9 @@ export default function ProjectsPage() {
                         </section>
                     )}
 
-                    {/* 目標見出しはカードが1枚も無くても出す（5つの目標は固定の枠であって、
-                        カードの有無で消える面ではない）。 */}
                     {!isInitialLoading && todayStr !== null && (
                         <>
-                            {goals.map((goal) => (
-                                <ProjectSection
-                                    key={goal.slug}
-                                    title={goal.title}
-                                    cards={cardsByGoal.get(goal.slug) ?? []}
-                                    today={todayStr}
-                                    showWhenEmpty
-                                />
-                            ))}
-
+                            <ProjectSection title="プロジェクト" cards={visibleCards} today={todayStr} />
                             <ProjectSection title="休止中" cards={dormantCards} today={todayStr} />
                         </>
                     )}

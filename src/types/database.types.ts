@@ -108,30 +108,6 @@ export type Database = {
         }
         Relationships: []
       }
-      goals: {
-        Row: {
-          created_at: string | null
-          slug: string
-          sort_order: number
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          slug: string
-          sort_order?: number
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          slug?: string
-          sort_order?: number
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       inboxes: {
         Row: {
           content: string
@@ -159,7 +135,6 @@ export type Database = {
           deadline: string | null
           deadline_note: string | null
           definition_of_done: string
-          goal_slug: string | null
           next_actions: string
           progress: Json
           slug: string
@@ -173,7 +148,6 @@ export type Database = {
           deadline?: string | null
           deadline_note?: string | null
           definition_of_done?: string
-          goal_slug?: string | null
           next_actions?: string
           progress?: Json
           slug: string
@@ -187,7 +161,6 @@ export type Database = {
           deadline?: string | null
           deadline_note?: string | null
           definition_of_done?: string
-          goal_slug?: string | null
           next_actions?: string
           progress?: Json
           slug?: string
@@ -196,15 +169,7 @@ export type Database = {
           title?: string
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "project_cards_goal_slug_fkey"
-            columns: ["goal_slug"]
-            isOneToOne: false
-            referencedRelation: "goals"
-            referencedColumns: ["slug"]
-          },
-        ]
+        Relationships: []
       }
       reports: {
         Row: {

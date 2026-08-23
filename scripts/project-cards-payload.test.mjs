@@ -40,15 +40,10 @@ describe('computeStaleSlugs', () => {
 
 describe('validateCards', () => {
     it('passes a well-formed batch', () => {
-        expect(
-            validateCards([
-                validCard({ goal_slug: 'monodukuri' }),
-                validCard({ slug: 'other', goal_slug: 'health' }),
-            ])
-        ).toEqual([])
+        expect(validateCards([validCard(), validCard({ slug: 'other' })])).toEqual([])
     })
 
-    it('rejects bad status, slug, deadline, and goal_slug', () => {
+    it('rejects bad status, slug, and deadline', () => {
         expect(validateCards([validCard({ status: 'nonsense' })])[0]).toContain('"status"')
         // waiting_user / waiting_other は2026-08-11に waiting へ統合済み。
         // DBのCHECK制約から外れた値なので、投入前にここで弾く。
@@ -57,10 +52,6 @@ describe('validateCards', () => {
         expect(validateCards([validCard({ status: 'waiting' })])).toEqual([])
         expect(validateCards([validCard({ slug: '   ' })])[0]).toContain('index=0')
         expect(validateCards([validCard({ deadline: '2026/09/30' })])).toHaveLength(1)
-        expect(validateCards([validCard({ goal_slug: 'unknown' })])[0]).toContain(
-            '未知の goal_slug'
-        )
-        expect(validateCards([validCard({ goal_slug: null })])).toEqual([])
     })
 
     it('reports every bad card in the batch, not just the first', () => {
@@ -85,7 +76,6 @@ describe('buildRow', () => {
                 'deadline',
                 'deadline_note',
                 'definition_of_done',
-                'goal_slug',
                 'next_actions',
                 'progress',
                 'slug',
@@ -117,7 +107,6 @@ describe('buildRow', () => {
     it('fills defaults for omitted optional fields', () => {
         const row = buildRow(validCard())
         expect(row).toMatchObject({
-            goal_slug: null,
             next_actions: '',
             progress: {},
             definition_of_done: '',
