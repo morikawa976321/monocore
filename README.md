@@ -26,9 +26,9 @@
 
 ### Projects（`/projects`）
 
-- カードは status（`active` / `waiting`（トリガー待ち）/ `dormant` / `done` の4値。DB上の定義）のうち、`done` は板から**アクセス経路自体を持たない**（取得段階で除外。開閉バー・件数・リンクいずれも無し。DBの行は残る）。`active` / `waiting` はそのまま表示、`dormant` は折りたたみ表示（2026-08-10・本人指示）。
-- `project_cards` は画面からの手入力は不可（SELECT のみ）。正は context-engine / taskbox 側にあり、`scripts/upsert-project-cards.mjs` が service_role で slug 単位 upsert する。
-- **板は読むだけの面である**（2026-08-11確定）。カードが伝えるのは ①状態 ②経過（`progress`）③次の一手（`next_actions`）の3点だけ。
+- カードに status 列は無い（2026-08-23廃止。旧 `active` / `waiting` / `dormant` / `done` の4値と「休止中」の折りたたみ表示をまとめて撤去した）。**完了したカードは行を残さず削除する**——板はアーカイブではなく「今読むべきものだけを出す面」なので、doneを表す代替フラグも持たない。表示順は `priority`（整数・降順）で決まる。
+- `project_cards` は画面からの手入力は不可（SELECT のみ）。正は context-engine / taskbox 側にあり、`scripts/upsert-project-cards.mjs` が service_role で slug 単位 upsert する（JSONに無い slug は delete も行う）。
+- **板は読むだけの面である**（2026-08-11確定）。カードが伝えるのは ①経過（`progress`）②次の一手（`next_actions`）の2点だけ（2026-08-23に③状態を撤去）。
   - **②③は主体ではなく時間軸で切る**（2026-08-12・本人指示）。見出しは「AIがやったこと」「あなたの番」から「経過」「次の一手」へ、列名は `ai_recent` / `your_turn` から改名した。行為主体が誰かは本質的な情報ではなく、実際 `ai_recent` には本人の行為（購入の実行など）が書かれていた。ただし**次の一手に載せるのは本人の行動になるものだけ**という基準は残る（AIの作業予定を書く欄ではない。それは2026-08-11に `ai_next` として廃止した）。判断ログは context-engine の `card-fields-time-axis-not-actor`。判断の問い（`decisions`）・AIの次の一手（`ai_next`）・自由記述メモ（`project_notes`）は同日に廃止した — 反映が1日4回・非同期という制約のもとでは、板で判断を返すより**セッションを開いた方が速い**と本人が判断したため。`waiting_user` / `waiting_other` を `waiting` に統合したのも同根で、実質のボトルネックは常に本人なので「誰を待っているか」の区別が行動を変えない。
   - 判断ログは context-engine の `board-decision-io-abolished` / `actor-distinction-useless-when-user-is-the-bottleneck`（決定の理由と一般則）。実施内容はこのリポジトリの `20260811145700_simplify_project_cards.sql` とその周辺コミット。選択肢式の `project_card_decision_answers` は 2026-08-05 に自由記述へ置き換え、2026-08-09 に drop 済み。
 

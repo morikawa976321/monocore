@@ -4,18 +4,16 @@
       "slug": "project-board-page",
       "title": "プロジェクトボードページ公開",
       "definition_of_done": "読み取り専用ページが本番UIに表示される",
-      "status": "active",
       "deadline": "2026-08-20",
       "deadline_note": "先に一覧表示だけ出す",
       "progress": {},
       "next_actions": "折りたたみ仕様の最終確認",
-      "sort_order": 10
+      "priority": 30
     },
     {
       "slug": "inbox-merge",
       "title": "Inbox統合導線",
       "definition_of_done": "Projects から Inbox 関連カードを追跡できる",
-      "status": "waiting",
       "deadline": null,
       "deadline_note": null,
       "progress": {
@@ -25,13 +23,12 @@
         ]
       },
       "next_actions": "導線ラベルを確定する",
-      "sort_order": 20
+      "priority": 20
     },
     {
       "slug": "old-experiment",
       "title": "旧実験カード",
       "definition_of_done": "必要時のみ参照できれば良い",
-      "status": "dormant",
       "deadline": "2026-09-10",
       "deadline_note": "再開時に再見積もり",
       "progress": {
@@ -39,7 +36,7 @@
         "links": []
       },
       "next_actions": "",
-      "sort_order": 30
+      "priority": 10
     }
   ]
 }

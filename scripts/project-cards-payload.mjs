@@ -8,17 +8,6 @@
 
 import { format, isValid, parseISO } from 'date-fns'
 
-export const ALLOWED_STATUSES = new Set([
-    'active',
-    // トリガー待ち。誰が待たれているかで分けていた waiting_user / waiting_other は
-    // 2026-08-11に統合した(実質のボトルネックは常に本人なので区別が行動を変えない)。
-    'waiting',
-    'dormant',
-    // 完了。dormant(寝ている=再開しうる)と意味が違うので分けている。
-    // upsertは行を消さないため、終わったカードはこの状態で板から下ろす。
-    'done',
-])
-
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 /**
@@ -79,12 +68,6 @@ export function validateCards(cards) {
             errors.push(`Card ${tag}: field "title" must be a non-empty string`)
         }
 
-        if (typeof card.status !== 'string' || !ALLOWED_STATUSES.has(card.status)) {
-            errors.push(
-                `Card ${tag}: field "status" must be one of ${Array.from(ALLOWED_STATUSES).join(', ')}`
-            )
-        }
-
         // 未指定(undefined)は null と同じ「期限なし」として扱う。
         if (card.deadline != null && !isValidDateString(card.deadline)) {
             errors.push(`Card ${tag}: field "deadline" must be null or yyyy-MM-dd`)
@@ -101,13 +84,12 @@ export function buildRow(card) {
         title: card.title.trim(),
         definition_of_done:
             typeof card.definition_of_done === 'string' ? card.definition_of_done : '',
-        status: card.status,
         deadline: card.deadline ?? null,
         deadline_note: typeof card.deadline_note === 'string' ? card.deadline_note : null,
         // 2欄は主体（AI／本人）ではなく時間軸で切る（2026-08-12）。
         // progress = 経過（過去）、next_actions = 次の一手（未来）。
         progress: isPlainObject(card.progress) ? card.progress : {},
         next_actions: typeof card.next_actions === 'string' ? card.next_actions : '',
-        sort_order: Number.isInteger(card.sort_order) ? card.sort_order : 0,
+        priority: Number.isInteger(card.priority) ? card.priority : 0,
     }
 }

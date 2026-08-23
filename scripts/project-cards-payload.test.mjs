@@ -11,7 +11,6 @@ function validCard(overrides = {}) {
     return {
         slug: 'sample-card',
         title: 'サンプル',
-        status: 'active',
         deadline: null,
         ...overrides,
     }
@@ -43,13 +42,7 @@ describe('validateCards', () => {
         expect(validateCards([validCard(), validCard({ slug: 'other' })])).toEqual([])
     })
 
-    it('rejects bad status, slug, and deadline', () => {
-        expect(validateCards([validCard({ status: 'nonsense' })])[0]).toContain('"status"')
-        // waiting_user / waiting_other は2026-08-11に waiting へ統合済み。
-        // DBのCHECK制約から外れた値なので、投入前にここで弾く。
-        expect(validateCards([validCard({ status: 'waiting_user' })])[0]).toContain('"status"')
-        expect(validateCards([validCard({ status: 'waiting_other' })])[0]).toContain('"status"')
-        expect(validateCards([validCard({ status: 'waiting' })])).toEqual([])
+    it('rejects bad slug and deadline', () => {
         expect(validateCards([validCard({ slug: '   ' })])[0]).toContain('index=0')
         expect(validateCards([validCard({ deadline: '2026/09/30' })])).toHaveLength(1)
     })
@@ -57,8 +50,8 @@ describe('validateCards', () => {
     it('reports every bad card in the batch, not just the first', () => {
         const errors = validateCards([
             validCard(),
-            validCard({ slug: 'bad-status', status: 'nonsense' }),
             validCard({ slug: '' }),
+            validCard({ deadline: '2026/09/30' }),
             'not-an-object',
         ])
         expect(errors.length).toBeGreaterThanOrEqual(3)
@@ -77,10 +70,9 @@ describe('buildRow', () => {
                 'deadline_note',
                 'definition_of_done',
                 'next_actions',
+                'priority',
                 'progress',
                 'slug',
-                'sort_order',
-                'status',
                 'title',
             ].sort()
         )
@@ -111,7 +103,7 @@ describe('buildRow', () => {
             progress: {},
             definition_of_done: '',
             deadline_note: null,
-            sort_order: 0,
+            priority: 0,
         })
     })
 })

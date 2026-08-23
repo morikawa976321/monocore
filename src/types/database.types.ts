@@ -136,10 +136,9 @@ export type Database = {
           deadline_note: string | null
           definition_of_done: string
           next_actions: string
+          priority: number
           progress: Json
           slug: string
-          sort_order: number
-          status: string
           title: string
           updated_at: string | null
         }
@@ -149,10 +148,9 @@ export type Database = {
           deadline_note?: string | null
           definition_of_done?: string
           next_actions?: string
+          priority?: number
           progress?: Json
           slug: string
-          sort_order?: number
-          status?: string
           title: string
           updated_at?: string | null
         }
@@ -162,10 +160,9 @@ export type Database = {
           deadline_note?: string | null
           definition_of_done?: string
           next_actions?: string
+          priority?: number
           progress?: Json
           slug?: string
-          sort_order?: number
-          status?: string
           title?: string
           updated_at?: string | null
         }

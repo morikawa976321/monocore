@@ -49,15 +49,6 @@ export default function ProjectsPage() {
         void loadProjectData('initial')
     }, [loadProjectData])
 
-    // waiting は「トリガー待ち」の1状態。誰が待たれているかで分けていた
-    // waiting_user / waiting_other は2026-08-11に統合した（実質のボトルネックは
-    // 常に本人なので、区別しても行動が変わらない）。
-    const visibleCards = projectCards.filter(
-        (card) => card.status === 'active' || card.status === 'waiting'
-    )
-    // done は getProjectCards の取得段階で除外済み（アクセス経路自体をなくす対象。
-    // 2026-08-10・本人指示）。
-    const dormantCards = projectCards.filter((card) => card.status === 'dormant')
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             <PageHeader
@@ -89,10 +80,7 @@ export default function ProjectsPage() {
                     )}
 
                     {!isInitialLoading && todayStr !== null && (
-                        <>
-                            <ProjectSection title="プロジェクト" cards={visibleCards} today={todayStr} />
-                            <ProjectSection title="休止中" cards={dormantCards} today={todayStr} />
-                        </>
+                        <ProjectSection title="プロジェクト" cards={projectCards} today={todayStr} />
                     )}
                 </div>
 
