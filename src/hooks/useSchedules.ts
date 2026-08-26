@@ -32,6 +32,13 @@ import {
     ScheduleSaveQueue,
 } from '@/src/lib/schedules/sync';
 
+/**
+ * 同じ日の自動保存が連続でこの回数失敗したら、その日の自動保存を打ち切る。
+ * 失敗し続ける保存を無人でリトライすると、1クライアントがDBのエラーログだけで
+ * インスタンスのDisk IOを飽和させる(2026-08-25の実障害)。人が編集し直せば解除される。
+ */
+const MAX_CONSECUTIVE_SAVE_FAILURES = 3;
+
 type UseSchedulesCompanions = {
     loadNotes: (startDay: string, endDay: string) => Promise<number>;
     flushPendingNoteSaves: () => void;
@@ -93,6 +100,10 @@ export function useSchedules(
     const isResumeSyncingRef = useRef(false);
     const dirtyDateLabelsRef = useRef(new Set<string>());
     const saveQueueRef = useRef(new ScheduleSaveQueue());
+    /** 日ごとの連続保存失敗回数。保存成功・編集・再読み込みでリセットする。 */
+    const saveFailureCountRef = useRef(new Map<string, number>());
+    /** 自動保存を打ち切った日。ユーザーの編集か再読み込みでのみ解除する。 */
+    const autoSaveSuspendedRef = useRef(new Set<string>());
 
     useLayoutEffect(() => {
         focusedDateLabelRef.current = focusedDateLabel;
@@ -181,6 +192,9 @@ export function useSchedules(
                     dirtyDateLabelsRef.current.has(entry.dateLabel) ? prev[index] : entry
                 );
             });
+            // サーバの最新revisionを取り込めたので、打ち切っていた日の自動保存を再開してよい。
+            autoSaveSuspendedRef.current.clear();
+            saveFailureCountRef.current.clear();
             setSyncError(null);
         } else {
             setSyncError('スケジュールの同期に失敗しました。');
@@ -221,9 +235,11 @@ export function useSchedules(
         (dateLabel: string) => {
             const dateStr = dateLabelToDateStr(dateLabel);
             if (!dateStr || !dirtyDateLabelsRef.current.has(dateLabel)) return Promise.resolve();
+            if (autoSaveSuspendedRef.current.has(dateLabel)) return Promise.resolve();
 
             return saveQueueRef.current.enqueue(dateStr, async () => {
                 if (!dirtyDateLabelsRef.current.has(dateLabel)) return;
+                if (autoSaveSuspendedRef.current.has(dateLabel)) return;
                 const entry = entriesRef.current.find((candidate) => candidate.dateLabel === dateLabel);
                 if (!entry) return;
 
@@ -242,13 +258,51 @@ export function useSchedules(
                 );
 
                 if (error || nextRevision == null) {
-                    setSyncError(
-                        isScheduleRevisionConflict(error)
-                            ? `${dateStr} は別のデバイスで更新されています。再読み込みしてください。`
-                            : `${dateStr} の保存に失敗しました。`
-                    );
+                    const failures = (saveFailureCountRef.current.get(dateLabel) ?? 0) + 1;
+                    saveFailureCountRef.current.set(dateLabel, failures);
+
+                    // 楽観ロックの競合は待っても解消しない。dirtyを残したまま再試行すると
+                    // 同じ expected_revision のまま永久に失敗し続けるので、この日は打ち切る。
+                    if (isScheduleRevisionConflict(error)) {
+                        const { data: revisions } = await getScheduleDayRevisions(
+                            supabase,
+                            dateStr,
+                            dateStr
+                        );
+                        const serverRevision = revisions?.find(
+                            (row) => row.day_key === dateStr
+                        )?.revision;
+                        if (serverRevision != null) {
+                            const synced = entriesRef.current.map((current) =>
+                                current.dateLabel === dateLabel
+                                    ? { ...current, revision: serverRevision }
+                                    : current
+                            );
+                            entriesRef.current = synced;
+                            setEntries(synced);
+                        }
+                        dirtyDateLabelsRef.current.delete(dateLabel);
+                        autoSaveSuspendedRef.current.add(dateLabel);
+                        setSyncError(
+                            `${dateStr} は別のデバイスで更新されています。再読み込みしてください。`
+                        );
+                        return;
+                    }
+
+                    if (failures >= MAX_CONSECUTIVE_SAVE_FAILURES) {
+                        dirtyDateLabelsRef.current.delete(dateLabel);
+                        autoSaveSuspendedRef.current.add(dateLabel);
+                        setSyncError(
+                            `${dateStr} の保存に${MAX_CONSECUTIVE_SAVE_FAILURES}回続けて失敗したため自動保存を止めました。再読み込みしてください。`
+                        );
+                        return;
+                    }
+
+                    setSyncError(`${dateStr} の保存に失敗しました。`);
                     return;
                 }
+
+                saveFailureCountRef.current.delete(dateLabel);
 
                 const nextEntries = entriesRef.current.map((current) => {
                     if (current.dateLabel !== dateLabel) return current;
@@ -299,6 +353,9 @@ export function useSchedules(
         (dateLabel: string, value: string) => {
             if (isEditLocked) return;
             dirtyDateLabelsRef.current.add(dateLabel);
+            // 人が編集し直したときだけ、打ち切った自動保存を再開する。
+            autoSaveSuspendedRef.current.delete(dateLabel);
+            saveFailureCountRef.current.delete(dateLabel);
             setSyncError(null);
             setEntries((prev) => {
                 const next = [...prev];
