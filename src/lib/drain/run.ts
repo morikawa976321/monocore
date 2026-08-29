@@ -18,7 +18,10 @@ export type RunStep = {
     status: RunStepStatus
 }
 
-/** タスクの中の工程1件（taskbox/traces/<task-id>.json の steps[] 由来）。 */
+/**
+ * タスクの中の工程1件（taskbox/traces/<task-id>.json の steps[] 由来）。
+ * 2026-08-30以降、板の本文は summary 1文で、これは summary の無い古い行の代替。
+ */
 export type TaskStep = {
     desc: string
     status: string
@@ -44,6 +47,8 @@ export type RunTask = {
     outcome: string | null
     gatePassed: boolean | null
     targetDir: string | null
+    /** 何のために何をして、どうなったか（1〜2文）。古い行は空で、そのときだけ steps を出す。 */
+    summary: string
     steps: TaskStep[]
     failures: TaskFailure[]
     delegation: TaskDelegation[]
@@ -98,6 +103,7 @@ export function parseRunTasks(value: Json): RunTask[] {
             outcome: asStringOrNull(task.outcome),
             gatePassed: typeof task.gate_passed === 'boolean' ? task.gate_passed : null,
             targetDir: asStringOrNull(task.target_dir),
+            summary: asString(task.summary),
             steps: asArray(task.steps ?? null)
                 .filter(isRecord)
                 .map((step) => ({

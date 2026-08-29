@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     MAX_REPORT_TEXT_LENGTH,
+    MAX_TASK_SUMMARY_LENGTH,
     buildRow,
     truncateReportText,
     validateRun,
@@ -98,6 +99,7 @@ describe('buildRow', () => {
                         title: '例',
                         outcome: 'done',
                         gate_passed: true,
+                        summary: '再開のたびに落ちるのを止めるため、初期化の順序を入れ替えた。全緑。',
                         steps: [{ n: 1, desc: '実装', status: 'done', note: '緑' }],
                         failures: [{ phase: 'QA', symptom: '赤', resolution: '直した' }],
                         qa_rounds: 2,
@@ -111,12 +113,29 @@ describe('buildRow', () => {
         )
         expect(row.tasks).toHaveLength(1)
         expect(row.tasks[0].task_id).toBe('20260812-0100-example')
+        expect(row.tasks[0].summary).toBe(
+            '再開のたびに落ちるのを止めるため、初期化の順序を入れ替えた。全緑。'
+        )
         expect(row.tasks[0].steps).toEqual([{ desc: '実装', status: 'done', note: '緑' }])
         expect(row.tasks[0].failures[0].resolution).toBe('直した')
         expect(row.tasks[0].qa_rounds).toBe(2)
         expect(row.tasks[0].notes).toBe('想定外: 依存が古かった')
         expect(row.tasks[0]).not.toHaveProperty('gate')
         expect(row.tasks[0]).not.toHaveProperty('artifacts')
+    })
+
+    it('keeps an empty summary so old traces still fall back to steps', () => {
+        const row = buildRow(validRun({ tasks: [{ task_id: 'legacy', steps: [{ desc: '実装' }] }] }))
+        expect(row.tasks[0].summary).toBe('')
+        expect(row.tasks[0].steps).toHaveLength(1)
+    })
+
+    it('truncates an over-long summary instead of dropping the whole run', () => {
+        const row = buildRow(
+            validRun({ tasks: [{ task_id: 'x', summary: 'あ'.repeat(MAX_TASK_SUMMARY_LENGTH + 1) }] })
+        )
+        expect(row.tasks[0].summary).toContain('切り捨て')
+        expect([...row.tasks[0].summary].length).toBeGreaterThan(MAX_TASK_SUMMARY_LENGTH)
     })
 
     it('drops non-string trigger reasons instead of writing them through', () => {

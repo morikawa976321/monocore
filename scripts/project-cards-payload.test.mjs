@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+    MAX_CARD_TEXT_LENGTH,
     buildRow,
     computeStaleSlugs,
     normalizeCards,
@@ -34,6 +35,40 @@ describe('computeStaleSlugs', () => {
 
     it('accepts a Set as the local side (投入スクリプトが渡す形)', () => {
         expect(computeStaleSlugs(['a', 'b'], new Set(['a']))).toEqual(['b'])
+    })
+})
+
+describe('validateCards（本文の長さ）', () => {
+    it('rejects a progress body over the limit instead of letting it grow', () => {
+        const errors = validateCards([
+            validCard({ progress: { text: 'あ'.repeat(MAX_CARD_TEXT_LENGTH + 1) } }),
+        ])
+        expect(errors).toHaveLength(1)
+        expect(errors[0]).toContain('progress.text')
+        expect(errors[0]).toContain(String(MAX_CARD_TEXT_LENGTH + 1))
+    })
+
+    it('rejects an over-long next_actions as well', () => {
+        const errors = validateCards([
+            validCard({ next_actions: 'あ'.repeat(MAX_CARD_TEXT_LENGTH + 1) }),
+        ])
+        expect(errors).toHaveLength(1)
+        expect(errors[0]).toContain('next_actions')
+    })
+
+    it('counts surrogate pairs as one character (規約の数え方に合わせる)', () => {
+        // [...text].length で数える。text.length だと絵文字が2文字になり、
+        // 規約どおりに書いたカードが理由なく弾かれる。
+        const errors = validateCards([
+            validCard({ next_actions: '🙂'.repeat(MAX_CARD_TEXT_LENGTH) }),
+        ])
+        expect(errors).toEqual([])
+    })
+
+    it('accepts a body exactly at the limit', () => {
+        expect(
+            validateCards([validCard({ progress: { text: 'あ'.repeat(MAX_CARD_TEXT_LENGTH) } })])
+        ).toEqual([])
     })
 })
 

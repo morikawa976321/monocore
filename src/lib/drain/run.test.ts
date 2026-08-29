@@ -42,6 +42,7 @@ describe('parseRunTasks', () => {
                 outcome: 'done',
                 gate_passed: true,
                 target_dir: 'C:\\Users\\tm976\\mf\\duocad',
+                summary: '面のピックが手前の板に化けるのを直すため、判定をelementFromPointへ寄せた。全緑。',
                 steps: [
                     { desc: '実装', status: 'done', note: '377 passed' },
                     { desc: '', status: 'done', note: '見出しの無い工程は落とす' },
@@ -59,6 +60,9 @@ describe('parseRunTasks', () => {
         expect(tasks).toHaveLength(1)
         expect(tasks[0].taskId).toBe('20260812-0100-example')
         expect(tasks[0].gatePassed).toBe(true)
+        expect(tasks[0].summary).toBe(
+            '面のピックが手前の板に化けるのを直すため、判定をelementFromPointへ寄せた。全緑。'
+        )
         expect(tasks[0].steps).toEqual([{ desc: '実装', status: 'done', note: '377 passed' }])
         expect(tasks[0].failures[0].phase).toBe('QA')
         expect(tasks[0].delegation).toEqual([{ target: 'cursor(auto)', calls: 2, outcome: 'ok' }])
@@ -74,6 +78,7 @@ describe('parseRunTasks', () => {
             outcome: null,
             gatePassed: null,
             targetDir: null,
+            summary: '',
             steps: [],
             failures: [],
             delegation: [],

@@ -164,23 +164,31 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
                                     {task.gatePassed === false && '（ゲート不通過）'}
                                 </span>
                             </h4>
-                            <ul className="flex flex-col gap-1">
-                                {task.steps.map((step, index) => (
-                                    <li
-                                        key={`${task.taskId}-step-${index}`}
-                                        className="flex flex-col gap-0.5 sm:flex-row sm:gap-2"
-                                    >
-                                        <span
-                                            className={`shrink-0 sm:w-48 ${step.status === 'failed' ? STATUS_CLASS_NAMES.error : ''}`}
+                            {/* 1タスク＝1要約（何のために何をして、どうなったか）。工程を
+                                並べるのは summary が無い古い行だけで、そちらは代替経路。 */}
+                            {task.summary.length > 0 ? (
+                                <p className="whitespace-pre-line text-neutral-700 dark:text-neutral-300">
+                                    {task.summary}
+                                </p>
+                            ) : (
+                                <ul className="flex flex-col gap-1">
+                                    {task.steps.map((step, index) => (
+                                        <li
+                                            key={`${task.taskId}-step-${index}`}
+                                            className="flex flex-col gap-0.5 sm:flex-row sm:gap-2"
                                         >
-                                            {step.desc}
-                                        </span>
-                                        <span className="text-neutral-700 dark:text-neutral-300">
-                                            {step.note}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
+                                            <span
+                                                className={`shrink-0 sm:w-48 ${step.status === 'failed' ? STATUS_CLASS_NAMES.error : ''}`}
+                                            >
+                                                {step.desc}
+                                            </span>
+                                            <span className="text-neutral-700 dark:text-neutral-300">
+                                                {step.note}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                             {task.delegation.length > 0 && (
                                 <p className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
                                     <span className="shrink-0 sm:w-48">委譲</span>

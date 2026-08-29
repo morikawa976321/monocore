@@ -23,6 +23,28 @@ export const MAX_REPORT_TEXT_LENGTH = 100000
 
 const TRUNCATION_NOTICE = '\n\n…（上限を超えたため切り捨て）'
 
+/**
+ * タスク1件の要約（何のために何をして、どうなったか）の上限。
+ * 規約は taskbox/README.md「板に出す文の書き方」の 1〜2文・目安120字。
+ *
+ * 超過を reject ではなく切り捨てで扱うのは、drain報告板がフェイルオープンだから。
+ * ここで落とすと「規約違反の文が長い」の代わりに「その回の実行記録が丸ごと無い」に
+ * なり、静かだったのか動かなかっただけなのかが読めなくなる（板の要件そのもの）。
+ * project_cards 側が同じ違反を reject で扱うのは、あちらが再実行できる投入で、
+ * 落ちても直前のカードが板に残るため。
+ */
+export const MAX_TASK_SUMMARY_LENGTH = 200
+
+const SUMMARY_TRUNCATION_NOTICE = '…（上限超過のため切り捨て）'
+
+/** 上限を超えた要約を、切り捨てたと分かる形で短くする。 */
+export function truncateSummary(text) {
+    if (typeof text !== 'string') return ''
+    const chars = [...text]
+    if (chars.length <= MAX_TASK_SUMMARY_LENGTH) return text
+    return chars.slice(0, MAX_TASK_SUMMARY_LENGTH).join('') + SUMMARY_TRUNCATION_NOTICE
+}
+
 export function isPlainObject(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -131,6 +153,11 @@ function buildTask(task) {
         outcome: asStringOrNull(task.outcome),
         gate_passed: typeof task.gate_passed === 'boolean' ? task.gate_passed : null,
         target_dir: asStringOrNull(task.target_dir),
+        // 板に出す①「何をやったか／どうなったか」は、2026-08-30に steps[] の3〜6行から
+        // summary 1文へ畳んだ（本人指示「各タスクは何のために何をしてどうなった、という
+        // レベルまで要約していい」）。steps[] は trace 側に残り、summary が空の回
+        // ＝規約更新より前に書かれた古い trace に限って、板の本文として使われる。
+        summary: truncateSummary(asString(task.summary)),
         steps: asArray(task.steps)
             .filter(isPlainObject)
             .map((step) => ({
