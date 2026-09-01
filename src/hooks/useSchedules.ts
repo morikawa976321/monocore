@@ -28,6 +28,7 @@ import {
 } from '@/src/lib/schedules/text-format';
 import {
     applyScheduleRevisions,
+    decodeScheduleSaveOutcome,
     isScheduleRevisionConflict,
     ScheduleSaveQueue,
 } from '@/src/lib/schedules/sync';
@@ -248,7 +249,7 @@ export function useSchedules(
                 const nextDateStr = format(addDays(parseISO(dateStr), 1), 'yyyy-MM-dd');
                 const day_end_utc = localTimeToUtc(nextDateStr, '0000', tz);
                 const items = dayContentToScheduleItems(dateStr, savedContent, tz);
-                const { data: nextRevision, error } = await replaceSchedulesForDay(
+                const { data: rpcResult, error } = await replaceSchedulesForDay(
                     supabase,
                     dateStr,
                     day_start_utc,
@@ -256,38 +257,55 @@ export function useSchedules(
                     entry.revision,
                     items
                 );
+                const outcome = error
+                    ? ({ kind: 'failed' } as const)
+                    : decodeScheduleSaveOutcome(rpcResult);
 
-                if (error || nextRevision == null) {
-                    const failures = (saveFailureCountRef.current.get(dateLabel) ?? 0) + 1;
-                    saveFailureCountRef.current.set(dateLabel, failures);
-
+                // 競合の合図は2つある。migration 20260902001000 以降のRPCは負の戻り値で返し、
+                // それ以前は SQLSTATE 40001 の例外を投げる。ロールアウトの前後で両方が来うる。
+                // 先にRPCだけを変えると、この分岐を持たないクライアントは競合を「成功」と
+                // 誤読して編集内容を無言で捨てるので、こちらを先に配ること。
+                if (outcome.kind === 'conflict' || isScheduleRevisionConflict(error)) {
                     // 楽観ロックの競合は待っても解消しない。dirtyを残したまま再試行すると
                     // 同じ expected_revision のまま永久に失敗し続けるので、この日は打ち切る。
-                    if (isScheduleRevisionConflict(error)) {
+                    let serverRevision: number | null = null;
+                    if (outcome.kind === 'conflict') {
+                        serverRevision = outcome.currentRevision;
+                    } else {
+                        // 旧RPC（例外）経路。現在revisionは戻り値に乗らないので取りに行く。
                         const { data: revisions } = await getScheduleDayRevisions(
                             supabase,
                             dateStr,
                             dateStr
                         );
-                        const serverRevision = revisions?.find(
-                            (row) => row.day_key === dateStr
-                        )?.revision;
-                        if (serverRevision != null) {
-                            const synced = entriesRef.current.map((current) =>
-                                current.dateLabel === dateLabel
-                                    ? { ...current, revision: serverRevision }
-                                    : current
-                            );
-                            entriesRef.current = synced;
-                            setEntries(synced);
-                        }
-                        dirtyDateLabelsRef.current.delete(dateLabel);
-                        autoSaveSuspendedRef.current.add(dateLabel);
-                        setSyncError(
-                            `${dateStr} は別のデバイスで更新されています。再読み込みしてください。`
-                        );
-                        return;
+                        serverRevision =
+                            revisions?.find((row) => row.day_key === dateStr)?.revision ?? null;
                     }
+                    const resolvedRevision = serverRevision;
+                    if (resolvedRevision != null) {
+                        const synced = entriesRef.current.map((current) =>
+                            current.dateLabel === dateLabel
+                                ? { ...current, revision: resolvedRevision }
+                                : current
+                        );
+                        entriesRef.current = synced;
+                        setEntries(synced);
+                    }
+                    saveFailureCountRef.current.set(
+                        dateLabel,
+                        (saveFailureCountRef.current.get(dateLabel) ?? 0) + 1
+                    );
+                    dirtyDateLabelsRef.current.delete(dateLabel);
+                    autoSaveSuspendedRef.current.add(dateLabel);
+                    setSyncError(
+                        `${dateStr} は別のデバイスで更新されています。再読み込みしてください。`
+                    );
+                    return;
+                }
+
+                if (outcome.kind === 'failed') {
+                    const failures = (saveFailureCountRef.current.get(dateLabel) ?? 0) + 1;
+                    saveFailureCountRef.current.set(dateLabel, failures);
 
                     if (failures >= MAX_CONSECUTIVE_SAVE_FAILURES) {
                         dirtyDateLabelsRef.current.delete(dateLabel);
@@ -309,7 +327,7 @@ export function useSchedules(
                     if (current.content === savedContent) {
                         dirtyDateLabelsRef.current.delete(dateLabel);
                     }
-                    return { ...current, revision: nextRevision };
+                    return { ...current, revision: outcome.revision };
                 });
                 entriesRef.current = nextEntries;
                 setEntries(nextEntries);

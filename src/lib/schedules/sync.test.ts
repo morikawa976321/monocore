@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     ScheduleSaveQueue,
     applyScheduleRevisions,
+    decodeScheduleSaveOutcome,
     isScheduleRevisionConflict,
 } from './sync';
 
@@ -103,5 +104,38 @@ describe('isScheduleRevisionConflict', () => {
         expect(isScheduleRevisionConflict({ code: '40001' })).toBe(true);
         expect(isScheduleRevisionConflict({ code: '23505' })).toBe(false);
         expect(isScheduleRevisionConflict(null)).toBe(false);
+    });
+});
+
+describe('decodeScheduleSaveOutcome', () => {
+    it('reads a positive return value as the new revision', () => {
+        expect(decodeScheduleSaveOutcome(1)).toEqual({ kind: 'saved', revision: 1 });
+        expect(decodeScheduleSaveOutcome(62)).toEqual({ kind: 'saved', revision: 62 });
+    });
+
+    it('reads a negative return value as a conflict carrying the server revision', () => {
+        expect(decodeScheduleSaveOutcome(-1)).toEqual({ kind: 'conflict', currentRevision: 0 });
+        expect(decodeScheduleSaveOutcome(-62)).toEqual({ kind: 'conflict', currentRevision: 61 });
+    });
+
+    // これが符号で分けている理由そのもの。競合相手が1回だけ書いた「最も普通の競合」では
+    // current === expected + 1 になるので、「expected + 1 なら成功」では見分けられない。
+    // 見分けられないと競合を成功と誤読してdirtyを落とし、編集内容が無言で消える。
+    it('separates a conflict at expected+1 from a successful save of the same number', () => {
+        const expectedRevision = 61;
+        const savedNext = decodeScheduleSaveOutcome(expectedRevision + 1);
+        const conflictAtNext = decodeScheduleSaveOutcome(-1 - (expectedRevision + 1));
+
+        expect(savedNext).toEqual({ kind: 'saved', revision: 62 });
+        expect(conflictAtNext).toEqual({ kind: 'conflict', currentRevision: 62 });
+    });
+
+    it('treats a missing or nonsensical return value as a plain failure', () => {
+        expect(decodeScheduleSaveOutcome(null)).toEqual({ kind: 'failed' });
+        expect(decodeScheduleSaveOutcome(undefined)).toEqual({ kind: 'failed' });
+        // 0 は成功でも競合でも返らない（revision は CHECK (revision >= 0) で、
+        // 成功は必ず 1 以上・競合は必ず -1 以下）。
+        expect(decodeScheduleSaveOutcome(0)).toEqual({ kind: 'failed' });
+        expect(decodeScheduleSaveOutcome(1.5)).toEqual({ kind: 'failed' });
     });
 });
