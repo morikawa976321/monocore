@@ -35,9 +35,16 @@ const OUTCOME_LABELS: Record<string, string> = {
     skipped: '起動なし',
 }
 
-function outcomeClassName(outcome: string): string {
-    if (outcome === 'crashed') {
+// outcome は 'completed' / 'crashed' / 'skipped' しか取れない（drain_runs の CHECK 制約）。
+// 「完了はしたが queue に残件がある」のような注意は outcome では表せないので、
+// steps[].status を巻き上げてバッジの色に載せる。畳んだ状態で steps は描画されないため、
+// ここで巻き上げないと注意・異常が展開するまで一切見えない。
+function outcomeClassName(outcome: string, worstStep: RunStepStatus): string {
+    if (outcome === 'crashed' || worstStep === 'error') {
         return 'border-red-700 text-red-700 dark:border-red-600 dark:text-red-500'
+    }
+    if (worstStep === 'warn') {
+        return 'border-amber-600 text-amber-600 dark:border-amber-400 dark:text-amber-400'
     }
     return 'border-neutral-400 text-neutral-700 dark:border-neutral-600 dark:text-neutral-300'
 }
@@ -57,6 +64,9 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
 
     const doneCount = tasks.filter((task) => task.outcome === 'done').length
     const failedCount = tasks.filter((task) => task.outcome === 'failed').length
+    const warnCount = steps.filter((step) => step.status === 'warn').length
+    const errorCount = steps.filter((step) => step.status === 'error').length
+    const worstStep: RunStepStatus = errorCount > 0 ? 'error' : warnCount > 0 ? 'warn' : 'ok'
 
     async function handleToggleReport() {
         if (isReportOpen) {
@@ -84,12 +94,28 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
                     <span className="flex min-w-0 items-center gap-2">
                         <span className="shrink-0 tabular-nums">{startedLabel}</span>
                         <span
-                            className={`shrink-0 px-1 py-0.5 rounded-sm border text-sm font-medium leading-none ${outcomeClassName(run.outcome)}`}
+                            className={`shrink-0 px-1 py-0.5 rounded-sm border text-sm font-medium leading-none ${outcomeClassName(run.outcome, worstStep)}`}
                         >
                             {OUTCOME_LABELS[run.outcome] ?? run.outcome}
                         </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                        {(errorCount > 0 || warnCount > 0) && (
+                            <span
+                                className={
+                                    errorCount > 0
+                                        ? STATUS_CLASS_NAMES.error
+                                        : STATUS_CLASS_NAMES.warn
+                                }
+                            >
+                                {[
+                                    errorCount > 0 && `異常${errorCount}件`,
+                                    warnCount > 0 && `注意${warnCount}件`,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' / ')}
+                            </span>
+                        )}
                         {tasks.length > 0 && (
                             <span className={failedCount > 0 ? STATUS_CLASS_NAMES.error : undefined}>
                                 タスク{doneCount}件
