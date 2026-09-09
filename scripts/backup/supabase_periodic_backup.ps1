@@ -1,4 +1,4 @@
-# monocore 本番Supabase — 定期バックアップ(スキーマ+データ)
+﻿# monocore 本番Supabase — 定期バックアップ(スキーマ+データ)
 #
 # 起動: taskbox drain.ps1 が毎run終了時に呼ぶ(Invoke-MonocoreDbBackup)。枠は drain と同じ
 #       01/07/13/19時。判断が要らない機械工程なので claude は起動しない。
@@ -124,15 +124,23 @@ $($problems | ForEach-Object { "- $_" } | Out-String)
     ``wsl -d Ubuntu -- /usr/lib/postgresql/17/bin/pg_dump --version`` で手動確認する
   - ``credentials_failed`` … ``npx supabase db dump --linked --dry-run`` 自体が失敗。CLIログイン
     セッションの失効(``npx supabase login``)、ネットワーク、Supabase側の障害を疑う
-  - ``timeout`` … ``npx supabase db dump --linked --dry-run`` が応答なしで打ち切られた(具体的な
-    秒数・どちらの段階(プロセス終了/出力読み取り)で止まったかは上の「検出された異常」を見る)。
+  - ``timeout`` … ``npx supabase db dump --linked --dry-run`` のプロセス自体が既定の秒数
+    (上の「検出された異常」参照)応答なしのため打ち切られた。
     ``%LOCALAPPDATA%\npm-cache\_logs\`` の最新debugログに「Ok to proceed」等のインストール確認
     プロンプト待ちの痕跡が無いかをまず確認する(2026-09-09に実際にこれが原因だった。supabase
     パッケージが monocore の依存に無いため npx が毎回レジストリを引き、新版が出るたびに
-    インストール確認が挟まる)。無ければCLIログインセッションの失効
-    (``npx supabase login``で手動確認)を疑う
+    インストール確認が挟まる。現在は ``--yes`` で無効化済みなので、再発したら別原因を疑う)。
+    無ければCLIログインセッションの失効(``npx supabase login``で手動確認)を疑う
   - ``dryrun_spawn_failed`` … ``npx supabase db dump --linked --dry-run`` のプロセス起動自体が
     失敗。cmd.exe/npxが見つからない、権限の問題などを疑う
+  - ``dryrun_io_setup_failed`` … プロセスは起動できたが直後の標準入出力ハンドル操作が失敗。
+    まれなOSレベルの異常を疑う
+  - ``dryrun_read_timeout`` … プロセス自体は正常終了したが、標準出力/エラーの読み切りが
+    既定の秒数応答なしで打ち切られた。孫プロセス(node.exe等)がパイプハンドルを握ったまま
+    生き残っている可能性がある。``Get-Process node`` で古いnode.exeが残っていないか確認する
+    (自動でのkillは意図的に行っていない — 終了済みPIDの再利用による誤爆を避けるため)
+  - ``dryrun_read_failed`` … 標準出力/エラーの読み取り自体が例外で失敗。まれなOSレベルの
+    異常を疑う
   - ``dump_failed`` … pg_dump自体の失敗。バージョン不一致・接続エラーなどログ本文を見る
   - それ以外 … ログの全文を見る
 
@@ -185,32 +193,48 @@ if (-not (Test-PgDump17)) {
 #   process.stdin.isTTY を見るだけで、CI/無人フラグは自動では立たない)。無人環境では誰も
 #   応答できず無期限に固まる。**`--yes` でこのプロンプト自体を無効化するのが本丸の対策**
 #   (標準入力を閉じるだけでも noTTY() 判定で暗黙に回避されるが、暗黙の副作用に頼らない)。
+#   代償: supabaseがどこにも固定されていないため、`--yes` は「レジストリの最新版を無人で
+#   自動導入することへの常時同意」でもある。CLIの破壊的変更で `db dump --dry-run` の出力形式が
+#   変われば下の `Get-DryRunVar` が黙って外れ、`credentials_failed` と誤報告される。
+#   devDependenciesへの追加やバージョン固定(`npx supabase@<major>`)による恒久対策は
+#   今回は見送った(このインシデントの直接原因ではないため)。
 #
 # ■ `npx`は.cmdファイルなので `[Diagnostics.Process]::Start` に直接渡せず(実測: FileNotFound)、
 #   `cmd.exe /c` 経由で起動する。`.Arguments`(単一文字列)を使う — `.ArgumentList` は
-#   Windows PowerShell 5.1 に無く、taskbox READMEが5.1での手動実行を明示的に想定しているため
-#   (今回の引数はどれもスペースを含まないので単純結合で安全)。
+#   Windows PowerShell 5.1 に無い(実測)。ただし本ファイルはUTF-8 BOM付きで保存しており、
+#   5.1側の文字化けの懸念(taskbox README参照)は解消済み。
 #
-# ■ タイムアウトは2箇所ある
-#   (a) プロセスの終了(WaitForExit)。
-#   (b) 標準出力/エラーの読み切り(ReadToEndAsync)。**(a)だけでは不十分** — cmd.exeが終わっても、
+# ■ タイムアウト・失敗経路は複数箇所あり、`Complete-DryRunFailure` に集約している
+#   (a) プロセス起動自体の失敗(`dryrun_spawn_failed`)。
+#   (b) 標準入出力ハンドルの取得に失敗(`dryrun_io_setup_failed`)。プロセスの生死が
+#       不明な時点なので、taskkillは試みない(下記(d)と同じ理由)。
+#   (c) プロセスの終了待ち(WaitForExit)がタイムアウト(`timeout`)。**この時点だけは
+#       プロセスが確実に生きているとわかっている**ので、taskkillでプロセスツリーごと
+#       終了させる(実測で孫プロセスまで含めて確実に終了することを確認済み)。
+#   (d) 標準出力/エラーの読み切り(ReadToEndAsync)が失敗(`dryrun_read_failed`)または
+#       タイムアウト(`dryrun_read_timeout`)。**(c)だけでは不十分** — cmd.exeが終わっても、
 #       npxが生成した孫プロセスが標準出力のパイプハンドルを握ったまま残ると、出力の読み取りは
 #       そのハンドルが閉じるまで無期限に待つ(実測で再現・確認)。放置すると今回直したのと
-#       同じ形で無期限ハングが再現するため、こちらにも上限を設ける(2026-09-09レビューで発覚)。
-#
-# ■ taskkillは `/T` でプロセスツリーごと終了を試みる。**(a)のタイムアウト(cmd.exeがまだ
-#   生きている)では、孫プロセスまで含めて確実に終了することを実測済み。(b)のタイムアウト
-#   (cmd.exeは既に終了、孫だけ残っている)では、対象PID(cmd.exeのもの)が既に存在しないため
-#   taskkillは失敗し、孫プロセスは終了できないことも実測で確認した。** その場合でも
-#   このスクリプト自体は確実にexitするので、無人パイプライン全体が無期限にブロックされる
-#   (今回のインシデントと同じ形)事態は防げる — taskkillの失敗はログに残るだけで処理は続行する。
-#   孫プロセスの確実な後始末にはジョブオブジェクト(Win32 API)が要るが、そこまではやっていない。
+#       同じ形で無期限ハングが再現するため、こちらにも上限を設けた(2026-09-09レビューで発覚)。
+#       **この段階ではtaskkillを一切呼ばない** — WaitForExitが既にtrueを返している=cmd.exeの
+#       PIDは既に終了しており、Windowsは終了したPIDを数秒スケールで再利用する(実測: 300回の
+#       プロセス生成中290個がユニークPID)。孫プロセスには届かないと分かっている
+#       taskkillを、たまたま同じPIDを再利用しただけの無関係なプロセスに向けて撃つ危険の方が
+#       大きい(2026-09-09レビューで発覚)。孫プロセスの後始末は諦め、「無人パイプラインを
+#       無期限に塞がない」ことだけを優先する(ジョブオブジェクト(Win32 API)を使えば
+#       確実な後始末も可能だが、今回は見送った)。
+#   `ReadToEndAsync`が例外(faulted task)を投げるケースは、`$ErrorActionPreference='Continue'`
+#   を自スコープに置いていても呼び出し元(taskbox `Invoke-BackupJob`)まで貫通し、
+#   backup-status.jsonの更新もqueueタスクの積み込みも両方スキップされる実害を確認したため、
+#   明示的にtry/catchで拾って同じ失敗経路へ合流させている(2026-09-09レビューで発覚)。
 # ---------------------------------------------------------------
 $dryRunTimeoutSeconds = 120  # 通常は数十秒未満で終わる工程(実測: CLIフルインストールでも
                               # 約11秒)。無人パイプラインを何時間も塞がないための上限
 $dryRunReadTimeoutSeconds = 15  # プロセス終了後、標準出力/エラーの読み切りに許す追加の猶予
 
 function Complete-DryRunFailure([string]$ReasonCode, [string]$Message, [int]$ProcId) {
+    # $ProcId は「プロセスがまだ確実に生きている」と分かっている呼び出し元だけが正の値を渡す
+    # (上のコメント参照)。0 なら taskkill 自体を試みない。
     if ($ProcId -gt 0) {
         try {
             & taskkill /T /F /PID $ProcId 2>&1 | Out-Null
@@ -242,23 +266,33 @@ try {
     Complete-DryRunFailure 'dryrun_spawn_failed' `
         ('npx supabase db dump --linked --dry-run の起動に失敗: ' + $_.Exception.Message) 0
 }
-$dryRunProc.StandardInput.Close()
-$dryRunStdoutTask = $dryRunProc.StandardOutput.ReadToEndAsync()
-$dryRunStderrTask = $dryRunProc.StandardError.ReadToEndAsync()
-$dryRunExited = $dryRunProc.WaitForExit($dryRunTimeoutSeconds * 1000)
 
+try {
+    $dryRunProc.StandardInput.Close()
+    $dryRunStdoutTask = $dryRunProc.StandardOutput.ReadToEndAsync()
+    $dryRunStderrTask = $dryRunProc.StandardError.ReadToEndAsync()
+} catch {
+    Complete-DryRunFailure 'dryrun_io_setup_failed' `
+        ('npx supabase db dump --linked --dry-run の入出力設定に失敗: ' + $_.Exception.Message) 0
+}
+
+$dryRunExited = $dryRunProc.WaitForExit($dryRunTimeoutSeconds * 1000)
 if (-not $dryRunExited) {
     Complete-DryRunFailure 'timeout' `
         ("npx supabase db dump --linked --dry-run が{0}秒応答なしのため打ち切った" -f $dryRunTimeoutSeconds) `
         $dryRunProc.Id
 }
 
-# プロセス自体は終わっていても、孫プロセスが標準出力ハンドルを握ったまま残っていると
-# ここが無期限に返らない(冒頭のコメント参照)。
-if (-not [System.Threading.Tasks.Task]::WaitAll(@($dryRunStdoutTask, $dryRunStderrTask), $dryRunReadTimeoutSeconds * 1000)) {
-    Complete-DryRunFailure 'timeout' `
+try {
+    $dryRunReadOk = [System.Threading.Tasks.Task]::WaitAll(@($dryRunStdoutTask, $dryRunStderrTask), $dryRunReadTimeoutSeconds * 1000)
+} catch {
+    Complete-DryRunFailure 'dryrun_read_failed' `
+        ('npx supabase db dump --linked --dry-run の出力読み取りが失敗: ' + $_.Exception.Message) 0
+}
+if (-not $dryRunReadOk) {
+    Complete-DryRunFailure 'dryrun_read_timeout' `
         ("npx supabase db dump --linked --dry-run の出力読み取りが{0}秒応答なしのため打ち切った(プロセス自体は終了済み)" -f $dryRunReadTimeoutSeconds) `
-        $dryRunProc.Id
+        0
 }
 $dryRunOut = $dryRunStdoutTask.Result + "`n" + $dryRunStderrTask.Result
 
