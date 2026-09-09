@@ -124,9 +124,15 @@ $($problems | ForEach-Object { "- $_" } | Out-String)
     ``wsl -d Ubuntu -- /usr/lib/postgresql/17/bin/pg_dump --version`` で手動確認する
   - ``credentials_failed`` … ``npx supabase db dump --linked --dry-run`` 自体が失敗。CLIログイン
     セッションの失効(``npx supabase login``)、ネットワーク、Supabase側の障害を疑う
-  - ``timeout`` … ``npx supabase db dump --linked --dry-run`` が既定の120秒応答なしで打ち切られた。
-    CLIログインセッションの失効(``npx supabase login``で手動確認)を筆頭に疑う。
-    再現するか ``npx supabase status`` を手動で叩いて固まるか確認する
+  - ``timeout`` … ``npx supabase db dump --linked --dry-run`` が応答なしで打ち切られた(具体的な
+    秒数・どちらの段階(プロセス終了/出力読み取り)で止まったかは上の「検出された異常」を見る)。
+    ``%LOCALAPPDATA%\npm-cache\_logs\`` の最新debugログに「Ok to proceed」等のインストール確認
+    プロンプト待ちの痕跡が無いかをまず確認する(2026-09-09に実際にこれが原因だった。supabase
+    パッケージが monocore の依存に無いため npx が毎回レジストリを引き、新版が出るたびに
+    インストール確認が挟まる)。無ければCLIログインセッションの失効
+    (``npx supabase login``で手動確認)を疑う
+  - ``dryrun_spawn_failed`` … ``npx supabase db dump --linked --dry-run`` のプロセス起動自体が
+    失敗。cmd.exe/npxが見つからない、権限の問題などを疑う
   - ``dump_failed`` … pg_dump自体の失敗。バージョン不一致・接続エラーなどログ本文を見る
   - それ以外 … ログの全文を見る
 
@@ -170,50 +176,91 @@ if (-not (Test-PgDump17)) {
 # 2. 本番の接続情報を解決(npx supabase db dump --linked --dry-run。Dockerは使わない)
 #
 # タイムアウト付きで実行する(2026-09-09追加)。単純な `& npx ... | Out-String` には
-# タイムアウトが無く、CLIログインセッションの異常等で応答が返らなくなると無人パイプライン
-# 全体を無期限にブロックし続けることを実測した(9/9朝の枠で3時間以上ハング)。
+# タイムアウトが無く、2026-09-09朝の枠でこの呼び出しが3時間以上ハングした実測がある。
 #
-# `npx`は.cmdファイルなので `[Diagnostics.Process]::Start` に直接渡せず(実測: FileNotFound)、
-# `cmd.exe /c` 経由で起動する。標準入力は即座に閉じる(drain.ps1の `$null | & $claudeExe` と
-# 同じ理由 — 対話プロンプトを出すツールが無人環境で応答なく待ち続けるのを避ける)。
-# タイムアウト時は `taskkill /T` でプロセスツリーごと終了する(`&`呼び出し+パイプの組み合わせ
-# だと生成された子プロセスが確実に終了する保証がない。実測でtaskkill /Tは子孫まで含めて
-# 確実に終了することを確認済み)。
+# ■ 根本原因(npm debugログ %LOCALAPPDATA%\npm-cache\_logs\ から特定できた)
+#   supabase は monocore の package.json / node_modules\.bin に無く、`npx supabase` は毎回
+#   レジストリを引く。新版が出てローカルキャッシュが古くなると、npxが「インストールしてよいか」
+#   の確認を対話コンソール(TTY)へ出そうとする(libnpmexec の no-tty 判定は
+#   process.stdin.isTTY を見るだけで、CI/無人フラグは自動では立たない)。無人環境では誰も
+#   応答できず無期限に固まる。**`--yes` でこのプロンプト自体を無効化するのが本丸の対策**
+#   (標準入力を閉じるだけでも noTTY() 判定で暗黙に回避されるが、暗黙の副作用に頼らない)。
+#
+# ■ `npx`は.cmdファイルなので `[Diagnostics.Process]::Start` に直接渡せず(実測: FileNotFound)、
+#   `cmd.exe /c` 経由で起動する。`.Arguments`(単一文字列)を使う — `.ArgumentList` は
+#   Windows PowerShell 5.1 に無く、taskbox READMEが5.1での手動実行を明示的に想定しているため
+#   (今回の引数はどれもスペースを含まないので単純結合で安全)。
+#
+# ■ タイムアウトは2箇所ある
+#   (a) プロセスの終了(WaitForExit)。
+#   (b) 標準出力/エラーの読み切り(ReadToEndAsync)。**(a)だけでは不十分** — cmd.exeが終わっても、
+#       npxが生成した孫プロセスが標準出力のパイプハンドルを握ったまま残ると、出力の読み取りは
+#       そのハンドルが閉じるまで無期限に待つ(実測で再現・確認)。放置すると今回直したのと
+#       同じ形で無期限ハングが再現するため、こちらにも上限を設ける(2026-09-09レビューで発覚)。
+#
+# ■ taskkillは `/T` でプロセスツリーごと終了を試みる。**(a)のタイムアウト(cmd.exeがまだ
+#   生きている)では、孫プロセスまで含めて確実に終了することを実測済み。(b)のタイムアウト
+#   (cmd.exeは既に終了、孫だけ残っている)では、対象PID(cmd.exeのもの)が既に存在しないため
+#   taskkillは失敗し、孫プロセスは終了できないことも実測で確認した。** その場合でも
+#   このスクリプト自体は確実にexitするので、無人パイプライン全体が無期限にブロックされる
+#   (今回のインシデントと同じ形)事態は防げる — taskkillの失敗はログに残るだけで処理は続行する。
+#   孫プロセスの確実な後始末にはジョブオブジェクト(Win32 API)が要るが、そこまではやっていない。
 # ---------------------------------------------------------------
-$dryRunTimeoutSeconds = 120  # 通常は数十秒未満で終わる工程。無人パイプラインを何時間も
-                              # 塞がないための上限であり、正常系の所要時間の目安ではない
+$dryRunTimeoutSeconds = 120  # 通常は数十秒未満で終わる工程(実測: CLIフルインストールでも
+                              # 約11秒)。無人パイプラインを何時間も塞がないための上限
+$dryRunReadTimeoutSeconds = 15  # プロセス終了後、標準出力/エラーの読み切りに許す追加の猶予
+
+function Complete-DryRunFailure([string]$ReasonCode, [string]$Message, [int]$ProcId) {
+    if ($ProcId -gt 0) {
+        try {
+            & taskkill /T /F /PID $ProcId 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Log ("taskkillが exit={0} で終わった(プロセスが既に終了している可能性)" -f $LASTEXITCODE) }
+        } catch { Write-Log ('taskkillの実行に失敗: ' + $_.Exception.Message) }
+    }
+    $script:reason = $ReasonCode
+    $script:problems += $Message
+    Write-Log ('異常: ' + $Message)
+    Write-Status $false
+    Add-QueueFailureTask
+    Write-Log ("===== monocore db backup end {0} exit=1 ({1}) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $ReasonCode)
+    exit 1
+}
+
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = "$env:ComSpec"
-$psi.ArgumentList.Add('/c')
-$psi.ArgumentList.Add('npx')
-$psi.ArgumentList.Add('supabase')
-$psi.ArgumentList.Add('db')
-$psi.ArgumentList.Add('dump')
-$psi.ArgumentList.Add('--linked')
-$psi.ArgumentList.Add('--dry-run')
+$psi.Arguments = '/c npx --yes supabase db dump --linked --dry-run'
 $psi.WorkingDirectory = $repoRoot
 $psi.UseShellExecute = $false
 $psi.RedirectStandardOutput = $true
 $psi.RedirectStandardError = $true
 $psi.RedirectStandardInput = $true
 $psi.CreateNoWindow = $true
-$dryRunProc = [System.Diagnostics.Process]::Start($psi)
+
+try {
+    $dryRunProc = [System.Diagnostics.Process]::Start($psi)
+} catch {
+    Complete-DryRunFailure 'dryrun_spawn_failed' `
+        ('npx supabase db dump --linked --dry-run の起動に失敗: ' + $_.Exception.Message) 0
+}
 $dryRunProc.StandardInput.Close()
 $dryRunStdoutTask = $dryRunProc.StandardOutput.ReadToEndAsync()
 $dryRunStderrTask = $dryRunProc.StandardError.ReadToEndAsync()
 $dryRunExited = $dryRunProc.WaitForExit($dryRunTimeoutSeconds * 1000)
 
 if (-not $dryRunExited) {
-    try { & taskkill /T /F /PID $dryRunProc.Id 2>&1 | Out-Null } catch {}
-    $reason = 'timeout'
-    $problems += ("npx supabase db dump --linked --dry-run が{0}秒応答なしのため打ち切った" -f $dryRunTimeoutSeconds)
-    Write-Log ('異常: ' + $problems[-1])
-    Write-Status $false
-    Add-QueueFailureTask
-    Write-Log ("===== monocore db backup end {0} exit=1 (dry-run timeout) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
-    exit 1
+    Complete-DryRunFailure 'timeout' `
+        ("npx supabase db dump --linked --dry-run が{0}秒応答なしのため打ち切った" -f $dryRunTimeoutSeconds) `
+        $dryRunProc.Id
 }
-$dryRunOut = $dryRunStdoutTask.GetAwaiter().GetResult() + $dryRunStderrTask.GetAwaiter().GetResult()
+
+# プロセス自体は終わっていても、孫プロセスが標準出力ハンドルを握ったまま残っていると
+# ここが無期限に返らない(冒頭のコメント参照)。
+if (-not [System.Threading.Tasks.Task]::WaitAll(@($dryRunStdoutTask, $dryRunStderrTask), $dryRunReadTimeoutSeconds * 1000)) {
+    Complete-DryRunFailure 'timeout' `
+        ("npx supabase db dump --linked --dry-run の出力読み取りが{0}秒応答なしのため打ち切った(プロセス自体は終了済み)" -f $dryRunReadTimeoutSeconds) `
+        $dryRunProc.Id
+}
+$dryRunOut = $dryRunStdoutTask.Result + "`n" + $dryRunStderrTask.Result
 
 function Get-DryRunVar([string]$name, [string]$text) {
     $m = [regex]::Match($text, "export $name=`"([^`"]+)`"")
