@@ -124,6 +124,9 @@ $($problems | ForEach-Object { "- $_" } | Out-String)
     ``wsl -d Ubuntu -- /usr/lib/postgresql/17/bin/pg_dump --version`` で手動確認する
   - ``credentials_failed`` … ``npx supabase db dump --linked --dry-run`` 自体が失敗。CLIログイン
     セッションの失効(``npx supabase login``)、ネットワーク、Supabase側の障害を疑う
+  - ``timeout`` … ``npx supabase db dump --linked --dry-run`` が既定の120秒応答なしで打ち切られた。
+    CLIログインセッションの失効(``npx supabase login``で手動確認)を筆頭に疑う。
+    再現するか ``npx supabase status`` を手動で叩いて固まるか確認する
   - ``dump_failed`` … pg_dump自体の失敗。バージョン不一致・接続エラーなどログ本文を見る
   - それ以外 … ログの全文を見る
 
@@ -165,10 +168,52 @@ if (-not (Test-PgDump17)) {
 
 # ---------------------------------------------------------------
 # 2. 本番の接続情報を解決(npx supabase db dump --linked --dry-run。Dockerは使わない)
+#
+# タイムアウト付きで実行する(2026-09-09追加)。単純な `& npx ... | Out-String` には
+# タイムアウトが無く、CLIログインセッションの異常等で応答が返らなくなると無人パイプライン
+# 全体を無期限にブロックし続けることを実測した(9/9朝の枠で3時間以上ハング)。
+#
+# `npx`は.cmdファイルなので `[Diagnostics.Process]::Start` に直接渡せず(実測: FileNotFound)、
+# `cmd.exe /c` 経由で起動する。標準入力は即座に閉じる(drain.ps1の `$null | & $claudeExe` と
+# 同じ理由 — 対話プロンプトを出すツールが無人環境で応答なく待ち続けるのを避ける)。
+# タイムアウト時は `taskkill /T` でプロセスツリーごと終了する(`&`呼び出し+パイプの組み合わせ
+# だと生成された子プロセスが確実に終了する保証がない。実測でtaskkill /Tは子孫まで含めて
+# 確実に終了することを確認済み)。
 # ---------------------------------------------------------------
-Push-Location $repoRoot
-$dryRunOut = & npx supabase db dump --linked --dry-run 2>&1 | Out-String
-Pop-Location
+$dryRunTimeoutSeconds = 120  # 通常は数十秒未満で終わる工程。無人パイプラインを何時間も
+                              # 塞がないための上限であり、正常系の所要時間の目安ではない
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = "$env:ComSpec"
+$psi.ArgumentList.Add('/c')
+$psi.ArgumentList.Add('npx')
+$psi.ArgumentList.Add('supabase')
+$psi.ArgumentList.Add('db')
+$psi.ArgumentList.Add('dump')
+$psi.ArgumentList.Add('--linked')
+$psi.ArgumentList.Add('--dry-run')
+$psi.WorkingDirectory = $repoRoot
+$psi.UseShellExecute = $false
+$psi.RedirectStandardOutput = $true
+$psi.RedirectStandardError = $true
+$psi.RedirectStandardInput = $true
+$psi.CreateNoWindow = $true
+$dryRunProc = [System.Diagnostics.Process]::Start($psi)
+$dryRunProc.StandardInput.Close()
+$dryRunStdoutTask = $dryRunProc.StandardOutput.ReadToEndAsync()
+$dryRunStderrTask = $dryRunProc.StandardError.ReadToEndAsync()
+$dryRunExited = $dryRunProc.WaitForExit($dryRunTimeoutSeconds * 1000)
+
+if (-not $dryRunExited) {
+    try { & taskkill /T /F /PID $dryRunProc.Id 2>&1 | Out-Null } catch {}
+    $reason = 'timeout'
+    $problems += ("npx supabase db dump --linked --dry-run が{0}秒応答なしのため打ち切った" -f $dryRunTimeoutSeconds)
+    Write-Log ('異常: ' + $problems[-1])
+    Write-Status $false
+    Add-QueueFailureTask
+    Write-Log ("===== monocore db backup end {0} exit=1 (dry-run timeout) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
+    exit 1
+}
+$dryRunOut = $dryRunStdoutTask.GetAwaiter().GetResult() + $dryRunStderrTask.GetAwaiter().GetResult()
 
 function Get-DryRunVar([string]$name, [string]$text) {
     $m = [regex]::Match($text, "export $name=`"([^`"]+)`"")
