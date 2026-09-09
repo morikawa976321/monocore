@@ -201,13 +201,13 @@ if (-not (Test-PgDump17)) {
 #
 # ■ `npx`は.cmdファイルなので `[Diagnostics.Process]::Start` に直接渡せず(実測: FileNotFound)、
 #   `cmd.exe /c` 経由で起動する。`.Arguments`(単一文字列)を使う — `.ArgumentList` は
-#   Windows PowerShell 5.1 に無い(実測)。ただし本ファイルはUTF-8 BOM付きで保存しており、
-#   5.1側の文字化けの懸念(taskbox README参照)は解消済み。
+#   Windows PowerShell 5.1に無く(実測)、taskbox READMEが5.1での手動実行を明示的に
+#   想定しているため避けた(今回の引数はどれもスペースを含まないので単純結合で安全)。
 #
 # ■ タイムアウト・失敗経路は複数箇所あり、`Complete-DryRunFailure` に集約している
-#   (a) プロセス起動自体の失敗(`dryrun_spawn_failed`)。
-#   (b) 標準入出力ハンドルの取得に失敗(`dryrun_io_setup_failed`)。プロセスの生死が
-#       不明な時点なので、taskkillは試みない(下記(d)と同じ理由)。
+#   (a) プロセス起動自体の失敗(`dryrun_spawn_failed`、taskkill無し=起動していないので不要)。
+#   (b) 標準入出力ハンドルの取得に失敗(`dryrun_io_setup_failed`)。プロセス自体は起動できて
+#       いる(高確率で生存)ので、taskkillを試みる。
 #   (c) プロセスの終了待ち(WaitForExit)がタイムアウト(`timeout`)。**この時点だけは
 #       プロセスが確実に生きているとわかっている**ので、taskkillでプロセスツリーごと
 #       終了させる(実測で孫プロセスまで含めて確実に終了することを確認済み)。
@@ -216,11 +216,14 @@ if (-not (Test-PgDump17)) {
 #       npxが生成した孫プロセスが標準出力のパイプハンドルを握ったまま残ると、出力の読み取りは
 #       そのハンドルが閉じるまで無期限に待つ(実測で再現・確認)。放置すると今回直したのと
 #       同じ形で無期限ハングが再現するため、こちらにも上限を設けた(2026-09-09レビューで発覚)。
-#       **この段階ではtaskkillを一切呼ばない** — WaitForExitが既にtrueを返している=cmd.exeの
-#       PIDは既に終了しており、Windowsは終了したPIDを数秒スケールで再利用する(実測: 300回の
-#       プロセス生成中290個がユニークPID)。孫プロセスには届かないと分かっている
-#       taskkillを、たまたま同じPIDを再利用しただけの無関係なプロセスに向けて撃つ危険の方が
-#       大きい(2026-09-09レビューで発覚)。孫プロセスの後始末は諦め、「無人パイプラインを
+#       **この段階ではtaskkillを呼んでも孫には届かない** — WaitForExitが既にtrueを返している
+#       =cmd.exeは既に終了しており、`taskkill /T /PID <cmd.exeのPID>`は死んだ親からは
+#       子孫を辿れず「not found」で無害に失敗するだけ(2026-09-09の当初レビューでは「終了済み
+#       PIDが数秒スケールで再利用され無関係なプロセスを誤爆する」と結論したが、これは誤りだった
+#       — `Process`オブジェクト(`$dryRunProc`)がスクリプトスコープでハンドルを保持している間、
+#       WindowsはそのPIDを再利用しないことを2000回のプロセス生成で実測・再確認した)。誤爆は
+#       起きないが、taskkillを呼んでも孫プロセスの終了には効果が無いため、無駄な呼び出しと
+#       ログを避けるだけの理由で呼んでいない。孫プロセスの後始末は諦め、「無人パイプラインを
 #       無期限に塞がない」ことだけを優先する(ジョブオブジェクト(Win32 API)を使えば
 #       確実な後始末も可能だが、今回は見送った)。
 #   `ReadToEndAsync`が例外(faulted task)を投げるケースは、`$ErrorActionPreference='Continue'`
@@ -233,8 +236,8 @@ $dryRunTimeoutSeconds = 120  # 通常は数十秒未満で終わる工程(実測
 $dryRunReadTimeoutSeconds = 15  # プロセス終了後、標準出力/エラーの読み切りに許す追加の猶予
 
 function Complete-DryRunFailure([string]$ReasonCode, [string]$Message, [int]$ProcId) {
-    # $ProcId は「プロセスがまだ確実に生きている」と分かっている呼び出し元だけが正の値を渡す
-    # (上のコメント参照)。0 なら taskkill 自体を試みない。
+    # $ProcId は「taskkillに意味がある」呼び出し元だけが正の値を渡す(上のコメント参照)。
+    # 0 なら taskkill 自体を試みない(実害は無いが呼んでも何も終了できない段階のため)。
     if ($ProcId -gt 0) {
         try {
             & taskkill /T /F /PID $ProcId 2>&1 | Out-Null
@@ -273,7 +276,8 @@ try {
     $dryRunStderrTask = $dryRunProc.StandardError.ReadToEndAsync()
 } catch {
     Complete-DryRunFailure 'dryrun_io_setup_failed' `
-        ('npx supabase db dump --linked --dry-run の入出力設定に失敗: ' + $_.Exception.Message) 0
+        ('npx supabase db dump --linked --dry-run の入出力設定に失敗: ' + $_.Exception.Message) `
+        $dryRunProc.Id
 }
 
 $dryRunExited = $dryRunProc.WaitForExit($dryRunTimeoutSeconds * 1000)
