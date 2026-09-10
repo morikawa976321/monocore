@@ -11,8 +11,10 @@ export type DrainRunListRow = Omit<DrainRunRow, 'report_text' | 'created_at'>
 const LIST_COLUMNS =
     'started_at,ended_at,outcome,trigger_reasons,model,effort,exit_code,steps,tasks'
 
-/** 一覧の件数。投入スクリプトの保持上限も同じ値（scripts/upsert-drain-run.mjs）。 */
-export const DRAIN_RUNS_LIST_LIMIT = 40
+/** 一覧の件数。投入スクリプトの保持上限も同じ値（scripts/upsert-drain-run.mjs）。
+ *  taskbox drainが1日4回(6時間おき)から1時間おきへ変更されたのに伴い、
+ *  2026-09-11に40から48(=1時間おき24枠の2日分)へ引き上げた（ユーザー指定の切りのよい数）。 */
+export const DRAIN_RUNS_LIST_LIMIT = 48
 
 export async function getDrainRuns(
     supabase: SupabaseClient<Database>,

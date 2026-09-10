@@ -28,8 +28,10 @@ import {
     resolveTimeoutMs,
 } from './supabase-timeout.mjs'
 
-/** 画面 getDrainRuns の既定 limit（src/lib/supabase/queries/drain-runs.ts）と揃える。 */
-const DRAIN_RUNS_KEEP = 40
+/** 画面 getDrainRuns の既定 limit（src/lib/supabase/queries/drain-runs.ts）と揃える。
+ *  taskbox drainが1日4回(6時間おき)から1時間おきへ変更されたのに伴い、
+ *  2026-09-11に40から48(=1時間おき24枠の2日分)へ引き上げた（ユーザー指定の切りのよい数）。 */
+const DRAIN_RUNS_KEEP = 48
 
 /**
  * 呼び出し元(taskbox/lib/board.ps1)は drain のほぼ最後にこのスクリプトを起動して待つので、
