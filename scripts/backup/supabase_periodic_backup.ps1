@@ -122,6 +122,9 @@ $($problems | ForEach-Object { "- $_" } | Out-String)
 - 理由コード別:
   - ``wsl_pgdump_missing`` … WSL Ubuntu側に postgresql-client-17 が無い/壊れている。
     ``wsl -d Ubuntu -- /usr/lib/postgresql/17/bin/pg_dump --version`` で手動確認する
+  - ``wsl_unresponsive`` … ``wsl.exe`` 自体が既定の秒数(上の「検出された異常」参照)返ってこない、
+    または起動できなかった。WSLの仮想マシンが起動途中/前回のクラッシュ残骸で固まっている疑い。
+    ``wsl -l -v`` で状態を見て、必要なら ``wsl --shutdown`` してから手動で1回起動する
   - ``credentials_failed`` … ``npx supabase db dump --linked --dry-run`` 自体が失敗。CLIログイン
     セッションの失効(``npx supabase login``)、ネットワーク、Supabase側の障害を疑う
   - ``timeout`` … ``npx supabase db dump --linked --dry-run`` のプロセス自体が既定の秒数
@@ -156,26 +159,202 @@ $($problems | ForEach-Object { "- $_" } | Out-String)
     }
 }
 
+# 失敗経路の集約(2026-09-09追加。2026-09-10に汎用名へ改め、定義位置を1節の前へ移した —
+# WSL関連の失敗もこの経路へ合流させるため。中身は変えていない)。
+# 理由コードを1つ取り、Write-Status(backup-status.json) → Add-QueueFailureTask(queueへ調査タスク)
+# → exit 1 という**このスクリプト唯一の異常終了経路**を通す。**drain報告板には出さない**
+# (2026-09-05のユーザー決定。engine [[monocore-db-backup-result-stays-off-the-board]])。
+function Complete-BackupFailure([string]$ReasonCode, [string]$Message, [int]$ProcId) {
+    # $ProcId は「taskkillに意味がある」呼び出し元だけが正の値を渡す(下の2節のコメント参照)。
+    # 0 なら taskkill 自体を試みない(実害は無いが呼んでも何も終了できない段階のため)。
+    if ($ProcId -gt 0) {
+        try {
+            & taskkill /T /F /PID $ProcId 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Log ("taskkillが exit={0} で終わった(プロセスが既に終了している可能性)" -f $LASTEXITCODE) }
+        } catch { Write-Log ('taskkillの実行に失敗: ' + $_.Exception.Message) }
+    }
+    $script:reason = $ReasonCode
+    $script:problems += $Message
+    Write-Log ('異常: ' + $Message)
+    Write-Status $false
+    Add-QueueFailureTask
+    Write-Log ("===== monocore db backup end {0} exit=1 ({1}) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $ReasonCode)
+    exit 1
+}
+
+# Windowsのコマンドライン規則に従って引数配列を1本の文字列へ組み立てる。空白か " を含む引数だけを
+# 引用符で囲み、" の直前と末尾の逆スラッシュ列は倍にする。`wsl.exe -- bash -c '<" を含むスクリプト>'`
+# がこの規則で正しく渡ることを実測で確認済み(直接 `& wsl.exe ...` と同一の出力になる)。
+function ConvertTo-BoundedArgumentLine {
+    param([string[]]$Arguments = @())
+    $q  = [string][char]34   # "
+    $bs = [string][char]92   # 逆スラッシュ。ソース中に直接書くとエスケープの読み違いを招くので定数化する
+    $parts = @()
+    foreach ($a in @($Arguments)) {
+        $x = [string]$a
+        if ($x.Length -eq 0) { $parts += ($q + $q); continue }
+        if (-not ($x.Contains(' ') -or $x.Contains([string][char]9) -or $x.Contains($q))) {
+            $parts += $x
+            continue
+        }
+        $sb = New-Object System.Text.StringBuilder
+        [void]$sb.Append($q)
+        $slashes = 0
+        foreach ($ch in $x.ToCharArray()) {
+            if ($ch -eq [char]92) { $slashes++; [void]$sb.Append($ch); continue }
+            if ($ch -eq [char]34) {
+                [void]$sb.Append($bs * $slashes)
+                [void]$sb.Append($bs + $q)
+            } else {
+                [void]$sb.Append($ch)
+            }
+            $slashes = 0
+        }
+        [void]$sb.Append($bs * $slashes)
+        [void]$sb.Append($q)
+        $parts += $sb.ToString()
+    }
+    return ($parts -join ' ')
+}
+
+# ---------------------------------------------------------------
+# 外部プロセスをタイムアウト付きで実行する(2026-09-10追加)
+#
+# 下の「2. 本番の接続情報を解決」節にある dry-run のインライン実装と同じ設計。あちらは
+# 2026-09-09のインシデント対応で書いた**動作実績のあるコード**なので、共通化のために
+# 書き換えることはしない(このスクリプトは無人バックアップの本体で、書き換えの利得より
+# 退行のほうが高くつく)。taskbox 側に同型の実装(lib/proc.ps1)があるが**dot-sourceしない** —
+# 別リポジトリのファイルへ実行時依存すると、taskbox が無い環境でこのスクリプトが動かなくなる。
+#
+# 戻り値: @{ ok; timedOut; exitCode; stdout; stderr; output; failure; message }
+#   failure は $null / spawn_failed / io_setup_failed / timeout / read_timeout / read_failed /
+#   internal_error。**例外は投げない** — 呼び出し元が Complete-BackupFailure へ合流させる。
+function Invoke-BoundedProcess {
+    param(
+        [Parameter(Mandatory)][string]$FileName,
+        [string[]]$Arguments = @(),
+        [int]$TimeoutSeconds = 120,
+        [int]$ReadTimeoutSeconds = 15,
+        [string]$Label = '外部コマンド'
+    )
+    $r = @{ ok = $false; timedOut = $false; exitCode = $null; stdout = ''; stderr = ''
+            output = ''; failure = $null; message = $null }
+    $proc = $null
+    $prevEap = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Stop'
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $FileName
+        # .ArgumentList は Windows PowerShell 5.1 に無いので単一文字列で渡す。
+        $psi.Arguments = (ConvertTo-BoundedArgumentLine $Arguments)
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.RedirectStandardInput = $true
+        $psi.CreateNoWindow = $true
+        try {
+            $proc = [System.Diagnostics.Process]::Start($psi)
+        } catch {
+            $r.failure = 'spawn_failed'
+            $r.message = ("{0} の起動に失敗: {1}" -f $Label, $_.Exception.Message)
+            return $r
+        }
+        try {
+            # 標準入力を閉じる。sudo のパスワード待ち等で無人環境が固まるのを防ぐ。
+            $proc.StandardInput.Close()
+            $outTask = $proc.StandardOutput.ReadToEndAsync()
+            $errTask = $proc.StandardError.ReadToEndAsync()
+        } catch {
+            $r.failure = 'io_setup_failed'
+            $r.message = ("{0} の入出力設定に失敗: {1}" -f $Label, $_.Exception.Message)
+            try { & taskkill /T /F /PID $proc.Id 2>&1 | Out-Null } catch {}
+            return $r
+        }
+        if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
+            $r.timedOut = $true
+            $r.failure = 'timeout'
+            $r.message = ("{0} が{1}秒応答なしのため打ち切った" -f $Label, $TimeoutSeconds)
+            # この時点だけはプロセスが確実に生きているとわかっている。なお wsl.exe を殺しても
+            # WSL側(Linux)のプロセスは残りうる。ここで保証するのは「呼び出し元が有限時間で
+            # 戻ること」だけで、WSL内の後始末はしない。
+            try { & taskkill /T /F /PID $proc.Id 2>&1 | Out-Null } catch {}
+            return $r
+        }
+        try {
+            $readOk = [System.Threading.Tasks.Task]::WaitAll(@($outTask, $errTask), $ReadTimeoutSeconds * 1000)
+        } catch {
+            $r.failure = 'read_failed'
+            $r.message = ("{0} の出力読み取りが失敗: {1}" -f $Label, $_.Exception.Message)
+            return $r
+        }
+        if (-not $readOk) {
+            $r.failure = 'read_timeout'
+            $r.message = ("{0} の出力読み取りが{1}秒応答なしのため打ち切った(プロセス自体は終了済み)" -f $Label, $ReadTimeoutSeconds)
+            return $r
+        }
+        $r.exitCode = $proc.ExitCode
+        $r.stdout = [string]$outTask.Result
+        $r.stderr = [string]$errTask.Result
+        # wsl.exe 自身の診断メッセージはUTF-16LEで出るため既定のデコードではNUL混じりになる。
+        # ログに載せる用途だけなのでNULを落として読める形にする(WSL内プロセスの出力は素通し)。
+        $r.output = (($r.stdout + "`n" + $r.stderr) -replace "`0", '').Trim()
+        $r.ok = ($r.exitCode -eq 0)
+        return $r
+    } catch {
+        $r.failure = 'internal_error'
+        $r.message = ("{0} の実行中に予期しない例外: {1}" -f $Label, $_.Exception.Message)
+        return $r
+    } finally {
+        $ErrorActionPreference = $prevEap
+        if ($proc) { try { $proc.Dispose() } catch {} }
+    }
+}
+
 # ---------------------------------------------------------------
 # 1. WSL側にpg_dump 17があるか確認(無ければ導入を試みる)
 # ---------------------------------------------------------------
+# wsl.exe の呼び出しにタイムアウトを掛ける(2026-09-10追加)。WSLの仮想マシン自体が応答しない
+# (初回起動・前回のクラッシュ残骸等)と `wsl.exe` そのものが返らず、drain全体が無期限に止まる。
+# 値はいずれも実測に基づかない暫定の上限。
+$wslProbeTimeoutSeconds   = 180  # VMのコールドスタートを含みうる軽量コマンド
+$wslInstallTimeoutSeconds = 900  # apt-get update + install。ネットワーク依存で重い
+
 function Test-PgDump17 {
-    & wsl.exe -d $wslDistro -- test -x $pgDumpBin
-    return ($LASTEXITCODE -eq 0)
+    return (Invoke-BoundedProcess -FileName 'wsl.exe' `
+                -Arguments @('-d', $wslDistro, '--', 'test', '-x', $pgDumpBin) `
+                -TimeoutSeconds $wslProbeTimeoutSeconds -Label 'WSLのpg_dump 17の有無確認')
 }
 
-if (-not (Test-PgDump17)) {
-    Write-Log 'WSL側にpg_dump 17が無い。PGDGリポジトリから導入を試みる'
-    & wsl.exe -d $wslDistro -- bash -c 'sudo install -d /usr/share/postgresql-common/pgdg && sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list && sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17' *> $null
+# 「wsl.exeが返ってこない/起動できない」と「pg_dumpが無い(exit≠0)」は別物として扱う。前者で
+# 導入へ進んでも、応答しないWSLに対して導入の上限ぶんだけ余計に待つだけで結論は変わらない。
+$pgDumpProbe = Test-PgDump17
+if ($pgDumpProbe.failure) {
+    Complete-BackupFailure 'wsl_unresponsive' ('WSLが応答しないため確認できなかった: ' + $pgDumpProbe.message) 0
+}
 
-    if (-not (Test-PgDump17)) {
-        $reason = 'wsl_pgdump_missing'
-        $problems += 'WSL(Ubuntu)にpostgresql-client-17を自動導入できなかった'
-        Write-Log ('異常: ' + $problems[-1])
-        Write-Status $false
-        Add-QueueFailureTask
-        Write-Log ("===== monocore db backup end {0} exit=1 (wsl pg_dump missing) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
-        exit 1
+if (-not $pgDumpProbe.ok) {
+    Write-Log 'WSL側にpg_dump 17が無い。PGDGリポジトリから導入を試みる'
+    # 内側にも上限を置く(2026-09-10): curl は --connect-timeout/--max-time、apt は
+    # DEBIAN_FRONTEND=noninteractive。外側の $wslInstallTimeoutSeconds だけでも無期限化は
+    # 防げるが、内側にもあると「どの段で詰まったか」がWSL側の終了コードとして残る。
+    # sudo -n はパスワードを要求する構成のときに待たず失敗させるため(無人実行では誰も
+    # 入力できないので、待っても結論は同じ)。
+    $pgdgInstallScript = 'sudo -n install -d /usr/share/postgresql-common/pgdg && sudo -n curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail --connect-timeout 20 --max-time 120 https://www.postgresql.org/media/keys/ACCC4CF8.asc && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo -n tee /etc/apt/sources.list.d/pgdg.list && sudo -n env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 update -qq && sudo -n env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 install -y -qq postgresql-client-17'
+    $install = Invoke-BoundedProcess -FileName 'wsl.exe' `
+                    -Arguments @('-d', $wslDistro, '--', 'bash', '-c', $pgdgInstallScript) `
+                    -TimeoutSeconds $wslInstallTimeoutSeconds -Label 'postgresql-client-17の自動導入'
+    if ($install.failure) {
+        Write-Log ('自動導入を完了できなかった: ' + $install.message)
+    } elseif (-not $install.ok) {
+        Write-Log ("自動導入が exit={0} で終わった: {1}" -f $install.exitCode, $install.output)
+    }
+
+    $pgDumpProbe = Test-PgDump17
+    if ($pgDumpProbe.failure) {
+        Complete-BackupFailure 'wsl_unresponsive' ('WSLが応答しないため確認できなかった: ' + $pgDumpProbe.message) 0
+    }
+    if (-not $pgDumpProbe.ok) {
+        Complete-BackupFailure 'wsl_pgdump_missing' 'WSL(Ubuntu)にpostgresql-client-17を自動導入できなかった' 0
     }
     Write-Log 'pg_dump 17の導入完了'
 }
@@ -204,7 +383,7 @@ if (-not (Test-PgDump17)) {
 #   Windows PowerShell 5.1に無く(実測)、taskbox READMEが5.1での手動実行を明示的に
 #   想定しているため避けた(今回の引数はどれもスペースを含まないので単純結合で安全)。
 #
-# ■ タイムアウト・失敗経路は複数箇所あり、`Complete-DryRunFailure` に集約している
+# ■ タイムアウト・失敗経路は複数箇所あり、`Complete-BackupFailure` に集約している
 #   (a) プロセス起動自体の失敗(`dryrun_spawn_failed`、taskkill無し=起動していないので不要)。
 #   (b) 標準入出力ハンドルの取得に失敗(`dryrun_io_setup_failed`)。プロセス自体は起動できて
 #       いる(高確率で生存)ので、taskkillを試みる。
@@ -235,24 +414,6 @@ $dryRunTimeoutSeconds = 120  # 通常は数十秒未満で終わる工程(実測
                               # 約11秒)。無人パイプラインを何時間も塞がないための上限
 $dryRunReadTimeoutSeconds = 15  # プロセス終了後、標準出力/エラーの読み切りに許す追加の猶予
 
-function Complete-DryRunFailure([string]$ReasonCode, [string]$Message, [int]$ProcId) {
-    # $ProcId は「taskkillに意味がある」呼び出し元だけが正の値を渡す(上のコメント参照)。
-    # 0 なら taskkill 自体を試みない(実害は無いが呼んでも何も終了できない段階のため)。
-    if ($ProcId -gt 0) {
-        try {
-            & taskkill /T /F /PID $ProcId 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { Write-Log ("taskkillが exit={0} で終わった(プロセスが既に終了している可能性)" -f $LASTEXITCODE) }
-        } catch { Write-Log ('taskkillの実行に失敗: ' + $_.Exception.Message) }
-    }
-    $script:reason = $ReasonCode
-    $script:problems += $Message
-    Write-Log ('異常: ' + $Message)
-    Write-Status $false
-    Add-QueueFailureTask
-    Write-Log ("===== monocore db backup end {0} exit=1 ({1}) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $ReasonCode)
-    exit 1
-}
-
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = "$env:ComSpec"
 $psi.Arguments = '/c npx --yes supabase db dump --linked --dry-run'
@@ -266,7 +427,7 @@ $psi.CreateNoWindow = $true
 try {
     $dryRunProc = [System.Diagnostics.Process]::Start($psi)
 } catch {
-    Complete-DryRunFailure 'dryrun_spawn_failed' `
+    Complete-BackupFailure 'dryrun_spawn_failed' `
         ('npx supabase db dump --linked --dry-run の起動に失敗: ' + $_.Exception.Message) 0
 }
 
@@ -275,14 +436,14 @@ try {
     $dryRunStdoutTask = $dryRunProc.StandardOutput.ReadToEndAsync()
     $dryRunStderrTask = $dryRunProc.StandardError.ReadToEndAsync()
 } catch {
-    Complete-DryRunFailure 'dryrun_io_setup_failed' `
+    Complete-BackupFailure 'dryrun_io_setup_failed' `
         ('npx supabase db dump --linked --dry-run の入出力設定に失敗: ' + $_.Exception.Message) `
         $dryRunProc.Id
 }
 
 $dryRunExited = $dryRunProc.WaitForExit($dryRunTimeoutSeconds * 1000)
 if (-not $dryRunExited) {
-    Complete-DryRunFailure 'timeout' `
+    Complete-BackupFailure 'timeout' `
         ("npx supabase db dump --linked --dry-run が{0}秒応答なしのため打ち切った" -f $dryRunTimeoutSeconds) `
         $dryRunProc.Id
 }
@@ -290,11 +451,11 @@ if (-not $dryRunExited) {
 try {
     $dryRunReadOk = [System.Threading.Tasks.Task]::WaitAll(@($dryRunStdoutTask, $dryRunStderrTask), $dryRunReadTimeoutSeconds * 1000)
 } catch {
-    Complete-DryRunFailure 'dryrun_read_failed' `
+    Complete-BackupFailure 'dryrun_read_failed' `
         ('npx supabase db dump --linked --dry-run の出力読み取りが失敗: ' + $_.Exception.Message) 0
 }
 if (-not $dryRunReadOk) {
-    Complete-DryRunFailure 'dryrun_read_timeout' `
+    Complete-BackupFailure 'dryrun_read_timeout' `
         ("npx supabase db dump --linked --dry-run の出力読み取りが{0}秒応答なしのため打ち切った(プロセス自体は終了済み)" -f $dryRunReadTimeoutSeconds) `
         0
 }

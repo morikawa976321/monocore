@@ -21,9 +21,26 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import { buildRow, validateRun } from './drain-run-payload.mjs'
+import {
+    DEFAULT_REQUEST_TIMEOUT_MS,
+    armWatchdog,
+    createTimeoutFetch,
+    resolveTimeoutMs,
+} from './supabase-timeout.mjs'
 
 /** 画面 getDrainRuns の既定 limit（src/lib/supabase/queries/drain-runs.ts）と揃える。 */
 const DRAIN_RUNS_KEEP = 40
+
+/**
+ * 呼び出し元(taskbox/lib/board.ps1)は drain のほぼ最後にこのスクリプトを起動して待つので、
+ * ここが返らないと drain.lock が解放されない。上限は ./supabase-timeout.mjs を参照。
+ * 環境変数はテストで実際にタイムアウトを発火させるための口。
+ */
+const REQUEST_TIMEOUT_MS = resolveTimeoutMs(
+    process.env.SUPABASE_REQUEST_TIMEOUT_MS,
+    DEFAULT_REQUEST_TIMEOUT_MS
+)
+const WATCHDOG_MS = resolveTimeoutMs(process.env.UPSERT_WATCHDOG_MS, 5 * 60_000)
 
 /**
  * process.exit() は使わない。呼び出し元(drain.ps1)は stdout/stderr をパイプで受けており、
@@ -99,7 +116,9 @@ async function main() {
     }
 
     const row = buildRow(payload)
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+        global: { fetch: createTimeoutFetch(REQUEST_TIMEOUT_MS) },
+    })
 
     const { error } = await supabase.from('drain_runs').upsert(row, { onConflict: 'started_at' })
     if (error) {
@@ -117,9 +136,12 @@ async function main() {
     }
 }
 
+const disarmWatchdog = armWatchdog('upsert-drain-run', WATCHDOG_MS)
 try {
     await main()
 } catch (error) {
     console.error(`Error: ${error.message}`)
     process.exitCode = 1
+} finally {
+    disarmWatchdog()
 }

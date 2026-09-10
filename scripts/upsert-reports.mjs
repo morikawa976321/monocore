@@ -42,10 +42,27 @@ import { visit } from 'unist-util-visit'
 import { toString as hastToString } from 'hast-util-to-string'
 import { toString as mdastToString } from 'mdast-util-to-string'
 import { computeStaleSlugs, filterReportFilenames, rewriteReportLinkUrl, sectionizeChildren } from './reports-payload.mjs'
+import {
+    DEFAULT_REQUEST_TIMEOUT_MS,
+    armWatchdog,
+    createTimeoutFetch,
+    resolveTimeoutMs,
+} from './supabase-timeout.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 // scripts/ の2つ上 = mf/。reportsとmonocoreは兄弟ディレクトリ。
 const DEFAULT_REPORTS_DIR = resolve(scriptDir, '..', '..', 'reports')
+
+/**
+ * 呼び出し元(taskbox/sync-reports.ps1)はこのスクリプトの終了を待つ。claudeを起動しない回でも
+ * 通る経路なので、ここが返らないと drain.lock を抱えたまま枠が潰れる。上限は
+ * ./supabase-timeout.mjs を参照。環境変数はテストで実際に発火させるための口。
+ */
+const REQUEST_TIMEOUT_MS = resolveTimeoutMs(
+    process.env.SUPABASE_REQUEST_TIMEOUT_MS,
+    DEFAULT_REQUEST_TIMEOUT_MS
+)
+const WATCHDOG_MS = resolveTimeoutMs(process.env.UPSERT_WATCHDOG_MS, 10 * 60_000)
 
 /**
  * process.exit() は使わない。2026-08-12から taskbox/sync-reports.ps1（drainの工程）が
@@ -177,7 +194,9 @@ async function main() {
         rows.push(await buildRow(reportsDir, filename, schema, localSlugs))
     }
 
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+        global: { fetch: createTimeoutFetch(REQUEST_TIMEOUT_MS) },
+    })
 
     const { data: upserted, error: upsertError } = await supabase
         .from('reports')
@@ -215,9 +234,12 @@ async function main() {
     }
 }
 
+const disarmWatchdog = armWatchdog('upsert-reports', WATCHDOG_MS)
 try {
     await main()
 } catch (error) {
     console.error(`Error: ${error.message}`)
     process.exitCode = 1
+} finally {
+    disarmWatchdog()
 }
