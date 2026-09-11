@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DrainRunCard } from '@/src/components/drain/DrainRunCard'
+import { DrainRunGroupCard } from '@/src/components/drain/DrainRunGroupCard'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { getDefaultTimezone } from '@/src/lib/date'
+import { groupDrainRuns } from '@/src/lib/drain/group-runs'
 import { createClient } from '@/src/lib/supabase/client'
 import {
     getDrainRunReport,
@@ -16,6 +18,7 @@ export default function DrainPage() {
     const supabase = useMemo(() => createClient(), [])
     const timezone = useMemo(() => getDefaultTimezone(), [])
     const [runs, setRuns] = useState<DrainRunListRow[]>([])
+    const displayItems = useMemo(() => groupDrainRuns(runs), [runs])
     const [isInitialLoading, setIsInitialLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -79,14 +82,23 @@ export default function DrainPage() {
                         </section>
                     )}
 
-                    {runs.map((run) => (
-                        <DrainRunCard
-                            key={run.started_at}
-                            run={run}
-                            timezone={timezone}
-                            onLoadReport={loadReport}
-                        />
-                    ))}
+                    {displayItems.map((item) =>
+                        item.kind === 'run' ? (
+                            <DrainRunCard
+                                key={item.run.started_at}
+                                run={item.run}
+                                timezone={timezone}
+                                onLoadReport={loadReport}
+                            />
+                        ) : (
+                            <DrainRunGroupCard
+                                key={item.runs[0].started_at}
+                                runs={item.runs}
+                                timezone={timezone}
+                                onLoadReport={loadReport}
+                            />
+                        )
+                    )}
                 </div>
 
                 {isInitialLoading && (
