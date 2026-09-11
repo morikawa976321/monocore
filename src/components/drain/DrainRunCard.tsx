@@ -96,19 +96,17 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
                     </span>
                     <span className="flex shrink-0 items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
                         {(errorCount > 0 || warnCount > 0) && (
-                            <span
-                                className={
-                                    errorCount > 0
-                                        ? STATUS_CLASS_NAMES.error
-                                        : STATUS_CLASS_NAMES.warn
-                                }
-                            >
-                                {[
-                                    errorCount > 0 && `異常${errorCount}件`,
-                                    warnCount > 0 && `注意${warnCount}件`,
-                                ]
-                                    .filter(Boolean)
-                                    .join(' / ')}
+                            <span className="flex items-center gap-2">
+                                {errorCount > 0 && (
+                                    <span className={STATUS_CLASS_NAMES.error}>
+                                        異常{errorCount}件
+                                    </span>
+                                )}
+                                {warnCount > 0 && (
+                                    <span className={STATUS_CLASS_NAMES.warn}>
+                                        注意{warnCount}件
+                                    </span>
+                                )}
                             </span>
                         )}
                         {isOpen ? (
