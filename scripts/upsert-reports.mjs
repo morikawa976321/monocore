@@ -5,9 +5,9 @@
  *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/upsert-reports.mjs [reportsDir]
  *
  * 引数省略時は monocore と同じ階層(mf/)にある reports/ を対象にする。
- * 環境変数はproject_cardsと同じ経路（`~/.monocore/config.json`のenvs.remote、
- * 既定はremote）。project_cardsの投入スクリプト同様、このスクリプト自身は
- * config.jsonを読まず、呼び出し側が値を環境変数として渡す
+ * 環境変数は`~/.monocore/config.json`のenvs.remote（既定はremote）から
+ * 呼び出し側が読み、このスクリプト自身は config.jsonを読まず、
+ * 呼び出し側が値を環境変数として渡す
  * （taskbox/README.mdの `SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node ...`
  * という既存の呼び出し方に揃えるため。ローカルSupabaseを指す等の差し替えも
  * この形なら環境変数を変えるだけで済む）。

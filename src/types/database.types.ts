@@ -129,45 +129,6 @@ export type Database = {
         }
         Relationships: []
       }
-      project_cards: {
-        Row: {
-          created_at: string | null
-          deadline: string | null
-          deadline_note: string | null
-          definition_of_done: string
-          next_actions: string
-          priority: number
-          progress: Json
-          slug: string
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          deadline?: string | null
-          deadline_note?: string | null
-          definition_of_done?: string
-          next_actions?: string
-          priority?: number
-          progress?: Json
-          slug: string
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          deadline?: string | null
-          deadline_note?: string | null
-          definition_of_done?: string
-          next_actions?: string
-          priority?: number
-          progress?: Json
-          slug?: string
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       reports: {
         Row: {
           body_html: string

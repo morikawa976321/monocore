@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
     Clock,
     FileText,
-    LayoutGrid,
     ListChecks,
     Menu,
     Newspaper,
@@ -17,7 +16,6 @@ import { Button } from "@/src/components/ui/Button";
 
 const MENU_ITEMS = [
     { href: "/schedules", icon: Clock, label: "Schedule" },
-    { href: "/projects", icon: LayoutGrid, label: "Projects" },
     { href: "/reports", icon: FileText, label: "Reports" },
     { href: "/news", icon: Newspaper, label: "News" },
     { href: "/drain", icon: ListChecks, label: "Drain" },
