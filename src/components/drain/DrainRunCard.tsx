@@ -9,7 +9,6 @@ import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import {
     formatDuration,
     parseRunSteps,
-    parseRunTasks,
     parseTriggerReasons,
     type RunStepStatus,
 } from '@/src/lib/drain/run'
@@ -57,13 +56,10 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
     const panelId = useId()
 
     const steps = parseRunSteps(run.steps)
-    const tasks = parseRunTasks(run.tasks)
     const reasons = parseTriggerReasons(run.trigger_reasons)
     const duration = formatDuration(run.started_at, run.ended_at)
     const startedLabel = format(toZonedTime(parseISO(run.started_at), timezone), 'MM/dd HH:mm')
 
-    const doneCount = tasks.filter((task) => task.outcome === 'done').length
-    const failedCount = tasks.filter((task) => task.outcome === 'failed').length
     const warnCount = steps.filter((step) => step.status === 'warn').length
     const errorCount = steps.filter((step) => step.status === 'error').length
     const worstStep: RunStepStatus = errorCount > 0 ? 'error' : warnCount > 0 ? 'warn' : 'ok'
@@ -114,12 +110,6 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
                                 ]
                                     .filter(Boolean)
                                     .join(' / ')}
-                            </span>
-                        )}
-                        {tasks.length > 0 && (
-                            <span className={failedCount > 0 ? STATUS_CLASS_NAMES.error : undefined}>
-                                タスク{doneCount}件
-                                {failedCount > 0 && ` / 失敗${failedCount}件`}
                             </span>
                         )}
                         {isOpen ? (
@@ -178,90 +168,6 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
                             </ul>
                         </section>
                     )}
-
-                    {tasks.map((task) => (
-                        <section key={task.taskId} className="flex flex-col gap-2">
-                            <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
-                                {task.title || task.taskId}
-                                <span
-                                    className={`ml-2 ${task.outcome === 'failed' ? STATUS_CLASS_NAMES.error : ''}`}
-                                >
-                                    {task.outcome ?? '不明'}
-                                    {task.gatePassed === false && '（ゲート不通過）'}
-                                </span>
-                            </h4>
-                            {/* 1タスク＝1要約（何のために何をして、どうなったか）。工程を
-                                並べるのは summary が無い古い行だけで、そちらは代替経路。 */}
-                            {task.summary.length > 0 ? (
-                                <p className="whitespace-pre-line text-neutral-700 dark:text-neutral-300">
-                                    {task.summary}
-                                </p>
-                            ) : (
-                                <ul className="flex flex-col gap-1">
-                                    {task.steps.map((step, index) => (
-                                        <li
-                                            key={`${task.taskId}-step-${index}`}
-                                            className="flex flex-col gap-0.5 sm:flex-row sm:gap-2"
-                                        >
-                                            <span
-                                                className={`shrink-0 sm:w-48 ${step.status === 'failed' ? STATUS_CLASS_NAMES.error : ''}`}
-                                            >
-                                                {step.desc}
-                                            </span>
-                                            <span className="text-neutral-700 dark:text-neutral-300">
-                                                {step.note}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                            {task.delegation.length > 0 && (
-                                <p className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
-                                    <span className="shrink-0 sm:w-48">委譲</span>
-                                    <span className="text-neutral-700 dark:text-neutral-300">
-                                        {task.delegation
-                                            .map(
-                                                (entry) =>
-                                                    `${entry.target} ${entry.calls ?? '?'}回 ${entry.outcome}`
-                                            )
-                                            .join(' / ')}
-                                        {task.qaRounds !== null && ` ／ QA ${task.qaRounds}往復`}
-                                    </span>
-                                </p>
-                            )}
-
-                            {task.failures.length > 0 && (
-                                <ul className="flex flex-col gap-1">
-                                    {task.failures.map((failure, index) => (
-                                        <li
-                                            key={`${task.taskId}-failure-${index}`}
-                                            className="flex flex-col gap-0.5 sm:flex-row sm:gap-2"
-                                        >
-                                            <span className="shrink-0 sm:w-48 text-amber-600 dark:text-amber-400">
-                                                つまずき（{failure.phase}）
-                                            </span>
-                                            <span className="text-neutral-700 dark:text-neutral-300">
-                                                {failure.symptom} → {failure.resolution}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-
-                            {/* 想定外に発生・発見したこと。本人が板に求める4点の最後の1つで、
-                                失敗とは限らないが「聞きに来る手がかり」なので注意色で出す。 */}
-                            {task.notes.length > 0 && (
-                                <p className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
-                                    <span className="shrink-0 sm:w-48 text-amber-600 dark:text-amber-400">
-                                        想定外
-                                    </span>
-                                    <span className="whitespace-pre-line text-neutral-700 dark:text-neutral-300">
-                                        {task.notes}
-                                    </span>
-                                </p>
-                            )}
-                        </section>
-                    ))}
 
                     <section className="flex flex-col gap-2">
                         <Button
