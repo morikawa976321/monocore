@@ -52,7 +52,6 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
     const [isOpen, setIsOpen] = useState(false)
     const [reportText, setReportText] = useState<string | null>(null)
     const [isReportLoading, setIsReportLoading] = useState(false)
-    const [isReportOpen, setIsReportOpen] = useState(false)
     const panelId = useId()
 
     const steps = parseRunSteps(run.steps)
@@ -64,12 +63,12 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
     const errorCount = steps.filter((step) => step.status === 'error').length
     const worstStep: RunStepStatus = errorCount > 0 ? 'error' : warnCount > 0 ? 'warn' : 'ok'
 
-    async function handleToggleReport() {
-        if (isReportOpen) {
-            setIsReportOpen(false)
+    async function handleToggle() {
+        if (isOpen) {
+            setIsOpen(false)
             return
         }
-        setIsReportOpen(true)
+        setIsOpen(true)
         if (reportText !== null || isReportLoading) return
         setIsReportLoading(true)
         setReportText(await onLoadReport(run.started_at))
@@ -81,7 +80,7 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
             <Button
                 color="ghost"
                 size="nav"
-                onClick={() => setIsOpen((prev) => !prev)}
+                onClick={() => void handleToggle()}
                 aria-expanded={isOpen}
                 aria-controls={panelId}
                 className="justify-start leading-6 rounded-none text-neutral-900 dark:text-neutral-50"
@@ -170,18 +169,12 @@ export function DrainRunCard({ run, timezone, onLoadReport }: DrainRunCardProps)
                     )}
 
                     <section className="flex flex-col gap-2">
-                        <Button
-                            color="link"
-                            size="link"
-                            onClick={() => void handleToggleReport()}
-                            aria-expanded={isReportOpen}
-                            className="self-start"
-                        >
-                            {isReportOpen ? '報告の全文を閉じる' : '報告の全文'}
-                        </Button>
-                        {isReportOpen && isReportLoading && <LoadingIndicator />}
-                        {isReportOpen && !isReportLoading && (
-                            <pre className="overflow-x-auto whitespace-pre-wrap break-words text-sm text-neutral-700 dark:text-neutral-300">
+                        <h4 className="text-sm font-medium leading-6 text-neutral-700 dark:text-neutral-300">
+                            報告
+                        </h4>
+                        {isReportLoading && <LoadingIndicator />}
+                        {!isReportLoading && (
+                            <pre className="overflow-x-auto whitespace-pre-wrap break-words">
                                 {reportText ?? '報告の全文は記録されていません。'}
                             </pre>
                         )}
