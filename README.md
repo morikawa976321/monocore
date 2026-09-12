@@ -15,7 +15,7 @@
 | `/news` | RSS で集めた記事の一覧（ソース別。読み取り専用） |
 | `/drain` | taskbox drain の実行記録（1枠=1カード。読み取り専用） |
 
-実装が守る設計制約と、未決の論点は `docs/design.md`。
+実装が守る設計制約と、未決の論点は `docs/design.md`。AI向けの運用知見（Supabase/PostgREST の落とし穴・運用の実測・過去の判断の理由）は `docs/knowledge/`（engineから2026-09-12に移設。一覧は `docs/knowledge/README.md`）。
 
 ### Schedules（`/schedules`）
 
