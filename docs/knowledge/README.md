@@ -1,50 +1,11 @@
 # docs/knowledge — monocore のAI向け運用知見
 
-context-engine の 02_context から 2026-09-12 の棚卸し(第2回)で移してきたノート。frontmatter は元のまま(`name` / `description` / `created` / `updated`)。本文中の `[[name]]` は同じフォルダ内の `name.md`、または context-engine 側に残ったノートを指す(engine から出たノートへの参照は名前のまま残る)。一覧は `description` の転記(`- name — description`)。grep で探すこと。
+context-engine の 02_context から 2026-09-12 の棚卸し(第2回)で移してきたノート46件を、2026-09-13にトピック別の文書5本へ統合した(元のノートは削除済み)。バックアップ・DB復旧の知見は `docs/supabase-backup.md` へ追記統合済み。grep で探すこと。
 
-- client-side-guard-cannot-reach-the-runaway-client — 判断(2026-09-02) — monocoreの40001暴走対策をクライアント側からサーバ側へ移した。クライアント側の打ち切りは暴走している当のクライアントに到達できないと無力で、実際に全端末リロードでも止まらなかった
-- drain-board-hides-task-details — 判断(2026-09-12) — monocoreの/drainページから、tracesに由来するタスク別詳細の表示をやめた
-- drain-board-keep-48-no-skip-card-consolidation — 事実+本人決定(2026-09-11) — monocore /drain板はupsert時のプルーニングで保持件数が頭打ち(40→48へ引き上げ、24枠×2日分)。連続スキップカードの統合UIは同日前半に見送ったが、8:00〜14:00の7回連続スキップが48枚中7枚を占めた実例で同日後半に実装へ戻した(groupDrainRunsが隣接2件以上のskippedを1枚に畳む。crashedは畳まない)
-- drain-board-machine-values-only — 判断(2026-08-12) — drain報告板の「何をして／どうなったか」はラッパーの機械値とtraces/のsteps[]だけで作り、セッションに構造化ブロックを出させない。薄い→厚いは後から足せるが逆は面倒、が選択理由
-- drain-board-report-four-points — 判断(2026-08-15、粒度は2026-08-30改訂) — drain報告板に載せるのは「何をやったか/うまくいったか/失敗ならその理由/想定外に起きたこと」の4点だけ。①②は1タスク1文の要約まで畳む。③つまずきと④想定外(本人の判断が要る点を含む)は畳まない
-- gen-types-drops-internalsupabase-block — 落とし穴(2026-08-14実測) — supabase CLI 2.114.0の gen types は __InternalSupabase(PostgrestVersion)ブロックを出力しない。生成物でファイルを丸ごと置き換えると既存の記述が黙って消えるので、差分を見て手で戻す
-- mirror-rewrite-internal-cross-links — 判断(2026-08-09) — monocoreミラー実装で、ローカルコンテンツ間の相対リンク(例: 他レポートへの`foo.md`)は同期時にミラー先のルート(`/reports/foo`)へ書き換える。書き換え先が同期対象に無ければ元のまま残す。[[monocore-mirror-design-principles]]の2原則に続く3点目の知見
-- monocore-ai-edit-skill — monocore M1(AI編集権)完了(2026-07-17) — Claudeセッションからmonocoreのschedulesを読み書きするスキルの所在・機能と設計判断(案A採用の理由・REVOKE必須・既定env=remote・AIマーク粒度は日単位許容)
-- monocore-bridge-polling-and-permission-model — 決定(2026-07-20) — monocoreのブリッジはRealtime常駐をやめdrain同様のポーリングにする。破壊的操作はLLM判定+2ターン確認とし、LLM判断は厳格化方向にのみ効かせる
-- monocore-button-variant-decision — monocoreの生<button>統一(20260809-1430)で、4形のうちどれをButtonのバリアントにし、どれを見送ったか・理由
-- monocore-button-variants-too-many — 判断(2026-08-10) — monocoreのButtonはバリアントが増えすぎ(color6値×size7値)と評価。削減案を作らせる。README-design.mdの変更も許容(規約は不変の前提ではない)
-- monocore-db-periodic-backup-added-to-drain — 決定・実装(2026-08-30、同日中にDocker依存を撤去) — monocore本番Supabaseの定期バックアップをtaskbox drainに統合(Invoke-MonocoreDbBackup)。実体はmonocore/scripts/backup/supabase_periodic_backup.ps1。当初npx supabase db dump --linked(Docker経由)で実装したが同日Docker Desktopの実クラッシュを踏み、WSL2に直接postgresql-client-17を入れpg_dumpを叩く方式へ書き換えた
-- monocore-design-doc-vs-practice-gap — 事実+判断(2026-08-09) — monocoreのREADME-design.mdは通常状態カードの境界線をneutral-200/800と規定するが、既存コンポーネント(ProjectCard・Sidebar・空状態ボックス)は軒並みneutral-400/600を使っており文書と実装が食い違っている。/reportsでは既存実装への一貫性を優先し文書には従わなかった。要ユーザー判断
-- monocore-due-tasks-panel-removal — 判断(2026-07-17) — monocore schedulesページの要注意タスクパネル(期限切れ+今日期限)を削除。理由は認知負荷が無駄に上がるだけだったため。Phase 2機能の実運用後の撤回事例
-- monocore-inbox-absorbed-reference-lists — 事実(2026-07-21確認) — knowledge削除後、読みたい本・トレーニングメニュー等「人間が常時読む参照リスト」はmonocoreのinboxブロブに流入していた。窓口一本化と全面凍結の緊張は2026-08-06の凍結解除で「実装で解ける未決問題」に変化、置き場は未決のまま
-- monocore-inbox-emptied-by-single-device-autosave-race — 原因特定(2026-08-30、最有力仮説) — 2026-08-29にmonocore inboxes.contentが空文字列で上書きされた件。useInbox.tsのデバウンス保存+タブ非表示時の即時flushが原因で、全消し直後に中断されると空の状態がそのまま確定しうる
-- monocore-inbox-revisions-content-history-added — 対策(2026-08-30) — monocore inboxesのUPDATE直前のcontentを退避するinbox_revisionsテーブル+トリガーを新設(migration 20260830010000)。schedule_day_revisionsは楽観ロック用カウンタでありcontent履歴ではないので流用不可、と判明したうえでの設計
-- monocore-inbox-write-requires-rest — 運用知見(2026-08-13) — monocoreのinboxはスキル(monocore.py)にコマンドが無くschedules専用。書くにはREST直叩きで、1ユーザー1行のTEXT blobゆえread-modify-writeとバックアップ・冪等マーカー・読み戻し検証が要る
-- monocore-infra-fixed-cloud-async — 決定(2026-07-14) — monocore v2のインフラは束A(Supabase現状維持)で確定し、人間とラップトップ上のAIが非同期にやりとりする構造を採用。非同期チャットの体感もユーザー許容済み(2026-07-16)。設計の正はdocs/design.md(2026-08-06更新)
-- monocore-list-pages-reconsideration — 決定と完了(2026-07-17提起、2026-07-20までに決着) — tasks/knowledgeの一覧ページを廃止。projectsに続き、monocoreの面はSchedule(+Inbox)中心に縮小した
-- monocore-mirror-design-principles — 判断(2026-08-09) — monocoreにローカルの導出物をミラーするときの2原則。①同期はupsertではなく「集合の一致」(ローカルに無い行はdelete) ②導出物は単一形式でのみ持ち、md/HTMLのような二重持ちをしない
-- monocore-phase-plan-abandoned — 判断(2026-08-06) — monocoreのフェーズ計画(Phase 1〜4)を廃止し、設計文書を「実装済み=README」「守る制約と未決の問い=docs/design.md」に分割。証拠: ドラフトは2026-07-18から放置され決定6件と乖離、3a/3b/3c分割は実体が失われ復元不能
-- monocore-postgrest-request-flood — 事実(2026-08-26判明) — monocore本番のpg_stat_statementsで、PostgRESTが全リクエストごとに打つset_config文が1億565万回に達しており、アプリの実クエリ(数万回)の約2000倍。Disk IO予算枯渇の原因はデータ量でもクエリ効率でもなくリクエスト本数
-- monocore-prod-db-is-1mb-scale — 事実(2026-08-26実測) — monocore本番Supabaseの実データは全テーブル合計約1MB・約1,200行しかなく、書き込みも記事5行/時+drain4回/日。SupabaseのDisk IO予算枯渇警告に対し「アプリのデータ量・クエリ最適化」を原因側に置くことはできない
-- monocore-remote-migration-drift-fixed — 事実+運用知見(2026-07-17) — monocore本番DBで2026-04-13のmigrationが3ヶ月間未適用のまま隠れていた。push前の migration list / --dry-run 確認を必須とする教訓
-- monocore-schedule-memo-pane-decision — 判断(2026-08-05) — monocore schedulesの各日セクションに記法制約なしの自由記述メモ欄を併設。PC横3:2・スマホ縦積み、テキストエリア最低高を3行相当から1行+py-2へ縮小
-- news-scraping-moves-into-monocore — 判断(2026-08-14) — news_scrapingの記事保存をJSONLからmonocoreのSupabaseへ移し、閲覧面はmonocore /newsに一本化してFlaskアプリを撤去する。保持は現状踏襲(8日で物理削除)で蓄積案は却下
-- news-scraping-repo-deleted-not-archived — 事実(2026-08-14) — news_scrapingはローカルフォルダもGitHubリポジトリも完全削除された(archiveではない)。移設前の履歴はもう参照できず、scraperのコードがそう書かれている理由はmonocore内のコメントにしか残らない
-- pg-stat-statements-keeps-frozen-rows-after-signature-change — 運用知見(2026-09-02実測) — pg_stat_statementsは関数のシグネチャを変えると旧クエリの行を凍結したまま残す。callsだけ見ると死んだ行を現役と誤読する。stats_sinceを必ず併記すること
-- postgres-dead-tuple-recovery — 運用知見 — 誤って消したPostgresの行は、VACUUM前ならpageinspectでdead tupleの生バイトを読んで完全復元できる(2026-07-17に実際に復旧した手順)
-- postgrest-bulk-insert-key-set-must-match — 落とし穴(2026-08-14実測) — PostgRESTの一括INSERT/upsertは配列内の全オブジェクトのキー集合が完全一致していないとPGRST102「All object keys must match」で400。省略可能な列はnullを明示して埋める
-- postgrest-plus-sign-query-encoding — 運用知見 — PostgRESTのクエリ文字列にtimestamptzを素で埋めると '+' が空白扱いになり22007で失敗する(URLエンコード必須)。楽観ロックのCASが全滅する罠
-- project-board-abolished — 判断(2026-09-11) — monocoreのプロジェクト板(project_cards)を廃止した
-- react-autosave-flush-pitfalls — 運用知見(2026-08-05) — Reactのデバウンス自動保存で踏んだ2つの罠。未保存フラグをeffect依存配列に入れるとcleanupが即flushする／アンマウント時のクリーンアップはフック定義順に走る
-- rehype-sanitize-clobber-prefix-breaks-anchors — 運用知見(2026-08-09実測) — rehype-slug+rehype-sanitizeを組み合わせると、既定スキーマのclobberPrefix("user-content-")が見出しidを書き換え目次アンカーと不一致になる。自分のコンテンツのみ扱うならschema.clobberPrefix=''で無効化する
-- remote-db-push-blocked-for-ai-session — 運用知見(2026-08-12実測) — リモートSupabaseへの `supabase db push` はClaude Codeの自動許可ゲートに弾かれ、AIセッションからは実行できない。DDLを含む変更は「本人が1コマンド打つ」前提で段取りを組む
-- replace-rpc-empty-items-data-loss — 教訓(2026-07-17) — 権限確認のつもりで置換方式RPCに空配列を渡し実データを削除した事故。「成功パスの疎通確認」は破壊的操作になりうる
-- report-warnings-in-index-dont-reach-mirror — 運用知見(2026-08-12) — reportsの_index.mdはmonocoreミラーの同期対象外なので、索引にだけ書いた「この結論は死んでいる」警告はスマホから読む面には届かない。警告は本文側に要る
-- reports-mobile-access-via-monocore — 判断(2026-08-09) — mf/reports/をスマホから読む経路はmonocoreに読み取り専用ミラーを作る方式で確定。全件同期、reportsのコミットとupsertをセットで走らせる。面追加基準「毎日使うか」への本人の回答も含む
-- schedule-revision-conflict-retry-storm — 障害(2026-08-25夕方発生・08-26特定) — monocoreのschedules保存で楽観ロックが40001で恒久的に失敗し続け、クライアントが最速リトライしてSupabaseのCPU55%固定・Disk IO予算枯渇を招いた。原因は「競合時にdirtyフラグを消さない」×「reloadがdirtyな日をサーバ値で上書きしない」の組み合わせで復帰不能状態になること
-- scraper-absorbed-but-not-rewritten — 判断(2026-08-14) — news_scrapingはリポジトリごとmonocoreに吸収してフォルダを消すが、スクレーパーはPythonのまま移設しnodeへ書き直さない。統合の利益は言語と無関係に得られ、書き直しは既に直したバグを買い直すだけと判断した
-- supabase-gen-types-stdout-pollution — 運用知見(2026-08-09実測) — npx supabase gen types typescript --local > file を初回実行時、postgres-metaのDockerイメージ未取得だとpullログがstdoutに混ざり生成ファイルが壊れる。無出力で再実行すれば直る
-- supabase-local-superuser-and-migration-repair — 運用知見 — ローカルSupabaseのpostgresロールはsuperuserではない(superuserはsupabase_admin)。migration履歴のdriftは repair --status applied で帳簿だけ合わせる
-- supabase-logs-explorer-edge-logs-queries-all-failed — 落とし穴(2026-09-02実測) — SupabaseのLogs Explorerで edge_logs へのクエリが何を書いてもBackend errorになり、リクエスト元のUser-Agent特定ができなかった。代替はpg_stat_statements
-- supabase-service-role-vs-authuid-rpc — 運用知見 — Supabaseのservice role keyでは auth.uid() 依存のSECURITY DEFINER RPCが必ず失敗する。monocoreのAI編集権(M1)の前提が実機で破綻した実例
-- supabase-session-delete-does-not-revoke-jwt — 運用知見(2026-08-26実測) — Supabaseで暴走クライアントを止めるとき `delete from auth.sessions` は効かない。JWTはステートレスで発行済みトークンは失効しない。最速の止め方は「リクエストを成功させる」ことだった
+- [supabase-postgrest-pitfalls.md](supabase-postgrest-pitfalls.md) — いつ読むか: Supabase CLI（gen types / migration / db push）やPostgRESTへの直接リクエストを書く・デバッグするとき。中身: gen typesの2つの落とし穴、PostgRESTの一括INSERT/クエリエンコーディングの罠、ローカルSupabaseのsuperuser・migration drift対処、service role keyとauth.uid()の非両立、リモートdb pushがAIセッションから通らない制約、3ヶ月隠れていたmigration未適用の実例
+- [incidents.md](incidents.md) — いつ読むか: 本番障害の再発時の切り分け、または過去のデータ消失・暴走の経緯を確認するとき。中身: (1)2026-07-17疎通確認のつもりの空配列でのデータ削除事故、(2)2026-08-25〜09-02のschedules保存40001リトライストーム(原因・調査の誤読・収束・暴走クライアントの止め方)、(3)2026-08-29〜30のinbox空文字上書きと対策
+- [bridge-and-drain-board.md](bridge-and-drain-board.md) — いつ読むか: taskbox drainの報告板(monocore `/drain`)やAIブリッジ、inbox/projectボードを実装・変更するとき。中身: drain報告板の表示方針の変遷(機械値のみ→4点→1文要約→タスク別詳細非表示)、保持件数とスキップカード統合、プロジェクト板廃止、AIブリッジのポーリング・権限モデル、AI編集権スキル(M1)の設計、inboxへの書き込み手順
+- [pages-and-features-decisions.md](pages-and-features-decisions.md) — いつ読むか: monocoreの既存ページ・コンポーネントの経緯(なぜ今の形か、なぜ削除/追加したか)を確認するとき。中身: インフラ方針(束A+非同期)、フェーズ計画の廃止、tasks/knowledge一覧ページの廃止、要注意タスクパネルの削除、schedulesメモ欄の追加(Reactの自動保存の罠を含む)、Buttonバリアントの統一と見直し、デザイン文書と実装の食い違い(未解決)、inboxへの参照リスト流入(置き場未決)
+- [mirror-and-reports-integration.md](mirror-and-reports-integration.md) — いつ読むか: `mf/reports/` のmonocoreミラーやnews_scrapingの統合を実装・変更するとき。中身: reportsミラーの設計方針(全件同期・集合の一致・単一形式・相対リンク書き換え・markdown変換の罠・索引警告が届かない問題)、news_scrapingのSupabase統合(保持方針・言語を書き直さない判断・移設元リポジトリ完全削除)
+
+バックアップ・DB復旧の関連知見は本フォルダではなく [../supabase-backup.md](../supabase-backup.md) を参照(定期バックアップのdrain統合、pageinspectによる誤削除復旧の手順を追記済み)。
