@@ -1,3 +1,12 @@
+"""
+RSS の取得と記事の正規化（OGP 画像・日付・エンコーディングのフォールバック）。
+
+このファイルは 2026-08-14 に旧リポジトリ mf/news_scraping から移設した。移設元は
+ローカル・GitHub とも削除済みで、移設前の git 履歴は存在しない。OGP の属性順2パターン、
+published_parsed / updated_parsed の優先順、エンコーディングのフォールバックなど
+「なぜこう書いたか」はここのコメントにしか残っていないので、消すと復元できない。
+"""
+
 import re
 import feedparser
 import requests

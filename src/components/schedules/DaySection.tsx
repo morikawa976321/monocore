@@ -77,9 +77,14 @@ export function DaySection({
                     </div>
                 )}
             </header>
-            {/* 予定と自由記述メモ。高さはそれぞれ入力量に合わせて自動調整。 */}
+            {/* 予定と自由記述メモ。高さはそれぞれ入力量に合わせて自動調整。
+                PC は横並びで予定:メモ = 3:2(2026-08-05 本人指定)、スマホは縦積み(375px で横2分割は両方使えない)。 */}
             {/* 仕切り線はセクションの外枠より一段濃くする。プレースホルダを置かないぶん、
                 予定欄とメモ欄の境目はこの線だけが示すため。 */}
+            {/* 最低高 min-h-6 + py-2 = 40px(1行 + 余白)。旧 64px(3行相当)のままメモ欄を縦に足すと、
+                ほぼ空の未来2か月(約60日)で約3,900px 余計にスクロールする。24px(余白なし)だと
+                スマホで予定欄とメモ欄が隣接してタップし分けられず(推奨 44px 前後)、記法警告も出ない
+                メモ欄へ予定を書く無言の失敗になる。40px はその妥協。 */}
             <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-neutral-300 dark:divide-neutral-700 px-1 sm:px-4 py-0 sm:py-2">
                 <div className="sm:basis-3/5 sm:min-w-0 sm:pr-4">
                     <AutoHeightTextarea

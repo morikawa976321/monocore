@@ -136,6 +136,10 @@ export function useDayNotes(supabase: SupabaseClient<Database>): UseDayNotesRetu
     useEffect(() => {
         // アンマウント（SPA遷移）ではデバウンス待ちを捨てずに保存する。
         // タイマーを消すだけにすると、入力から500ms以内の遷移で内容が失われる。
+        // 保存を呼び出し側コンポーネントの cleanup に任せてもだめで、React はアンマウント時の
+        // cleanup をフック定義順（このフック → 呼び出し側）に走らせるため、先にここでタイマーが
+        // 消え、後から走る呼び出し側は「保留中のタイマーが無い」と判断して何も保存しない。
+        // ライフサイクル保存の責務はこのフックに集約し、useSchedules 側では flush しない。
         return () => {
             flushRef.current();
         };

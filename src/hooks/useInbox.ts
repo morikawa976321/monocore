@@ -87,6 +87,11 @@ export function useInbox(supabase: SupabaseClient<Database>): UseInboxReturn {
     }, [hasPendingChanges]);
 
     useEffect(() => {
+        // タブが隠れる/閉じる/フリーズする瞬間に保留中の保存を問答無用で流す。
+        // 「全選択して消す → 貼り直す前にアプリがバックグラウンドへ回る」と空の content が
+        // そのまま確定する経路がここにある(2026-08-29 に inboxes.content が空で上書きされた
+        // 件の最有力原因。未修正)。inbox_revisions が直前の値を退避するので事後には遡れるが、
+        // 空保存自体は防いでいない。直す場合の候補は「保存直前に内容が大きく縮むなら確認を挟む」。
         const flushPendingInboxSave = () => {
             if (inboxDebounceRef.current == null) return;
             saveInboxNow();
