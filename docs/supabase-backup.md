@@ -1,6 +1,10 @@
-# Supabase 手動バックアップ / 本番→ローカル同期
+# Supabase バックアップ / 本番→ローカル同期 / 復元
 
-当面、バックアップは必要なタイミングで手動取得する。定期実行、世代管理、Raspberry Pi への保存は行わない。
+## 定期バックアップ（自動）
+
+`scripts/backup/supabase_periodic_backup.ps1` を taskbox の `drain.ps1` が毎 run の終了時に呼ぶ（`Invoke-MonocoreDbBackup`。2026-08-30 導入）。保存先は `backups/auto/<timestamp>/{schema.sql,data.sql}`、保持 30 日で超過分は自動削除。結果は `backups/auto/backup-status.json` と `taskbox/drain.log` で確認する（`/drain` 板には出さない）。Docker を使わず WSL2 の `pg_dump`（postgresql-client-17）で取る理由・資格情報を永続化しない仕組み・`WSLENV` の区切り文字の罠は、スクリプト冒頭のコメントが正。
+
+導入前の手動バックアップは 2026-08-11 が最後で、2026-08-29 の inbox 空文字上書きでは以後の追記を取り戻せなかった。手動取得は以下の手順で引き続き使える。
 
 ## 本番 → ローカル同期（推奨）
 
@@ -101,3 +105,30 @@ unset RESTORE_DATA_ONLY
 ```
 
 このモードを既存のローカル Supabase に対して使うと、`auth` などの既存スキーマと衝突する可能性がある。
+
+---
+
+## 部分的な復元
+
+### inbox の直前の内容
+
+`inboxes` は UPDATE 直前の `content` を `inbox_revisions` に退避している（直近 50 件。migration `20260830010000`）。空保存などで消えた直前の値は次で取り戻せる:
+
+```sql
+SELECT content FROM inbox_revisions WHERE user_id = '<uuid>' ORDER BY revised_at DESC LIMIT 1;
+```
+
+`schedule_day_revisions` は名前が似ているが楽観ロック用のカウンタで、過去の内容は持たない。他のテーブルで「過去の値を読み返したい」要求が出たときの雛形は `record_inbox_revision()` トリガーの方。
+
+### バックアップが無いとき — dead tuple からの復元
+
+誤って DELETE した行は、**VACUUM が走る前なら** `pageinspect` で dead tuple の生バイトを読んで全項目を原値のまま復元できる（2026-07-17 に schedules 2 行で実施）。
+
+1. まだ VACUUM が走っていないことを確認する（`pg_stat_user_tables` の `last_vacuum` / `last_autovacuum` が空、`n_dead_tup > 0`）。走ると物理的に消えるので、気づいたら即座にやる。
+2. `CREATE EXTENSION pageinspect;`（superuser 必須。ローカルなら `supabase_admin`）。
+3. `heap_page_item_attrs(get_raw_page('<table>', <blkno>), '<table>'::regclass)` で全ページを走査し、`t_xmax <> 0`（削除済み）のタプルを拾う。`t_xmax` は削除したトランザクション ID なので、自分の事故の xid だけを対象にできる。`xid` 型は順序演算子が無いので `ORDER BY t_xmax::text`。
+4. 属性のバイト列を物理表現に従って復号する: `uuid` は 16 バイト raw を 8-4-4-4-12 で区切る / `text` の varlena 短形式は先頭 1 バイトが `(全長<<1)|1` で以降が UTF-8 本体 / `timestamptz` は 8 バイト little-endian int64 = 2000-01-01 00:00:00 UTC からのマイクロ秒。
+5. 復号値で INSERT し直す（`id` / `created_at` も原値で戻せる）。後から `ALTER TABLE ADD COLUMN ... DEFAULT` で足した列は fast default のため古いタプルに物理的に存在せず空で返るので、DEFAULT 値で復元する。
+6. `DROP EXTENSION pageinspect;`
+
+復元の成否は事故前に取った指紋（件数 + `md5(string_agg(id::text, ',' ORDER BY id))`）との一致で機械的に判定できる。破壊的操作の前に指紋を取る規則は `docs/database.md` §5。
