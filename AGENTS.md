@@ -81,6 +81,7 @@ Do not duplicate those rules here. Quick pointers for agents:
 
 ## Agent Behaviour Rules
 
+- **Check `git log` before starting work.** The owner sometimes commits directly to this repo from Cursor while a Claude Code session is running (2026-07-17: 6 unrelated commits in two hours). Migrations and skills that assume an older schema break silently otherwise.
 - Do **not** put DB calls in `page.tsx`; use `lib/supabase/queries/` only.
 - Do **not** rename existing classes/methods/files without explicit approval.
 - Do **not** guess business logic — ask when unclear.
@@ -96,3 +97,7 @@ Do not duplicate those rules here. Quick pointers for agents:
 | `README.md` | Tech stack, development philosophy, DB workflow, test setup, UI/UX requirements, commit rules |
 | `README-design.md` | Design system (single source of truth) |
 | `docs/directory_structure.md` | Directory map, folder roles, dev flow, operational rules, coding style (function declarations) |
+| `docs/design.md` | Constraints the implementation must keep, and open questions |
+| `docs/decisions.md` | Per-surface decisions and their reasons; criteria for adding/removing surfaces |
+| `docs/database.md` | Supabase: service_role vs `auth.uid()`, migration workflow, `gen types`, observation, incidents |
+| `docs/supabase-backup.md` | Periodic/manual backup, prod→local sync, recovery (including dead-tuple restore) |

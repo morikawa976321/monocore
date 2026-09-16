@@ -96,7 +96,7 @@ UIを構成するパーツです。機能ごとにサブフォルダを作りま
 ## 5. 開発フロー：新しい機能（例：メモ機能）を追加する手順
 
 1. **Database**: Supabaseのダッシュボード等で `notes` テーブルを作成。
-2. **Types**: `npx supabase gen types` 等で `src/types/database.types.ts` を更新。
+2. **Types**: `npx supabase gen types` 等で `src/types/database.types.ts` を更新（生成物で丸ごと上書きせず diff を取って手で入れる。理由は `docs/database.md` §4）。
 3. **Queries**: `src/lib/supabase/queries/notes.ts` を作り、データ取得・保存関数を実装。
 4. **Components**: `src/components/notes/` 内に表示用パーツを作成。
 5. **App**: `src/app/notes/page.tsx` を作成し、Queriesを呼び出してComponentsにデータを渡す。
