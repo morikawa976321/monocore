@@ -357,6 +357,15 @@ $$;
 
 -- =======================================================
 -- RPC: 指定日のスケジュールを一括置換（service_role 専用）
+--
+-- p_user_id を引数で受けるのは、service_role の JWT に sub が無く auth.uid() が
+-- NULL になるため（上の replace_schedules_for_day は service_role から呼ぶと
+-- 'Not authenticated' で落ちる）。認証チェックを持たない SECURITY DEFINER 関数なので、
+-- Postgres 既定の PUBLIC EXECUTE のままだと anon が任意ユーザーの予定を破壊できる。
+-- 末尾の REVOKE ... FROM PUBLIC, anon, authenticated → GRANT ... TO service_role が
+-- 必須で、同種の service_role 専用 RPC を足すときも同じ REVOKE を付けること
+-- （本番で anon/publishable key が 401 になることを 2026-07-17 に実機確認）。
+-- 空配列を渡すとその日を全削除する。疎通確認に実呼び出しを使わない（docs/database.md §5）。
 -- =======================================================
 CREATE OR REPLACE FUNCTION public.replace_schedules_for_day_as(
   p_user_id uuid,
