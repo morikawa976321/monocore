@@ -12,6 +12,7 @@ from run_once import collect_all, run_once
 CONFIG = {
     "rss_sites": {"A": "https://a.test/feed", "B": "https://b.test/feed"},
     "blacklist_prefixes": ["https://a.test/ad/"],
+    "blacklist_categories": {"Gigazine": ["試食"]},
     "max_age_days": 8,
 }
 
@@ -100,7 +101,14 @@ def test_collect_all_passes_blacklist_prefixes():
     with patch.object(run_once_module, "collect_new_rss_articles", return_value=[]) as collect:
         collect_all(CONFIG, set(), sleep_seconds=0)
 
-    assert collect.call_args_list[0][0][3] == ["https://a.test/ad/"]
+    assert collect.call_args_list[0][0][3]["prefixes"] == ["https://a.test/ad/"]
+
+
+def test_collect_all_passes_blacklist_categories():
+    with patch.object(run_once_module, "collect_new_rss_articles", return_value=[]) as collect:
+        collect_all(CONFIG, set(), sleep_seconds=0)
+
+    assert collect.call_args_list[0][0][3]["categories"] == {"Gigazine": ["試食"]}
 
 
 def test_collect_all_shares_one_link_set_across_sites():

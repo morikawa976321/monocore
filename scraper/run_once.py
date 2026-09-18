@@ -33,7 +33,10 @@ def collect_all(config, existing_links, sleep_seconds=SLEEP_BETWEEN_SITES_SECOND
     同じ記事が複数サイトに出ても1度しか積まれない。
     """
     target_sites = config.get("rss_sites", {})
-    blacklist_prefixes = config.get("blacklist_prefixes", [])
+    blacklist = {
+        "prefixes": config.get("blacklist_prefixes", []),
+        "categories": config.get("blacklist_categories", {}),
+    }
 
     all_new_articles = []
     for site_name, feed_url in target_sites.items():
@@ -41,7 +44,7 @@ def collect_all(config, existing_links, sleep_seconds=SLEEP_BETWEEN_SITES_SECOND
             continue
 
         all_new_articles.extend(
-            collect_new_rss_articles(feed_url, site_name, existing_links, blacklist_prefixes)
+            collect_new_rss_articles(feed_url, site_name, existing_links, blacklist)
         )
 
         gc.collect()

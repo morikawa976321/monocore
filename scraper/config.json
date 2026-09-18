@@ -15,5 +15,8 @@
     "https://www.gdm.or.jp/specialprice/",
     "https://www.gdm.or.jp/price/"
   ],
+  "blacklist_categories": {
+    "Gigazine": ["試食", "生き物", "取材", "ゲーム", "マンガ", "インタビュー", "ピックアップ", "コラム", "広告"]
+  },
   "max_age_days": 8
 }

@@ -16,6 +16,74 @@ from log_config import get_logger
 
 logger = get_logger(__name__)
 
+_CATEGORY_SPLIT_RE = re.compile(r"[,、]")
+
+
+def _split_category_field(raw):
+    """カテゴリ文字列1件をカンマ・読点で分割し、空要素を除いて返す。"""
+    names = []
+    for part in _CATEGORY_SPLIT_RE.split(str(raw)):
+        name = part.strip()
+        if name:
+            names.append(name)
+    return names
+
+
+def entry_categories(entry):
+    """feedparser の entry からカテゴリ名のリストを取り出す（GIGAZINE の dc:subject 等）。"""
+    names = []
+
+    for tag in entry.get("tags") or []:
+        raw = (tag.get("term") or tag.get("label") or "").strip()
+        if raw:
+            names.extend(_split_category_field(raw))
+
+    for key in ("subject", "dc_subject"):
+        subj = entry.get(key)
+        if subj:
+            names.extend(_split_category_field(subj))
+
+    return list(dict.fromkeys(names))
+
+
+def _resolve_blocked_categories(source_name, blacklist_categories):
+    """blacklist_categories からそのサイトに適用するブロック対象カテゴリの集合を求める。"""
+    if not isinstance(blacklist_categories, dict):
+        return set()
+
+    blocked = set()
+    for key in ("*", source_name):
+        values = blacklist_categories.get(key) or []
+        if isinstance(values, str):
+            values = [values]
+        for name in values:
+            stripped = str(name).strip()
+            if stripped:
+                blocked.add(stripped)
+    return blocked
+
+
+def _entry_matches_blocked_categories(entry, blocked):
+    """記事のカテゴリがすべて blocked に含まれるときだけ True（保存しない）。"""
+    if not blocked:
+        return False
+
+    categories = entry_categories(entry)
+    if not categories:
+        return False
+
+    return all(category in blocked for category in categories)
+
+
+def entry_matches_category_blacklist(entry, source_name, blacklist_categories):
+    """
+    blacklist_categories は { "サイト名": ["カテゴリ", ...], "*": [...] }。
+    記事のカテゴリがすべてブロックリストに含まれるときだけ True（保存しない）。
+    カテゴリが1つでもリスト外にあれば False（保存する）。カテゴリなしは False。
+    """
+    blocked = _resolve_blocked_categories(source_name, blacklist_categories)
+    return _entry_matches_blocked_categories(entry, blocked)
+
 
 def get_article_image(entry):
     """
@@ -76,13 +144,18 @@ def get_article_image(entry):
     return ""
 
 
-def collect_new_rss_articles(rss_url, source_name, existing_links, blacklist_prefixes=None):
+def collect_new_rss_articles(rss_url, source_name, existing_links, blacklist=None):
     """
     RSSフィードを取得し、既存リンクにない新しい記事をリストとして返す。
     ファイルI/Oは行わない。
+
+    blacklist は {"prefixes": [...], "categories": {...}}（両方省略可）。
     """
-    if blacklist_prefixes is None:
-        blacklist_prefixes = []
+    blacklist = blacklist or {}
+    blacklist_prefixes = blacklist.get("prefixes") or []
+    blocked_categories = _resolve_blocked_categories(
+        source_name, blacklist.get("categories") or {}
+    )
 
     new_articles = []
 
@@ -94,10 +167,13 @@ def collect_new_rss_articles(rss_url, source_name, existing_links, blacklist_pre
         for entry in feed.entries:
             link = entry.get("link")
 
-            if link and any(link.startswith(prefix) for prefix in blacklist_prefixes):
+            if not link or link in existing_links:
                 continue
 
-            if not link or link in existing_links:
+            if any(link.startswith(prefix) for prefix in blacklist_prefixes):
+                continue
+
+            if _entry_matches_blocked_categories(entry, blocked_categories):
                 continue
 
             image_url = get_article_image(entry)
