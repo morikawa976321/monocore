@@ -37,6 +37,25 @@ export async function getScheduleDayRevisions(
     return { data, error }
 }
 
+/**
+ * startDay〜endDay（両端含む、YYYY-MM-DD のローカル日付）へ、まだ入れていない既定予定を書き込む。
+ * 戻り値は予定を1件以上足した日の数。その日の revision も進むので、呼び出し側は
+ * これを待ってから getSchedules / getScheduleDayRevisions を読むこと。
+ */
+export async function applyDefaultSchedules(
+    supabase: SupabaseClient<Database>,
+    startDay: string,
+    endDay: string,
+    timezone: string,
+): Promise<{ data: number | null; error: PostgrestError | null }> {
+    const { data, error } = await supabase.rpc('apply_default_schedules', {
+        p_start_day: startDay,
+        p_end_day: endDay,
+        p_timezone: timezone,
+    })
+    return { data, error }
+}
+
 /** 1件分のスケジュール。start_at / end_at は UTC の ISO 文字列であること（呼び出し元で変換する）。 */
 export type ReplaceScheduleItem = {
     activity: string

@@ -14,6 +14,7 @@ import { toZonedTime } from 'date-fns-tz';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/src/types/database.types';
 import {
+    applyDefaultSchedules,
     getScheduleDayRevisions,
     getSchedules,
     replaceSchedulesForDay,
@@ -129,6 +130,18 @@ export function useSchedules(
     });
     const isEditLocked = isInitialSyncing || isResumeSyncing;
 
+    /**
+     * 読み込む日へ既定予定を書き込む。取得より前に待つこと（書き込み後の revision を読むため）。
+     * 失敗しても予定の表示は止めない。既定予定が入らないだけで、次の読み込みで入る。
+     */
+    const applyDefaults = useCallback(
+        async (startDay: string, endDay: string) => {
+            const { error } = await applyDefaultSchedules(supabase, startDay, endDay, tz);
+            if (error) console.error('既定予定の書き込みに失敗しました', error);
+        },
+        [supabase, tz]
+    );
+
     // --- 初回（クライアントのみ）: 日付確定 → entries 生成 → DB fetch → 今日へスクロール ---
     useEffect(() => {
         const str = format(toZonedTime(new Date(), tz), 'yyyy-MM-dd');
@@ -144,14 +157,15 @@ export function useSchedules(
         const startUtc = localTimeToUtc(format(start, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(end, 1), 'yyyy-MM-dd'), '0000', tz);
         void loadNotes(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'));
-        void Promise.all([
-            getSchedules(supabase, startUtc, endUtc),
-            getScheduleDayRevisions(
-                supabase,
-                format(start, 'yyyy-MM-dd'),
-                format(end, 'yyyy-MM-dd')
-            ),
-        ])
+        void applyDefaults(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'))
+            .then(() => Promise.all([
+                getSchedules(supabase, startUtc, endUtc),
+                getScheduleDayRevisions(
+                    supabase,
+                    format(start, 'yyyy-MM-dd'),
+                    format(end, 'yyyy-MM-dd')
+                ),
+            ]))
             .then(([schedulesResult, revisionsResult]) => {
                 if (schedulesResult.error || revisionsResult.error) {
                     setSyncError('スケジュールの読み込みに失敗しました。');
@@ -175,6 +189,7 @@ export function useSchedules(
         void loadNotes(format(rangeStart, 'yyyy-MM-dd'), format(rangeEnd, 'yyyy-MM-dd'));
         const startUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), '0000', tz);
+        await applyDefaults(format(rangeStart, 'yyyy-MM-dd'), format(rangeEnd, 'yyyy-MM-dd'));
         const [schedulesResult, revisionsResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(
@@ -203,7 +218,7 @@ export function useSchedules(
         setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
         setLoadingTop(false);
         setLoadingBottom(false);
-    }, [rangeStart, rangeEnd, tz, supabase, loadNotes]);
+    }, [rangeStart, rangeEnd, tz, supabase, loadNotes, applyDefaults]);
 
     useEffect(() => {
         if (!todayStr || entries.length === 0) return;
@@ -464,6 +479,7 @@ export function useSchedules(
             tz
         );
         const endUtc = localTimeToUtc(format(addDays(newEnd, 1), 'yyyy-MM-dd'), '0000', tz);
+        await applyDefaults(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd'));
         const [schedulesResult, revisionsResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(
@@ -479,7 +495,7 @@ export function useSchedules(
         setEntries((prev) => [...prev, ...merged]);
         setRangeEnd(newEnd);
         setLoadingBottom(false);
-    }, [loadingBottom, rangeEnd, supabase, tz, loadNotes]);
+    }, [loadingBottom, rangeEnd, supabase, tz, loadNotes, applyDefaults]);
 
     const loadMorePast = useCallback(async () => {
         if (loadingTop || !hasMorePast || !rangeStart) return;
@@ -488,6 +504,7 @@ export function useSchedules(
         const newEntries = generateDayEntries(newStart, addDays(rangeStart, -1));
         const startUtc = localTimeToUtc(format(newStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
+        await applyDefaults(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd'));
         const [noteCount, [schedulesResult, revisionsResult]] = await Promise.all([
             loadNotes(
                 format(newStart, 'yyyy-MM-dd'),
@@ -519,7 +536,7 @@ export function useSchedules(
         setEntries((prev) => [...merged, ...prev]);
         setRangeStart(newStart);
         setLoadingTop(false);
-    }, [loadingTop, hasMorePast, rangeStart, supabase, tz, loadNotes]);
+    }, [loadingTop, hasMorePast, rangeStart, supabase, tz, loadNotes, applyDefaults]);
 
     useEffect(() => {
         const container = scrollContainerRef.current;

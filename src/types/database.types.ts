@@ -108,6 +108,68 @@ export type Database = {
         }
         Relationships: []
       }
+      default_schedule_applications: {
+        Row: {
+          applied_at: string
+          day_key: string
+          default_schedule_id: string
+          user_id: string
+        }
+        Insert: {
+          applied_at?: string
+          day_key: string
+          default_schedule_id: string
+          user_id: string
+        }
+        Update: {
+          applied_at?: string
+          day_key?: string
+          default_schedule_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "default_schedule_applications_default_schedule_id_fkey"
+            columns: ["default_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "default_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      default_schedules: {
+        Row: {
+          activity: string
+          created_at: string
+          effective_from: string
+          end_time: string | null
+          id: string
+          start_time: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity: string
+          created_at?: string
+          effective_from?: string
+          end_time?: string | null
+          id?: string
+          start_time: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          activity?: string
+          created_at?: string
+          effective_from?: string
+          end_time?: string | null
+          id?: string
+          start_time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inboxes: {
         Row: {
           content: string
@@ -236,6 +298,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_default_schedules: {
+        Args: {
+          p_end_day: string
+          p_start_day: string
+          p_timezone: string
+        }
+        Returns: number
+      }
       replace_schedules_for_day: {
         Args: {
           p_day_end_utc: string
