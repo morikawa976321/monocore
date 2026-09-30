@@ -124,6 +124,8 @@ $($problems | ForEach-Object { "- $_" } | Out-String)
 
 - ``monocore\backups\auto\backup.log`` の直近の実行ブロック
 - ``monocore\backups\auto\backup-status.json``(機械可読の最新状態。``reason`` フィールドを見る)
+- ``monocore\backups\auto\<日時>\FAILED.txt``(失敗した回のダンプディレクトリの目印。その回の
+  schema.sql / data.sql は途中で打ち切られた不完全なものの可能性があり、復元に使わない)
 - 理由コード別:
   - ``pgdump_missing`` … Windows に PostgreSQL 17 以上の ``pg_dump.exe`` が見つからない、または
     ``--version`` が動かない。``& 'C:\Program Files\PostgreSQL\17\bin\pg_dump.exe' --version`` で
@@ -191,8 +193,9 @@ function Complete-BackupFailure([string]$ReasonCode, [string]$Message, [int]$Pro
 }
 
 # Windowsのコマンドライン規則に従って引数配列を1本の文字列へ組み立てる。空白か " を含む引数だけを
-# 引用符で囲み、" の直前と末尾の逆スラッシュ列は倍にする。`wsl.exe -- bash -c '<" を含むスクリプト>'`
-# がこの規則で正しく渡ることを実測で確認済み(直接 `& wsl.exe ...` と同一の出力になる)。
+# 引用符で囲み、" の直前と末尾の逆スラッシュ列は倍にする。この規則で、2026-09-30 まで使っていた
+# WSL 版の `wsl.exe -- bash -c '<" を含むスクリプト>'` も正しく渡ることを実測で確認していた
+# (直接 `& wsl.exe ...` と同一の出力になる)。今は pg_dump.exe と npx にこの規則で引数を渡す。
 function ConvertTo-BoundedArgumentLine {
     param([string[]]$Arguments = @())
     $q  = [string][char]34   # "
@@ -268,7 +271,7 @@ function Invoke-BoundedProcess {
             return $r
         }
         try {
-            # 標準入力を閉じる。sudo のパスワード待ち等で無人環境が固まるのを防ぐ。
+            # 標準入力を閉じる。対話プロンプトで待つ子(npx のインストール確認等)で無人環境が固まるのを防ぐ。
             $proc.StandardInput.Close()
             $outTask = $proc.StandardOutput.ReadToEndAsync()
             $errTask = $proc.StandardError.ReadToEndAsync()
@@ -282,9 +285,8 @@ function Invoke-BoundedProcess {
             $r.timedOut = $true
             $r.failure = 'timeout'
             $r.message = ("{0} が{1}秒応答なしのため打ち切った" -f $Label, $TimeoutSeconds)
-            # この時点だけはプロセスが確実に生きているとわかっている。なお wsl.exe を殺しても
-            # WSL側(Linux)のプロセスは残りうる。ここで保証するのは「呼び出し元が有限時間で
-            # 戻ること」だけで、WSL内の後始末はしない。
+            # この時点だけはプロセスが確実に生きているとわかっているので、プロセスツリーごと終了させる
+            # (taskkill /T /F)。ここで保証するのは「呼び出し元が有限時間で戻ること」だけ。
             try { & taskkill /T /F /PID $proc.Id 2>&1 | Out-Null } catch {}
             return $r
         }
@@ -303,8 +305,9 @@ function Invoke-BoundedProcess {
         $r.exitCode = $proc.ExitCode
         $r.stdout = [string]$outTask.Result
         $r.stderr = [string]$errTask.Result
-        # wsl.exe 自身の診断メッセージはUTF-16LEで出るため既定のデコードではNUL混じりになる。
-        # ログに載せる用途だけなのでNULを落として読める形にする(WSL内プロセスの出力は素通し)。
+        # 子の出力にNUL(UTF-16LEの診断メッセージなど)が混じることがあるので落とす。ログに載せる用途だけ。
+        # なお pg_dump.exe は日本語ロケールだとエラー文をCP932で出し、ここ(UTF-8として読む)では
+        # 文字化けする。そのため呼び出し側(Invoke-PgDump)で LC_MESSAGES=C を設定して英語で出させている。
         $r.output = (($r.stdout + "`n" + $r.stderr) -replace "`0", '').Trim()
         $r.ok = ($r.exitCode -eq 0)
         return $r
@@ -326,11 +329,38 @@ function Invoke-BoundedProcess {
 $pgDumpProbeTimeoutSeconds = 60    # --version だけ。コールドスタートが遅くても余る
 $pgDumpTimeoutSeconds      = 900   # schema / data それぞれ。実測は数秒(data.sql 約2MB)なので桁違いに余る
 
-# 候補: <ProgramFiles>\PostgreSQL\<メジャー>\bin\pg_dump.exe のうち、$pgDumpMinMajor 以上で最大のもの。
+# 環境変数を設定/削除する。$null なら**本当に削除する**。`[Environment]::SetEnvironmentVariable(名前, $null)` は
+# pwsh 7.6 で変数を消さず**空の値で残す**(子プロセスに `PGSSLMODE=` のように渡り、libpq が空の値を設定済みと
+# 解釈しうる。実測)。Remove-Item Env:\名前 と `$env:名前 = $null` は正しく消える。
+function Set-EnvVar {
+    # $Value に [string] を付けてはいけない: PowerShell は $null を空文字へ変換してしまい、削除の分岐に入らない。
+    param([string]$Name, $Value)
+    if ($null -eq $Value) { Remove-Item -LiteralPath ('Env:\' + $Name) -ErrorAction SilentlyContinue }
+    else { Set-Item -LiteralPath ('Env:\' + $Name) -Value $Value }
+}
+
+# pg_dump.exe の呼び出し。LC_MESSAGES=C で英語のメッセージを出させる(2026-09-30、独立レビューの指摘)。
+# 日本語ロケールの pg_dump.exe はエラー文を CP932 で出し、Invoke-BoundedProcess は UTF-8 として読むので
+# 文字化けする。エラー文はログ・backup-status.json・調査タスク本文に載る(本人に届く唯一の経路)ので、
+# 読めなければ意味が無い(旧 WSL 版は英語で出ていた)。ダンプ本文(SQL)はメッセージ翻訳の対象ではない
+# ので出力は変わらない。呼び出しの間だけ設定し、終わったら元へ戻す(drain と同じプロセスで動くため)。
+function Invoke-PgDump {
+    param([string]$Bin, [string[]]$Arguments, [int]$TimeoutSeconds, [string]$Label)
+    $prev = $env:LC_MESSAGES
+    $env:LC_MESSAGES = 'C'
+    try {
+        return (Invoke-BoundedProcess -FileName $Bin -Arguments $Arguments -TimeoutSeconds $TimeoutSeconds -Label $Label)
+    } finally {
+        Set-EnvVar 'LC_MESSAGES' $prev
+    }
+}
+
+# 候補: <ProgramFiles>\PostgreSQL\<メジャー>\bin\pg_dump.exe のうち $pgDumpMinMajor 以上を、新しい順に全部返す。
+# 32bit の PowerShell では ProgramFiles が x86 を指すので、64bit 側(ProgramW6432)も探す。
 function Find-PgDump {
     $found = @()
-    foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
-        if (-not $base) { continue }
+    $bases = @($env:ProgramW6432, $env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ } | Select-Object -Unique
+    foreach ($base in $bases) {
         $pg = Join-Path $base 'PostgreSQL'
         if (-not (Test-Path $pg)) { continue }
         foreach ($d in (Get-ChildItem $pg -Directory -ErrorAction SilentlyContinue)) {
@@ -341,21 +371,34 @@ function Find-PgDump {
             }
         }
     }
-    return @($found | Sort-Object Major -Descending | Select-Object -First 1)
+    return @($found | Sort-Object Major -Descending)
 }
 
-$pgDumpCandidate = @(Find-PgDump)
-if ($pgDumpCandidate.Count -eq 0) {
-    Complete-BackupFailure 'pgdump_missing' ("PostgreSQL {0} 以上の pg_dump.exe が見つからない(探索先: <ProgramFiles>\PostgreSQL\<メジャー>\bin)" -f $pgDumpMinMajor) 0
+# 動く最初の候補を採る(最新版のフォルダが壊れていても、次の候補=17へ戻る)。17以上かは、ディレクトリ名
+# ではなく --version の実際の出力で確かめる。
+$pgDumpBin = $null
+$pgDumpVersion = ''
+$probeNotes = @()
+foreach ($cand in @(Find-PgDump)) {
+    $probe = Invoke-PgDump -Bin $cand.Path -Arguments @('--version') -TimeoutSeconds $pgDumpProbeTimeoutSeconds -Label 'pg_dump --version'
+    if ($probe.failure -or -not $probe.ok) {
+        $why = if ($probe.failure) { $probe.message } else { "exit={0}: {1}" -f $probe.exitCode, $probe.output }
+        $probeNotes += ("{0}: {1}" -f $cand.Path, $why)
+        continue
+    }
+    if ($probe.output -match 'pg_dump \(PostgreSQL\) (\d+)' -and [int]$Matches[1] -ge $pgDumpMinMajor) {
+        $pgDumpBin = $cand.Path
+        $pgDumpVersion = $probe.output
+        break
+    }
+    $probeNotes += ("{0}: バージョンが {1} 未満か読めない: {2}" -f $cand.Path, $pgDumpMinMajor, $probe.output)
 }
-$pgDumpBin = $pgDumpCandidate[0].Path
-$pgDumpProbe = Invoke-BoundedProcess -FileName $pgDumpBin -Arguments @('--version') `
-                   -TimeoutSeconds $pgDumpProbeTimeoutSeconds -Label 'pg_dump --version'
-if ($pgDumpProbe.failure -or -not $pgDumpProbe.ok) {
-    $why = if ($pgDumpProbe.failure) { $pgDumpProbe.message } else { "exit={0}: {1}" -f $pgDumpProbe.exitCode, $pgDumpProbe.output }
-    Complete-BackupFailure 'pgdump_missing' ("pg_dump.exe が動かない: {0} ({1})" -f $why, $pgDumpBin) 0
+if (-not $pgDumpBin) {
+    $detail = if ($probeNotes.Count -gt 0) { ' — ' + ($probeNotes -join ' / ') } else { '' }
+    Complete-BackupFailure 'pgdump_missing' ("PostgreSQL {0} 以上の動く pg_dump.exe が見つからない(探索先: <ProgramFiles>\PostgreSQL\<メジャー>\bin){1}" -f $pgDumpMinMajor, $detail) 0
 }
-Write-Log ('pg_dump: ' + $pgDumpProbe.output + ' (' + $pgDumpBin + ')')
+Write-Log ('pg_dump: ' + $pgDumpVersion + ' (' + $pgDumpBin + ')')
+
 # ---------------------------------------------------------------
 # 2. 本番の接続情報を解決(npx supabase db dump --linked --dry-run。Dockerは使わない)
 #
@@ -492,6 +535,14 @@ New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 $schemaPath = Join-Path $runDir 'schema.sql'
 $dataPath = Join-Path $runDir 'data.sql'
 
+# 環境の隔離(2026-09-30、独立レビューの指摘): Windows 側や drain のプロセスに PGSSLMODE / PGSERVICE /
+# PGOPTIONS / PGPASSFILE などがあると、pg_dump.exe がそれを受け継いでダンプの接続が黙って変わる。
+# 旧 WSL 版は WSLENV で渡した5つだけが見えていたので、それと同じにするため、既存の PG* をいったん
+# 全部退避して消し、終わったら戻す。
+$savedPgEnv = @{}
+foreach ($e in @(Get-ChildItem Env: | Where-Object { $_.Name -like 'PG*' })) { $savedPgEnv[$e.Name] = $e.Value }
+foreach ($k in @($savedPgEnv.Keys)) { Set-EnvVar $k $null }
+
 $env:PGHOST = $pgHost
 $env:PGPORT = $pgPort
 $env:PGUSER = $pgUser
@@ -504,7 +555,7 @@ $env:PGDATABASE = $pgDatabase
 # --encoding=UTF8 は明示(サーバのエンコーディングと同じで、出力は変わらない)。
 try {
     Write-Log 'スキーマダンプ開始(pg_dump.exe)'
-    $schemaRun = Invoke-BoundedProcess -FileName $pgDumpBin -TimeoutSeconds $pgDumpTimeoutSeconds -Label 'スキーマダンプ' `
+    $schemaRun = Invoke-PgDump -Bin $pgDumpBin -TimeoutSeconds $pgDumpTimeoutSeconds -Label 'スキーマダンプ' `
         -Arguments @('--role=postgres', '--schema-only', '--no-owner', '--no-privileges', '--encoding=UTF8', ('--file=' + $schemaPath))
     if ($schemaRun.failure) {
         $problems += $schemaRun.message
@@ -512,16 +563,22 @@ try {
         $problems += "スキーマダンプが exit=$($schemaRun.exitCode): $($schemaRun.output)"
     }
 
-    Write-Log 'データダンプ開始(pg_dump.exe)'
-    $dataRun = Invoke-BoundedProcess -FileName $pgDumpBin -TimeoutSeconds $pgDumpTimeoutSeconds -Label 'データダンプ' `
-        -Arguments @('--role=postgres', '--data-only', '--encoding=UTF8', ('--file=' + $dataPath))
-    if ($dataRun.failure) {
-        $problems += $dataRun.message
-    } elseif (-not $dataRun.ok) {
-        $problems += "データダンプが exit=$($dataRun.exitCode): $($dataRun.output)"
+    if ($schemaRun.timedOut) {
+        # DB が応答していない可能性が高い。データも同じ上限だけ待つと、最悪 上限の2倍ぶん drain を塞ぐ。
+        $problems += 'データダンプは、スキーマダンプがタイムアウトしたため省略した'
+    } else {
+        Write-Log 'データダンプ開始(pg_dump.exe)'
+        $dataRun = Invoke-PgDump -Bin $pgDumpBin -TimeoutSeconds $pgDumpTimeoutSeconds -Label 'データダンプ' `
+            -Arguments @('--role=postgres', '--data-only', '--encoding=UTF8', ('--file=' + $dataPath))
+        if ($dataRun.failure) {
+            $problems += $dataRun.message
+        } elseif (-not $dataRun.ok) {
+            $problems += "データダンプが exit=$($dataRun.exitCode): $($dataRun.output)"
+        }
     }
 } finally {
-    Remove-Item Env:\PGHOST, Env:\PGPORT, Env:\PGUSER, Env:\PGPASSWORD, Env:\PGDATABASE -ErrorAction SilentlyContinue
+    foreach ($k in 'PGHOST', 'PGPORT', 'PGUSER', 'PGPASSWORD', 'PGDATABASE') { Set-EnvVar $k $null }
+    foreach ($k in $savedPgEnv.Keys) { Set-EnvVar $k $savedPgEnv[$k] }
 }
 
 if (Test-Path $schemaPath) { $schemaBytes = (Get-Item $schemaPath).Length }
@@ -533,6 +590,15 @@ if ($dataBytes -le 64) { $problems += "data.sqlが小さすぎる(${dataBytes} b
 if ($problems.Count -gt 0) {
     if (-not $reason) { $reason = 'dump_failed' }
     foreach ($p in $problems) { Write-Log ('異常: ' + $p) }
+    # 失敗した回のディレクトリを、正常な回と見分けられるようにする(タイムアウトで打ち切られた不完全な
+    # ダンプが残りうる。backup-status.json は最新の1回分しか持たない)。消さない: 破損の証拠になる。
+    # ディレクトリ名は変えない: 保持期間の削除が名前(yyyyMMdd-HHmmss)で判定するため。
+    try {
+        $mark = @("reason=$reason", ('ran_at=' + (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK'))) + @($problems | ForEach-Object { "- $_" })
+        [System.IO.File]::WriteAllText((Join-Path $runDir 'FAILED.txt'), (($mark -join "`r`n") + "`r`n"), $script:Utf8NoBom)
+    } catch {
+        Write-Log ('FAILED.txt を書けなかった: ' + $_.Exception.Message)
+    }
     Write-Status $false
     Add-QueueFailureTask
     Write-Log ("===== monocore db backup end {0} exit=1 (dump failed) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
