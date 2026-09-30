@@ -154,6 +154,11 @@ $($problems | ForEach-Object { "- $_" } | Out-String)
 
 - バックアップ先のファイルを消して作り直さない(破損の証拠が消える)。
 - 原因が特定できないまま「復旧した」と報告しない。
+- **ユーザー判断・ユーザー操作が要る結論**(pg_dump.exe の導入・Supabase CLI の再ログイン・
+  バックアップ方式の変更など)は、報告ファイルやtraceに書くだけでは本人に届かない。
+  $taskboxRoot\handover.md に「status: carry — 本人判断待ち」のエントリとして残すこと
+  (書き方は taskbox の README「handover.md の憲章と運用」)。本人はこのDBバックアップの失敗を
+  /drain 板では見ない(2026-09-05のユーザー決定)ので、これが唯一の通知経路になる。
 "@
         [System.IO.File]::WriteAllText($qpath, $body, $script:Utf8NoBom)
         Write-Log ('queue へ調査タスクを積んだ: ' + $qname)
