@@ -2,7 +2,7 @@
 
 ## 定期バックアップ（自動）
 
-`scripts/backup/supabase_periodic_backup.ps1` を taskbox の `drain.ps1` が毎 run の終了時に呼ぶ（`Invoke-MonocoreDbBackup`。2026-08-30 導入）。保存先は `backups/auto/<timestamp>/{schema.sql,data.sql}`、保持 30 日で超過分は自動削除。結果は `backups/auto/backup-status.json` と `taskbox/drain.log` で確認する（`/drain` 板には出さない）。Docker を使わず WSL2 の `pg_dump`（postgresql-client-17）で取る理由・資格情報を永続化しない仕組み・`WSLENV` の区切り文字の罠は、スクリプト冒頭のコメントが正。
+`scripts/backup/supabase_periodic_backup.ps1` を taskbox の `drain.ps1` が毎 run の終了時に呼ぶ（`Invoke-MonocoreDbBackup`。2026-08-30 導入）。保存先は `backups/auto/<timestamp>/{schema.sql,data.sql}`、保持 30 日で超過分は自動削除。結果は `backups/auto/backup-status.json` と `taskbox/drain.log` で確認する（`/drain` 板には出さない）。Docker も WSL も使わず Windows ネイティブの `pg_dump.exe`（PostgreSQL 17 以上。`C:\Program Files\PostgreSQL\<メジャー>\bin`）で取る理由・資格情報を永続化しない仕組みは、スクリプト冒頭のコメントが正。`pg_dump.exe` が無いと `pgdump_missing` で失敗して taskbox の queue に調査タスクが積まれる（自動導入はしない）。
 
 導入前の手動バックアップは 2026-08-11 が最後で、2026-08-29 の inbox 空文字上書きでは以後の追記を取り戻せなかった。手動取得は以下の手順で引き続き使える。
 
