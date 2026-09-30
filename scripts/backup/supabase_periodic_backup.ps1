@@ -1,28 +1,33 @@
 ﻿# monocore 本番Supabase — 定期バックアップ(スキーマ+データ)
 #
 # 起動: taskbox drain.ps1 が毎run終了時に呼ぶ(Invoke-MonocoreDbBackup)。枠は drain と同じ
-#       01/07/13/19時。判断が要らない機械工程なので claude は起動しない。
+#       毎時24枠+ログオン時(2026-09-11に1日4回から変更)。判断が要らない機械工程なので
+#       claude は起動しない。
 #       手動: pwsh -ExecutionPolicy Bypass -File C:\Users\tm976\mf\monocore\scripts\backup\supabase_periodic_backup.ps1
 #
 # 経緯(2026-08-30): inboxes.contentが空文字列で上書きされ、直近の手動バックアップ
 # (backups/manual)が2026-08-11までしか遡れなかった。手動バックアップは「必要なタイミングで
 # 取る」運用のため、日常的な取りこぼしを防ぐ定期実行が無かった。
 #
-# ■ Dockerを使わない設計(2026-08-30、当初のDocker版から書き換え)
-#   当初はDocker経由(npx supabase db dump --linked)で実装したが、同日Docker Desktopが
+# ■ Docker も WSL も使わない設計(2026-09-30、WSL版から書き換え。その前は2026-08-30にDocker版から書き換え)
+#   当初(2026-08-30)はDocker経由(npx supabase db dump --linked)で実装したが、同日Docker Desktopが
 #   sailor-ingest.sockのバインドに失敗して繰り返しクラッシュする不具合を実地で踏んだ
 #   (Windows側の問題で、WSLの完全シャットダウンでも直らなかった)。無人実行のたびに
 #   Docker Desktop(GUIアプリ)の起動待ちに依存するのはそれ自体が壊れやすい設計だったため、
-#   WSL2(Ubuntu)へ直接 postgresql-client-17 を入れ、pg_dumpをDocker無しで直接実行する方式へ
-#   切り替えた。`wsl.exe`はGUIセッションが無くても動くコマンドラインツールなので、
-#   Docker Desktopより無人実行との相性が良い。
+#   WSL2(Ubuntu)の postgresql-client-17 で pg_dump を直接実行する方式へ切り替えた。
+#   2026-09-30 に Debian 移行計画の Phase 1 で WSL の Ubuntu ディストロを削除した結果、pg_dump が
+#   消えて毎時のバックアップが 19:03 の回から失敗した(reason=wsl_pgdump_missing)。
+#   Windows には PostgreSQL 17 が入っており(C:\Program Files\PostgreSQL\17、pg_dump 17.11)、
+#   pg_dump.exe は GUI も仮想マシンも要らずコマンドラインだけで動く。WSL の起動待ち・ディストロの
+#   状態・環境変数の受け渡し(WSLENV)への依存が丸ごと無くなるので、Windowsネイティブの
+#   pg_dump.exe を直接実行する方式へ切り替えた。
 #
 # ■ 資格情報を一切永続化しない(docs/supabase-backup.md の既存方針を踏襲)
 #   `npx supabase db dump --linked --dry-run` が接続情報(PGHOST/PGPORT/PGUSER/PGPASSWORD/
 #   PGDATABASE)を都度解決する(CLIのログイン済みセッションを使う。dry-runはDockerを使わない
 #   ことを実地で確認済み)。取得した値はこのスクリプト内のメモリ上でのみ扱い、ディスク上の
-#   どのファイルにも書かない。WSLへは`$env:WSLENV`(コロン区切り。スラッシュ区切りだと
-#   このWSLビルドでは転送に失敗することを実地で確認した)経由で環境変数として渡すのみ。
+#   どのファイルにも書かない。pg_dump.exe へは子プロセスの環境変数(PGHOST等)として渡すのみで、
+#   コマンドラインには載せない。
 #
 # ■ スキーマ変更に追随するためスクリプトを書き直さない設計
 #   pg_dumpはテーブル名を一切ハードコードせず、その時点の実スキーマを丸ごと読む。テーブルの
@@ -30,11 +35,12 @@
 #   取る。プレーンSQLで保存するのは、pg_restoreが無くても psql -f だけで中身を読める/
 #   戻せるようにするため。
 #
-# ■ WSL側の前提(初回のみ手動セットアップ済み。以降は自動判定してスキップ)
-#   WSL Ubuntuディストロに postgresql-client-17 (apt.postgresql.org / PGDG) を導入済み。
-#   本番がPostgreSQL 17系のため、pg_dumpもバージョンを合わせる必要がある
-#   (バージョンが古いと `aborting because of server version mismatch` で拒否される)。
-#   未導入の環境で動かす場合は Install-PgDump17IfMissing が自動導入を試みる。
+# ■ pg_dump の前提(自動導入はしない)
+#   Windows に PostgreSQL 17 以上のクライアントツール(pg_dump.exe)があること。探索先は
+#   <ProgramFiles>\PostgreSQL\<メジャー>\bin\pg_dump.exe で、17以上のうち最大のメジャーを使う。
+#   本番がPostgreSQL 17系のため、pg_dumpが古いと `aborting because of server version mismatch` で
+#   拒否される(新しい分には問題ない)。見つからなければ pgdump_missing で失敗して調査タスクが積まれる。
+#   自動導入は試みない: Windows では導入に管理者権限か対話が要り、無人実行では誰も操作できない。
 
 param(
     [int]$RetentionDays = 30
@@ -48,8 +54,7 @@ $taskboxRoot = 'C:\Users\tm976\mf\taskbox'
 $backupRoot  = Join-Path $repoRoot 'backups\auto'
 $log         = Join-Path $backupRoot 'backup.log'
 $statusPath  = Join-Path $backupRoot 'backup-status.json'
-$wslDistro   = 'Ubuntu'
-$pgDumpBin   = '/usr/lib/postgresql/17/bin/pg_dump'
+$pgDumpMinMajor = 17   # 本番のPostgreSQLのメジャー。これ未満の pg_dump は version mismatch で拒否される
 
 New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
 
@@ -120,11 +125,9 @@ $($problems | ForEach-Object { "- $_" } | Out-String)
 - ``monocore\backups\auto\backup.log`` の直近の実行ブロック
 - ``monocore\backups\auto\backup-status.json``(機械可読の最新状態。``reason`` フィールドを見る)
 - 理由コード別:
-  - ``wsl_pgdump_missing`` … WSL Ubuntu側に postgresql-client-17 が無い/壊れている。
-    ``wsl -d Ubuntu -- /usr/lib/postgresql/17/bin/pg_dump --version`` で手動確認する
-  - ``wsl_unresponsive`` … ``wsl.exe`` 自体が既定の秒数(上の「検出された異常」参照)返ってこない、
-    または起動できなかった。WSLの仮想マシンが起動途中/前回のクラッシュ残骸で固まっている疑い。
-    ``wsl -l -v`` で状態を見て、必要なら ``wsl --shutdown`` してから手動で1回起動する
+  - ``pgdump_missing`` … Windows に PostgreSQL 17 以上の ``pg_dump.exe`` が見つからない、または
+    ``--version`` が動かない。``& 'C:\Program Files\PostgreSQL\17\bin\pg_dump.exe' --version`` で
+    手動確認する。無ければ公式インストーラの Command Line Tools を入れる(自動導入はしない)
   - ``credentials_failed`` … ``npx supabase db dump --linked --dry-run`` 自体が失敗。CLIログイン
     セッションの失効(``npx supabase login``)、ネットワーク、Supabase側の障害を疑う
   - ``timeout`` … ``npx supabase db dump --linked --dry-run`` のプロセス自体が既定の秒数
@@ -144,7 +147,7 @@ $($problems | ForEach-Object { "- $_" } | Out-String)
     (自動でのkillは意図的に行っていない — 終了済みPIDの再利用による誤爆を避けるため)
   - ``dryrun_read_failed`` … 標準出力/エラーの読み取り自体が例外で失敗。まれなOSレベルの
     異常を疑う
-  - ``dump_failed`` … pg_dump自体の失敗。バージョン不一致・接続エラーなどログ本文を見る
+  - ``dump_failed`` … pg_dump自体の失敗(タイムアウトを含む)。バージョン不一致・接続エラーなどログ本文を見る
   - それ以外 … ログの全文を見る
 
 ## 制約
@@ -311,54 +314,43 @@ function Invoke-BoundedProcess {
 }
 
 # ---------------------------------------------------------------
-# 1. WSL側にpg_dump 17があるか確認(無ければ導入を試みる)
+# 1. Windows の pg_dump.exe を探して動作確認する(2026-09-30、WSL版から書き換え)
 # ---------------------------------------------------------------
-# wsl.exe の呼び出しにタイムアウトを掛ける(2026-09-10追加)。WSLの仮想マシン自体が応答しない
-# (初回起動・前回のクラッシュ残骸等)と `wsl.exe` そのものが返らず、drain全体が無期限に止まる。
+# 外部プロセスはすべてタイムアウト付きで呼ぶ(2026-09-09のハング事故と同じ理由)。
 # 値はいずれも実測に基づかない暫定の上限。
-$wslProbeTimeoutSeconds   = 180  # VMのコールドスタートを含みうる軽量コマンド
-$wslInstallTimeoutSeconds = 900  # apt-get update + install。ネットワーク依存で重い
+$pgDumpProbeTimeoutSeconds = 60    # --version だけ。コールドスタートが遅くても余る
+$pgDumpTimeoutSeconds      = 900   # schema / data それぞれ。実測は数秒(data.sql 約2MB)なので桁違いに余る
 
-function Test-PgDump17 {
-    return (Invoke-BoundedProcess -FileName 'wsl.exe' `
-                -Arguments @('-d', $wslDistro, '--', 'test', '-x', $pgDumpBin) `
-                -TimeoutSeconds $wslProbeTimeoutSeconds -Label 'WSLのpg_dump 17の有無確認')
+# 候補: <ProgramFiles>\PostgreSQL\<メジャー>\bin\pg_dump.exe のうち、$pgDumpMinMajor 以上で最大のもの。
+function Find-PgDump {
+    $found = @()
+    foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if (-not $base) { continue }
+        $pg = Join-Path $base 'PostgreSQL'
+        if (-not (Test-Path $pg)) { continue }
+        foreach ($d in (Get-ChildItem $pg -Directory -ErrorAction SilentlyContinue)) {
+            $exe = Join-Path $d.FullName 'bin\pg_dump.exe'
+            $major = 0
+            if ([int]::TryParse($d.Name, [ref]$major) -and $major -ge $pgDumpMinMajor -and (Test-Path $exe)) {
+                $found += [pscustomobject]@{ Major = $major; Path = $exe }
+            }
+        }
+    }
+    return @($found | Sort-Object Major -Descending | Select-Object -First 1)
 }
 
-# 「wsl.exeが返ってこない/起動できない」と「pg_dumpが無い(exit≠0)」は別物として扱う。前者で
-# 導入へ進んでも、応答しないWSLに対して導入の上限ぶんだけ余計に待つだけで結論は変わらない。
-$pgDumpProbe = Test-PgDump17
-if ($pgDumpProbe.failure) {
-    Complete-BackupFailure 'wsl_unresponsive' ('WSLが応答しないため確認できなかった: ' + $pgDumpProbe.message) 0
+$pgDumpCandidate = @(Find-PgDump)
+if ($pgDumpCandidate.Count -eq 0) {
+    Complete-BackupFailure 'pgdump_missing' ("PostgreSQL {0} 以上の pg_dump.exe が見つからない(探索先: <ProgramFiles>\PostgreSQL\<メジャー>\bin)" -f $pgDumpMinMajor) 0
 }
-
-if (-not $pgDumpProbe.ok) {
-    Write-Log 'WSL側にpg_dump 17が無い。PGDGリポジトリから導入を試みる'
-    # 内側にも上限を置く(2026-09-10): curl は --connect-timeout/--max-time、apt は
-    # DEBIAN_FRONTEND=noninteractive。外側の $wslInstallTimeoutSeconds だけでも無期限化は
-    # 防げるが、内側にもあると「どの段で詰まったか」がWSL側の終了コードとして残る。
-    # sudo -n はパスワードを要求する構成のときに待たず失敗させるため(無人実行では誰も
-    # 入力できないので、待っても結論は同じ)。
-    $pgdgInstallScript = 'sudo -n install -d /usr/share/postgresql-common/pgdg && sudo -n curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail --connect-timeout 20 --max-time 120 https://www.postgresql.org/media/keys/ACCC4CF8.asc && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo -n tee /etc/apt/sources.list.d/pgdg.list && sudo -n env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 update -qq && sudo -n env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 install -y -qq postgresql-client-17'
-    $install = Invoke-BoundedProcess -FileName 'wsl.exe' `
-                    -Arguments @('-d', $wslDistro, '--', 'bash', '-c', $pgdgInstallScript) `
-                    -TimeoutSeconds $wslInstallTimeoutSeconds -Label 'postgresql-client-17の自動導入'
-    if ($install.failure) {
-        Write-Log ('自動導入を完了できなかった: ' + $install.message)
-    } elseif (-not $install.ok) {
-        Write-Log ("自動導入が exit={0} で終わった: {1}" -f $install.exitCode, $install.output)
-    }
-
-    $pgDumpProbe = Test-PgDump17
-    if ($pgDumpProbe.failure) {
-        Complete-BackupFailure 'wsl_unresponsive' ('WSLが応答しないため確認できなかった: ' + $pgDumpProbe.message) 0
-    }
-    if (-not $pgDumpProbe.ok) {
-        Complete-BackupFailure 'wsl_pgdump_missing' 'WSL(Ubuntu)にpostgresql-client-17を自動導入できなかった' 0
-    }
-    Write-Log 'pg_dump 17の導入完了'
+$pgDumpBin = $pgDumpCandidate[0].Path
+$pgDumpProbe = Invoke-BoundedProcess -FileName $pgDumpBin -Arguments @('--version') `
+                   -TimeoutSeconds $pgDumpProbeTimeoutSeconds -Label 'pg_dump --version'
+if ($pgDumpProbe.failure -or -not $pgDumpProbe.ok) {
+    $why = if ($pgDumpProbe.failure) { $pgDumpProbe.message } else { "exit={0}: {1}" -f $pgDumpProbe.exitCode, $pgDumpProbe.output }
+    Complete-BackupFailure 'pgdump_missing' ("pg_dump.exe が動かない: {0} ({1})" -f $why, $pgDumpBin) 0
 }
-
+Write-Log ('pg_dump: ' + $pgDumpProbe.output + ' (' + $pgDumpBin + ')')
 # ---------------------------------------------------------------
 # 2. 本番の接続情報を解決(npx supabase db dump --linked --dry-run。Dockerは使わない)
 #
@@ -485,7 +477,7 @@ if (-not $pgHost -or -not $pgPort -or -not $pgUser -or -not $pgPassword -or -not
 Write-Log ("接続情報を解決: host=${pgHost} port=${pgPort} user=${pgUser} db=${pgDatabase}")
 
 # ---------------------------------------------------------------
-# 3. ダンプ取得(スキーマ + データ、WSL側のpg_dump 17を直接実行)
+# 3. ダンプ取得(スキーマ + データ、Windowsネイティブの pg_dump.exe を直接実行)
 #    テーブル名を一切ハードコードしない — その時点の実スキーマをそのまま読む。
 # ---------------------------------------------------------------
 $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -500,29 +492,31 @@ $env:PGPORT = $pgPort
 $env:PGUSER = $pgUser
 $env:PGPASSWORD = $pgPassword
 $env:PGDATABASE = $pgDatabase
-$env:WSLENV = 'PGHOST:PGPORT:PGUSER:PGPASSWORD:PGDATABASE'
 
+# 接続先・資格情報は上の環境変数(PGHOST等)で渡し、コマンドラインには載せない。
+# 出力は標準出力のリダイレクトではなく --file で書かせる: PowerShell のリダイレクトは
+# エンコーディングを掛けうる(Windows PowerShell 5.1 は UTF-16)ので、SQL を壊さないため。
+# --encoding=UTF8 は明示(サーバのエンコーディングと同じで、出力は変わらない)。
 try {
-    Write-Log 'スキーマダンプ開始(WSL pg_dump 17)'
-    $schemaCmd = "$pgDumpBin --host=`"`$PGHOST`" --port=`"`$PGPORT`" --username=`"`$PGUSER`" --dbname=`"`$PGDATABASE`" --role=postgres --schema-only --no-owner --no-privileges"
-    & wsl.exe -d $wslDistro -- bash -c $schemaCmd 2>$($schemaPath + '.err') 1>$schemaPath
-    $schemaExit = $LASTEXITCODE
-    if ($schemaExit -ne 0) {
-        $errText = if (Test-Path ($schemaPath + '.err')) { Get-Content ($schemaPath + '.err') -Raw } else { '' }
-        $problems += "スキーマダンプが exit=${schemaExit}: ${errText}"
+    Write-Log 'スキーマダンプ開始(pg_dump.exe)'
+    $schemaRun = Invoke-BoundedProcess -FileName $pgDumpBin -TimeoutSeconds $pgDumpTimeoutSeconds -Label 'スキーマダンプ' `
+        -Arguments @('--role=postgres', '--schema-only', '--no-owner', '--no-privileges', '--encoding=UTF8', ('--file=' + $schemaPath))
+    if ($schemaRun.failure) {
+        $problems += $schemaRun.message
+    } elseif (-not $schemaRun.ok) {
+        $problems += "スキーマダンプが exit=$($schemaRun.exitCode): $($schemaRun.output)"
     }
 
-    Write-Log 'データダンプ開始(WSL pg_dump 17)'
-    $dataCmd = "$pgDumpBin --host=`"`$PGHOST`" --port=`"`$PGPORT`" --username=`"`$PGUSER`" --dbname=`"`$PGDATABASE`" --role=postgres --data-only"
-    & wsl.exe -d $wslDistro -- bash -c $dataCmd 2>$($dataPath + '.err') 1>$dataPath
-    $dataExit = $LASTEXITCODE
-    if ($dataExit -ne 0) {
-        $errText = if (Test-Path ($dataPath + '.err')) { Get-Content ($dataPath + '.err') -Raw } else { '' }
-        $problems += "データダンプが exit=${dataExit}: ${errText}"
+    Write-Log 'データダンプ開始(pg_dump.exe)'
+    $dataRun = Invoke-BoundedProcess -FileName $pgDumpBin -TimeoutSeconds $pgDumpTimeoutSeconds -Label 'データダンプ' `
+        -Arguments @('--role=postgres', '--data-only', '--encoding=UTF8', ('--file=' + $dataPath))
+    if ($dataRun.failure) {
+        $problems += $dataRun.message
+    } elseif (-not $dataRun.ok) {
+        $problems += "データダンプが exit=$($dataRun.exitCode): $($dataRun.output)"
     }
 } finally {
-    Remove-Item Env:\PGHOST, Env:\PGPORT, Env:\PGUSER, Env:\PGPASSWORD, Env:\PGDATABASE, Env:\WSLENV -ErrorAction SilentlyContinue
-    Remove-Item ($schemaPath + '.err'), ($dataPath + '.err') -ErrorAction SilentlyContinue
+    Remove-Item Env:\PGHOST, Env:\PGPORT, Env:\PGUSER, Env:\PGPASSWORD, Env:\PGDATABASE -ErrorAction SilentlyContinue
 }
 
 if (Test-Path $schemaPath) { $schemaBytes = (Get-Item $schemaPath).Length }
