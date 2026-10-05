@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { DrainAskList } from '@/src/components/drain/DrainAskList'
 import { DrainRunCard } from '@/src/components/drain/DrainRunCard'
 import { DrainRunGroupCard } from '@/src/components/drain/DrainRunGroupCard'
 import { PageHeader } from '@/src/components/layout/PageHeader'
@@ -8,6 +9,11 @@ import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { getDefaultTimezone } from '@/src/lib/date'
 import { groupDrainRuns } from '@/src/lib/drain/group-runs'
 import { createClient } from '@/src/lib/supabase/client'
+import {
+    getOpenDrainAsks,
+    resolveDrainAsk,
+    type DrainAskRow,
+} from '@/src/lib/supabase/queries/drain-asks'
 import {
     getDrainRunReport,
     getDrainRuns,
@@ -18,6 +24,8 @@ export default function DrainPage() {
     const supabase = useMemo(() => createClient(), [])
     const timezone = useMemo(() => getDefaultTimezone(), [])
     const [runs, setRuns] = useState<DrainRunListRow[]>([])
+    const [asks, setAsks] = useState<DrainAskRow[]>([])
+    const [resolvingAskId, setResolvingAskId] = useState<string | null>(null)
     const displayItems = useMemo(() => groupDrainRuns(runs), [runs])
     const [isInitialLoading, setIsInitialLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
@@ -31,16 +39,34 @@ export default function DrainPage() {
                 setIsInitialLoading(true)
             }
 
-            const { data, error } = await getDrainRuns(supabase)
+            const [runsResult, asksResult] = await Promise.all([
+                getDrainRuns(supabase),
+                getOpenDrainAsks(supabase),
+            ])
 
-            if (error) {
+            if (runsResult.error || asksResult.error) {
                 setErrorMessage('実行記録の読み込みに失敗しました。')
             } else {
-                setRuns(data ?? [])
                 setErrorMessage(null)
             }
+            if (!runsResult.error) setRuns(runsResult.data ?? [])
+            if (!asksResult.error) setAsks(asksResult.data ?? [])
             setIsInitialLoading(false)
             setIsRefreshing(false)
+        },
+        [supabase]
+    )
+
+    const handleResolveAsk = useCallback(
+        async (id: string) => {
+            setResolvingAskId(id)
+            const { error } = await resolveDrainAsk(supabase, id)
+            if (error) {
+                setErrorMessage('依頼を済にできませんでした。')
+            } else {
+                setAsks((current) => current.filter((ask) => ask.id !== id))
+            }
+            setResolvingAskId(null)
         },
         [supabase]
     )
@@ -72,6 +98,13 @@ export default function DrainPage() {
 
             <div className="flex-1 overflow-hidden relative">
                 <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4">
+                    <DrainAskList
+                        asks={asks}
+                        timezone={timezone}
+                        resolvingId={resolvingAskId}
+                        onResolve={(id) => void handleResolveAsk(id)}
+                    />
+
                     {!isInitialLoading && runs.length === 0 && (
                         <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">

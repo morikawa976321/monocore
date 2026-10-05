@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     MAX_REPORT_TEXT_LENGTH,
     MAX_TASK_SUMMARY_LENGTH,
+    buildAsks,
     buildRow,
     truncateReportText,
     validateRun,
@@ -65,6 +66,36 @@ describe('validateRun', () => {
     it('rejects a non-object payload', () => {
         expect(validateRun(null)).toEqual(['payload must be an object'])
         expect(validateRun([])).toEqual(['payload must be an object'])
+    })
+
+    it('rejects asks without id or title', () => {
+        expect(validateRun(validRun({ asks: {} }))[0]).toContain('"asks"')
+        expect(validateRun(validRun({ asks: [{ title: 'x' }] }))[0]).toContain('"id"')
+        expect(validateRun(validRun({ asks: [{ id: 'a#1', title: '  ' }] }))[0]).toContain('"title"')
+        expect(validateRun(validRun({ asks: [{ id: 'a#1', title: 'x' }] }))).toEqual([])
+    })
+})
+
+describe('buildAsks', () => {
+    it('returns no rows when the run carries no asks', () => {
+        expect(buildAsks(validRun())).toEqual([])
+    })
+
+    it('keeps the detail whole and nulls empty optional fields', () => {
+        const detail = 'あ'.repeat(5000)
+        expect(
+            buildAsks(
+                validRun({
+                    asks: [
+                        { id: ' t#1 ', source: 't', title: ' 平文の認証情報を消す ', detail },
+                        { id: 't#2', title: 'Docker Desktop を直す', source: '', detail: '' },
+                    ],
+                })
+            )
+        ).toEqual([
+            { id: 't#1', source: 't', title: '平文の認証情報を消す', detail },
+            { id: 't#2', source: null, title: 'Docker Desktop を直す', detail: null },
+        ])
     })
 })
 

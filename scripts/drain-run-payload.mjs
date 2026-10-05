@@ -127,7 +127,40 @@ export function validateRun(run) {
         }
     }
 
+    if (run.asks !== undefined && !Array.isArray(run.asks)) {
+        errors.push('field "asks" must be an array')
+    }
+
+    for (const [index, ask] of asArray(run.asks).entries()) {
+        if (!isPlainObject(ask)) {
+            errors.push(`asks[${index}] must be an object`)
+            continue
+        }
+        if (typeof ask.id !== 'string' || ask.id.trim().length === 0) {
+            errors.push(`asks[${index}]: field "id" must be a non-empty string`)
+        }
+        if (typeof ask.title !== 'string' || ask.title.trim().length === 0) {
+            errors.push(`asks[${index}]: field "title" must be a non-empty string`)
+        }
+    }
+
     return errors
+}
+
+/**
+ * 本人への依頼(drain_asks の行)を整形する。run の行とは別テーブルに入れる。
+ * 依頼は本人が「済」にするまで残る面なので、run の保持(48件)に巻き込まない。
+ * 要約と違って切り詰めない: 本人が動く必要のあるものは縮めない(docs/decisions.md /drain)。
+ */
+export function buildAsks(run) {
+    return asArray(run.asks)
+        .filter(isPlainObject)
+        .map((ask) => ({
+            id: ask.id.trim(),
+            source: asStringOrNull(ask.source),
+            title: ask.title.trim(),
+            detail: asStringOrNull(ask.detail),
+        }))
 }
 
 /** 工程1件をカードに出す形へ整形する。status は未指定なら ok 扱い。 */

@@ -66,6 +66,33 @@ export type Database = {
         }
         Relationships: []
       }
+      drain_asks: {
+        Row: {
+          created_at: string
+          detail: string | null
+          id: string
+          resolved_at: string | null
+          source: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          id: string
+          resolved_at?: string | null
+          source?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          resolved_at?: string | null
+          source?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       drain_runs: {
         Row: {
           created_at: string

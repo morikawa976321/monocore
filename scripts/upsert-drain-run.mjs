@@ -20,7 +20,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
-import { buildRow, validateRun } from './drain-run-payload.mjs'
+import { buildAsks, buildRow, validateRun } from './drain-run-payload.mjs'
 import {
     DEFAULT_REQUEST_TIMEOUT_MS,
     armWatchdog,
@@ -127,11 +127,23 @@ async function main() {
         fail(`upsert failed: ${error.message}`)
     }
 
+    // 依頼は既存の行を上書きしない(ignoreDuplicates = ON CONFLICT DO NOTHING)。
+    // 同じ trace が次の run でも拾われることがあり、上書きすると本人の「済」が消える。
+    const asks = buildAsks(payload)
+    if (asks.length > 0) {
+        const { error: askError } = await supabase
+            .from('drain_asks')
+            .upsert(asks, { onConflict: 'id', ignoreDuplicates: true })
+        if (askError) {
+            fail(`asks upsert failed: ${askError.message}`)
+        }
+    }
+
     const pruned = await pruneOlderThanKeep(supabase, DRAIN_RUNS_KEEP)
 
     console.log(
         `drain_run upserted: ${row.started_at} outcome=${row.outcome} ` +
-            `steps=${row.steps.length} tasks=${row.tasks.length}`
+            `steps=${row.steps.length} tasks=${row.tasks.length} asks=${asks.length}`
     )
     if (pruned > 0) {
         console.log(`pruned ${pruned} drain_runs beyond keep=${DRAIN_RUNS_KEEP}`)
