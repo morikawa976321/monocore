@@ -39,7 +39,7 @@
 #   Windows に PostgreSQL 17 以上のクライアントツール(pg_dump.exe)があること。探索先は
 #   <ProgramFiles>\PostgreSQL\<メジャー>\bin\pg_dump.exe で、17以上のうち最大のメジャーを使う。
 #   本番がPostgreSQL 17系のため、pg_dumpが古いと `aborting because of server version mismatch` で
-#   拒否される(新しい分には問題ない)。見つからなければ pgdump_missing で失敗して調査タスクが積まれる。
+#   拒否される(新しい分には問題ない)。見つからなければ pgdump_missing で失敗する(drain 報告板の run カードに error 行で出る)。
 #   自動導入は試みない: Windows では導入に管理者権限か対話が要り、無人実行では誰も操作できない。
 
 param(
@@ -50,7 +50,6 @@ $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
 $repoRoot    = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$taskboxRoot = 'C:\Users\tm976\mf\taskbox'
 $backupRoot  = Join-Path $repoRoot 'backups\auto'
 $log         = Join-Path $backupRoot 'backup.log'
 $statusPath  = Join-Path $backupRoot 'backup-status.json'
@@ -89,92 +88,12 @@ function Write-Status([bool]$ok) {
     [System.IO.File]::WriteAllText($statusPath, $json, $script:Utf8NoBom)
 }
 
-function Add-QueueFailureTask {
-    try {
-        $qname = (Get-Date -Format 'yyyyMMdd') + '-0000-monocore-db-backup-failure.md'
-        $qpath = Join-Path (Join-Path $taskboxRoot 'queue') $qname
-        $already = (Test-Path $qpath) -or
-                   (Test-Path (Join-Path (Join-Path $taskboxRoot 'running') $qname)) -or
-                   (Test-Path (Join-Path (Join-Path $taskboxRoot 'done') $qname))
-        if ($already) {
-            Write-Log '調査タスクは既に積まれている(重複を避けてスキップ)'
-            return
-        }
-        $body = @"
----
-title: monocore本番DBの定期バックアップの異常を調査して報告する
-target_dir: C:\Users\tm976\mf\monocore
-expected_artifacts: backups/auto/backup-incident-$(Get-Date -Format 'yyyy-MM-dd').md
-started:
----
-
-## 目的
-
-$(Get-Date -Format 'yyyy-MM-dd HH:mm') のmonocore本番Supabaseの定期バックアップ実行で異常が
-検出された。原因を切り分け、
-monocore/backups/auto/backup-incident-$(Get-Date -Format 'yyyy-MM-dd').md に報告を書く。
-
-## 検出された異常
-
-理由コード: **$(if ($reason) { $reason } else { 'unknown' })**
-
-$($problems | ForEach-Object { "- $_" } | Out-String)
-
-## 調べること
-
-- ``monocore\backups\auto\backup.log`` の直近の実行ブロック
-- ``monocore\backups\auto\backup-status.json``(機械可読の最新状態。``reason`` フィールドを見る)
-- ``monocore\backups\auto\<日時>\FAILED.txt``(失敗した回のダンプディレクトリの目印。その回の
-  schema.sql / data.sql は途中で打ち切られた不完全なものの可能性があり、復元に使わない)
-- 理由コード別:
-  - ``pgdump_missing`` … Windows に PostgreSQL 17 以上の ``pg_dump.exe`` が見つからない、または
-    ``--version`` が動かない。``& 'C:\Program Files\PostgreSQL\17\bin\pg_dump.exe' --version`` で
-    手動確認する。無ければ公式インストーラの Command Line Tools を入れる(自動導入はしない)
-  - ``credentials_failed`` … ``npx supabase db dump --linked --dry-run`` 自体が失敗。CLIログイン
-    セッションの失効(``npx supabase login``)、ネットワーク、Supabase側の障害を疑う
-  - ``timeout`` … ``npx supabase db dump --linked --dry-run`` のプロセス自体が既定の秒数
-    (上の「検出された異常」参照)応答なしのため打ち切られた。
-    ``%LOCALAPPDATA%\npm-cache\_logs\`` の最新debugログに「Ok to proceed」等のインストール確認
-    プロンプト待ちの痕跡が無いかをまず確認する(2026-09-09に実際にこれが原因だった。supabase
-    パッケージが monocore の依存に無いため npx が毎回レジストリを引き、新版が出るたびに
-    インストール確認が挟まる。現在は ``--yes`` で無効化済みなので、再発したら別原因を疑う)。
-    無ければCLIログインセッションの失効(``npx supabase login``で手動確認)を疑う
-  - ``dryrun_spawn_failed`` … ``npx supabase db dump --linked --dry-run`` のプロセス起動自体が
-    失敗。cmd.exe/npxが見つからない、権限の問題などを疑う
-  - ``dryrun_io_setup_failed`` … プロセスは起動できたが直後の標準入出力ハンドル操作が失敗。
-    まれなOSレベルの異常を疑う
-  - ``dryrun_read_timeout`` … プロセス自体は正常終了したが、標準出力/エラーの読み切りが
-    既定の秒数応答なしで打ち切られた。孫プロセス(node.exe等)がパイプハンドルを握ったまま
-    生き残っている可能性がある。``Get-Process node`` で古いnode.exeが残っていないか確認する
-    (自動でのkillは意図的に行っていない — 終了済みPIDの再利用による誤爆を避けるため)
-  - ``dryrun_read_failed`` … 標準出力/エラーの読み取り自体が例外で失敗。まれなOSレベルの
-    異常を疑う
-  - ``dump_failed`` … pg_dump自体の失敗(タイムアウトを含む)。バージョン不一致・接続エラーなどログ本文を見る
-  - それ以外 … ログの全文を見る
-
-## 制約
-
-- バックアップ先のファイルを消して作り直さない(破損の証拠が消える)。
-- 原因が特定できないまま「復旧した」と報告しない。
-- **本人の手が要る結論**(pg_dump.exe の導入・Supabase CLI の再ログイン・
-  バックアップ方式の変更など)は、報告ファイルや trace の notes に書くだけでは本人に届かない。
-  trace の asks[] に1件ずつ書くこと(書き方は taskbox の README「トレースの文の書き方」の asks[])。
-  monocore /drain 板の先頭の依頼欄に出て、本人が「済」にするまで残る。失敗そのものは板に出さない
-  (2026-09-05のユーザー決定)が、本人の手が要る結論だけはこの経路で届ける(2026-10-05)。
-  handover には載せない(「本人判断待ち」の carry は2026-10-05に廃止)。
-"@
-        [System.IO.File]::WriteAllText($qpath, $body, $script:Utf8NoBom)
-        Write-Log ('queue へ調査タスクを積んだ: ' + $qname)
-    } catch {
-        Write-Log ('queueへの積み込みに失敗: ' + $_.Exception.Message)
-    }
-}
-
 # 失敗経路の集約(2026-09-09追加。2026-09-10に汎用名へ改め、定義位置を1節の前へ移した —
 # WSL関連の失敗もこの経路へ合流させるため。中身は変えていない)。
-# 理由コードを1つ取り、Write-Status(backup-status.json) → Add-QueueFailureTask(queueへ調査タスク)
-# → exit 1 という**このスクリプト唯一の異常終了経路**を通す。**drain報告板には出さない**
-# (2026-09-05のユーザー決定。engine [[monocore-db-backup-result-stays-off-the-board]])。
+# 理由コードを1つ取り、Write-Status(backup-status.json)
+# → exit 1 という**このスクリプト唯一の異常終了経路**を通す。失敗は呼び出し側(taskbox lib/backup.ps1 →
+# lib/board.ps1 の New-DbBackupStep)が drain 報告板の run カードに error 行で出す(2026-10-05本人判断)。
+# 2026-09-05〜10-05 は板に出さず、ここから taskbox の queue へ調査タスクを積んでいた。
 function Complete-BackupFailure([string]$ReasonCode, [string]$Message, [int]$ProcId) {
     # $ProcId は「taskkillに意味がある」呼び出し元だけが正の値を渡す(下の2節のコメント参照)。
     # 0 なら taskkill 自体を試みない(実害は無いが呼んでも何も終了できない段階のため)。
@@ -188,7 +107,6 @@ function Complete-BackupFailure([string]$ReasonCode, [string]$Message, [int]$Pro
     $script:problems += $Message
     Write-Log ('異常: ' + $Message)
     Write-Status $false
-    Add-QueueFailureTask
     Write-Log ("===== monocore db backup end {0} exit=1 ({1}) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $ReasonCode)
     exit 1
 }
@@ -342,7 +260,7 @@ function Set-EnvVar {
 
 # pg_dump.exe の呼び出し。LC_MESSAGES=C で英語のメッセージを出させる(2026-09-30、独立レビューの指摘)。
 # 日本語ロケールの pg_dump.exe はエラー文を CP932 で出し、Invoke-BoundedProcess は UTF-8 として読むので
-# 文字化けする。エラー文はログ・backup-status.json・調査タスク本文に載る(本人に届く唯一の経路)ので、
+# 文字化けする。エラー文はログ・backup-status.json・drain 報告板の run カードに載る(本人に届く唯一の経路)ので、
 # 読めなければ意味が無い(旧 WSL 版は英語で出ていた)。ダンプ本文(SQL)はメッセージ翻訳の対象ではない
 # ので出力は変わらない。呼び出しの間だけ設定し、終わったら元へ戻す(drain と同じプロセスで動くため)。
 function Invoke-PgDump {
@@ -519,7 +437,6 @@ if (-not $pgHost -or -not $pgPort -or -not $pgUser -or -not $pgPassword -or -not
     $problems += 'npx supabase db dump --linked --dry-run から接続情報を解決できなかった'
     Write-Log ('異常: ' + $problems[-1])
     Write-Status $false
-    Add-QueueFailureTask
     Write-Log ("===== monocore db backup end {0} exit=1 (credentials failed) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
     exit 1
 }
@@ -601,7 +518,6 @@ if ($problems.Count -gt 0) {
         Write-Log ('FAILED.txt を書けなかった: ' + $_.Exception.Message)
     }
     Write-Status $false
-    Add-QueueFailureTask
     Write-Log ("===== monocore db backup end {0} exit=1 (dump failed) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
     exit 1
 }
