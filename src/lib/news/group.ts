@@ -2,7 +2,7 @@ import type { ArticleListRow } from '@/src/lib/supabase/queries/articles'
 
 /** 「すべて」タブのキー。ソース名と衝突しないよう空文字を使う。 */
 export const ALL_SOURCES_KEY = ''
-export const ALL_SOURCES_LABEL = 'ALL'
+const ALL_SOURCES_LABEL = 'ALL'
 
 export type SourceTab = {
     key: string

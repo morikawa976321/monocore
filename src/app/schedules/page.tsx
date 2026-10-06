@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { createClient } from '@/src/lib/supabase/client';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
 import { DaySection } from '@/src/components/schedules/DaySection';

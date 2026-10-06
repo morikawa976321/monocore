@@ -1,7 +1,7 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
-export type ReportRow = Database['public']['Tables']['reports']['Row']
+type ReportRow = Database['public']['Tables']['reports']['Row']
 
 // 一覧画面用の列だけを明示的に選ぶ。body_html(数MB相当になりうる)は含めない。
 // 一覧を開くたびに全レポート本文がモバイル回線に飛ぶのを避けるのがこの面唯一の

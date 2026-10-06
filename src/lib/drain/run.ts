@@ -22,20 +22,20 @@ export type RunStep = {
  * タスクの中の工程1件（taskbox/traces/<task-id>.json の steps[] 由来）。
  * 2026-08-30以降、板の本文は summary 1文で、これは summary の無い古い行の代替。
  */
-export type TaskStep = {
+type TaskStep = {
     desc: string
     status: string
     note: string
 }
 
-export type TaskFailure = {
+type TaskFailure = {
     phase: string
     symptom: string
     resolution: string
 }
 
 /** 委譲先1件の成否。outcome は ok / quota(使用量制限) / error。 */
-export type TaskDelegation = {
+type TaskDelegation = {
     target: string
     calls: number | null
     outcome: string

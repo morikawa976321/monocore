@@ -9,10 +9,10 @@
  */
 
 /** run全体の結末。skipped=トリアージで理由ゼロだったためclaudeを起動していない枠。 */
-export const ALLOWED_OUTCOMES = new Set(['completed', 'crashed', 'skipped'])
+const ALLOWED_OUTCOMES = new Set(['completed', 'crashed', 'skipped'])
 
 /** 工程1件の結末。表示側の色分け（warn/error のみ強調）がこの3値に対応する。 */
-export const ALLOWED_STEP_STATUSES = new Set(['ok', 'warn', 'error'])
+const ALLOWED_STEP_STATUSES = new Set(['ok', 'warn', 'error'])
 
 /**
  * report_text（drainセッションの最終報告の全文）の上限。
@@ -36,19 +36,19 @@ export const MAX_TASK_SUMMARY_LENGTH = 200
 const SUMMARY_TRUNCATION_NOTICE = '…（上限超過のため切り捨て）'
 
 /** 上限を超えた要約を、切り捨てたと分かる形で短くする。 */
-export function truncateSummary(text) {
+function truncateSummary(text) {
     if (typeof text !== 'string') return ''
     const chars = [...text]
     if (chars.length <= MAX_TASK_SUMMARY_LENGTH) return text
     return chars.slice(0, MAX_TASK_SUMMARY_LENGTH).join('') + SUMMARY_TRUNCATION_NOTICE
 }
 
-export function isPlainObject(value) {
+function isPlainObject(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** ISO日時としてパースできる文字列か。 */
-export function isValidTimestamp(value) {
+function isValidTimestamp(value) {
     if (typeof value !== 'string' || value.trim().length === 0) return false
     return !Number.isNaN(Date.parse(value))
 }

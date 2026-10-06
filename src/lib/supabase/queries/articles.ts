@@ -1,7 +1,7 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
-export type ArticleRow = Database['public']['Tables']['articles']['Row']
+type ArticleRow = Database['public']['Tables']['articles']['Row']
 
 // 一覧に出す列だけを明示的に選ぶ(reports.ts と同じ規律)。collected_at は
 // 期限切れ削除のためだけの列で画面には出さないので取らない。

@@ -1,7 +1,7 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
-export type DrainRunRow = Database['public']['Tables']['drain_runs']['Row']
+type DrainRunRow = Database['public']['Tables']['drain_runs']['Row']
 
 // 一覧では report_text(セッションの最終報告の全文・数KB)を含めない。
 // 一覧を開くたびに全枠の散文がモバイル回線に飛ぶのを避ける、というのは
@@ -14,7 +14,7 @@ const LIST_COLUMNS =
 /** 一覧の件数。投入スクリプトの保持上限も同じ値（scripts/upsert-drain-run.mjs）。
  *  taskbox drainが1日4回(6時間おき)から1時間おきへ変更されたのに伴い、
  *  2026-09-11に40から48(=1時間おき24枠の2日分)へ引き上げた（ユーザー指定の切りのよい数）。 */
-export const DRAIN_RUNS_LIST_LIMIT = 48
+const DRAIN_RUNS_LIST_LIMIT = 48
 
 export async function getDrainRuns(
     supabase: SupabaseClient<Database>,

@@ -5,7 +5,7 @@
  * 回帰させてはならない境界のため、DBアクセスから切り離してある。
  */
 
-export const EXCLUDED_FILENAMES = new Set(['CLAUDE.md', '_index.md'])
+const EXCLUDED_FILENAMES = new Set(['CLAUDE.md', '_index.md'])
 
 /** reports直下の全ファイル名から、同期対象の.mdファイル名だけを残す。 */
 export function filterReportFilenames(filenames) {

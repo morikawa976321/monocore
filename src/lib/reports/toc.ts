@@ -36,7 +36,7 @@ export function parseToc(value: Json): TocEntry[] {
 }
 
 /** 詳細ページの目次に出す最大見出しレベル（### = h3）。####以下は出さない。 */
-export const TOC_DISPLAY_MAX_LEVEL = 3
+const TOC_DISPLAY_MAX_LEVEL = 3
 
 /** 詳細ページ用。h1〜h3だけを残す。一覧検索はparseTocの全件を使う。 */
 export function tocForDisplay(entries: TocEntry[]): TocEntry[] {
