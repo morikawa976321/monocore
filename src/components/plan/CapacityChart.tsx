@@ -75,7 +75,7 @@ export function CapacityChart({ days, statuses }: { days: CapacityDay[]; statuse
                             style={{ height: `${y(c.c0)}%` }}
                         />
                         <div
-                            className={`absolute inset-x-px ${i === 0 ? 'bg-amber-500 dark:bg-amber-400' : 'bg-neutral-600 dark:bg-neutral-400'}`}
+                            className={`absolute inset-x-px ${i === 0 ? 'bg-amber-500 dark:bg-amber-500' : 'bg-neutral-600 dark:bg-neutral-400'}`}
                             style={{ bottom: `${y(c.c0)}%`, height: `${Math.max(0.5, y(c.c1) - y(c.c0))}%` }}
                         />
                         {(i === 0 || isMonday(c.date)) && (
@@ -90,10 +90,10 @@ export function CapacityChart({ days, statuses }: { days: CapacityDay[]; statuse
                 {marks.map(({ s, k, mx, my, fromX, fromY }) => (
                     <div key={s.goal.id}>
                         <div className="absolute bottom-0 top-0 border-l border-dashed border-amber-500/60 dark:border-amber-400/60" style={{ left: `${mx}%` }} />
-                        <div className="absolute h-0.5 bg-amber-500 dark:bg-amber-400" style={{ left: `${fromX}%`, width: `${Math.max(0, mx - fromX)}%`, bottom: `${fromY}%` }} />
-                        <div className="absolute w-0.5 bg-amber-500 dark:bg-amber-400" style={{ left: `${mx}%`, bottom: `${fromY}%`, height: `${Math.max(0, my - fromY)}%` }} />
+                        <div className="absolute h-0.5 bg-amber-500 dark:bg-amber-500" style={{ left: `${fromX}%`, width: `${Math.max(0, mx - fromX)}%`, bottom: `${fromY}%` }} />
+                        <div className="absolute w-0.5 bg-amber-500 dark:bg-amber-500" style={{ left: `${mx}%`, bottom: `${fromY}%`, height: `${Math.max(0, my - fromY)}%` }} />
                         <div
-                            className={`absolute -ml-1 -mb-1 h-2 w-2 rounded-full ${s.ok ? 'bg-amber-500 dark:bg-amber-400' : 'border-2 border-amber-600 bg-neutral-50 dark:border-amber-400 dark:bg-neutral-900'}`}
+                            className={`absolute -ml-1 -mb-1 h-2 w-2 rounded-full ${s.ok ? 'bg-amber-500 dark:bg-amber-500' : 'border-2 border-amber-600 bg-neutral-50 dark:border-amber-400 dark:bg-neutral-900'}`}
                             style={{ left: `${mx}%`, bottom: `${my}%` }}
                             title={`${s.goal.name} 必要の累計 ${(s.cumulativeMinutes / 60).toFixed(1)}h / 締切までの空き ${(s.supplyMinutes / 60).toFixed(1)}h`}
                         />
@@ -113,7 +113,7 @@ export function CapacityChart({ days, statuses }: { days: CapacityDay[]; statuse
                     1日の使える空き（累計の段）
                 </span>
                 <span className="inline-flex items-center gap-1">
-                    <span className="inline-block h-0.5 w-4 bg-amber-500 dark:bg-amber-400" />
+                    <span className="inline-block h-0.5 w-4 bg-amber-500 dark:bg-amber-500" />
                     目標の残り必要時間の累計（線が段より下なら間に合う）
                 </span>
             </div>

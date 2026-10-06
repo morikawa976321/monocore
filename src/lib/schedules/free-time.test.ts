@@ -4,7 +4,6 @@ import {
     analyzeDayContent,
     evaluateGoals,
     usableFreeMinutes,
-    type DayAnalysis,
     type GoalInput,
 } from './free-time';
 
@@ -60,6 +59,11 @@ describe('analyzeDayContent', () => {
         const a = analyzeDayContent('2300-0100 作業');
         expect(a.segments[0]).toMatchObject({ start: h(23), end: h(24) });
     });
+
+    it('does not turn a reversed or zero-length daytime range into a block until midnight', () => {
+        expect(analyzeDayContent('1500-1300 作業').segments[0]).toMatchObject({ start: h(15), end: h(15) + 5 });
+        expect(analyzeDayContent('1000-1000 作業').segments[0]).toMatchObject({ start: h(10), end: h(10) + 5 });
+    });
 });
 
 describe('usableFreeMinutes', () => {
@@ -82,31 +86,39 @@ describe('addDays', () => {
 
 describe('evaluateGoals', () => {
     const contents: Record<string, string> = {
+        '2026-10-06': '0700 起床\n1300-1500 論文の図\n2330 BM 読書 消灯',
         '2026-10-07': '0700 起床\n0900-1700 BCL\n2330 BM 読書 消灯',
         '2026-10-08': '0700 起床\n1300-1600 論文の図\n2330 BM 読書 消灯',
         '2026-10-09': '0700 起床\n2330 BM 読書 消灯',
     };
-    const cache = new Map<string, DayAnalysis>();
-    const analyze = (date: string) => {
-        if (!cache.has(date)) cache.set(date, analyzeDayContent(contents[date] ?? ''));
-        return cache.get(date)!;
-    };
-    const base = { analyze, knownDates: Object.keys(contents), today: '2026-10-07', nowMinutes: h(8), lifeMinutesPerDay: 0 };
+    const days = new Map(Object.entries(contents).map(([d, c]) => [d, analyzeDayContent(c)]));
+    const base = { days, today: '2026-10-07', nowMinutes: h(8), lifeMinutesPerDay: 0 };
+    const goal = (g: Partial<GoalInput> & Pick<GoalInput, 'id' | 'dueOn'>): GoalInput => ({
+        name: '',
+        dueMinutes: null,
+        needMinutes: 0,
+        countFrom: '2026-10-07',
+        ...g,
+    });
 
-    it('counts ranged lines that contain the goal name as placed time', () => {
-        const goals: GoalInput[] = [{ id: 'a', name: '論文の図', dueOn: '2026-10-09', dueMinutes: h(12), needMinutes: h(10) }];
+    it('counts ranged lines that contain the goal name as placed time, from countFrom', () => {
+        const goals = [goal({ id: 'a', name: '論文の図', dueOn: '2026-10-09', dueMinutes: h(12), needMinutes: h(10) })];
         const [s] = evaluateGoals({ ...base, goals });
+        // 10/6 の2時間は countFrom(10/7) より前なので数えない
         expect(s.placedMinutes).toBe(h(3));
         expect(s.remainingMinutes).toBe(h(7));
         // 10/7: 8:00-9:00 + 17:00-23:30 = 7.5h, 10/8: 16.5-3 = 13.5h, 10/9: 7:00-12:00 = 5h
         expect(s.supplyMinutes).toBe(h(7.5) + h(13.5) + h(5));
         expect(s.ok).toBe(true);
+
+        const [fromEarlier] = evaluateGoals({ ...base, goals: [{ ...goals[0], countFrom: '2026-10-01' }] });
+        expect(fromEarlier.placedMinutes).toBe(h(5));
     });
 
     it('compares cumulative remaining time by earliest deadline', () => {
-        const goals: GoalInput[] = [
-            { id: 'late', name: '課題B', dueOn: '2026-10-09', dueMinutes: null, needMinutes: h(30) },
-            { id: 'early', name: '課題A', dueOn: '2026-10-07', dueMinutes: null, needMinutes: h(3) },
+        const goals = [
+            goal({ id: 'late', name: '課題B', dueOn: '2026-10-09', needMinutes: h(30) }),
+            goal({ id: 'early', name: '課題A', dueOn: '2026-10-07', needMinutes: h(3) }),
         ];
         const [early, late] = evaluateGoals({ ...base, goals, lifeMinutesPerDay: h(4) });
         expect(early.goal.id).toBe('early');
@@ -118,13 +130,33 @@ describe('evaluateGoals', () => {
     });
 
     it('marks goals whose deadline has passed and leaves them out of the cumulative check', () => {
-        const goals: GoalInput[] = [
-            { id: 'old', name: 'X', dueOn: '2026-10-06', dueMinutes: null, needMinutes: h(100) },
-            { id: 'next', name: 'Y', dueOn: '2026-10-09', dueMinutes: null, needMinutes: h(1) },
+        const goals = [
+            goal({ id: 'old', name: 'X', dueOn: '2026-10-06', needMinutes: h(100) }),
+            goal({ id: 'next', name: 'Y', dueOn: '2026-10-09', needMinutes: h(1) }),
         ];
         const [old, next] = evaluateGoals({ ...base, goals });
         expect(old.past).toBe(true);
         expect(next.cumulativeMinutes).toBe(h(1));
         expect(next.ok).toBe(true);
+    });
+
+    it('counts days beyond the loaded range as empty days without walking them one by one', () => {
+        const [s] = evaluateGoals({ ...base, goals: [goal({ id: 'x', dueOn: '2026-10-11', dueMinutes: h(12) })] });
+        // 10/7: 7.5h, 10/8: 13.5h, 10/9: 16.5h, 読み込んでいない 10/10: 16.5h と 10/11 の 12:00 まで: 5h
+        expect(s.supplyMinutes).toBe(h(7.5) + h(13.5) + h(16.5) + h(16.5) + h(5));
+
+        const started = performance.now();
+        const [far] = evaluateGoals({ ...base, goals: [goal({ id: 'far', dueOn: '9999-12-31' })] });
+        expect(performance.now() - started).toBeLessThan(50);
+        expect(far.supplyMinutes).toBeGreaterThan(0);
+    });
+
+    it('handles a goal due today on a day that was not loaded', () => {
+        const [s] = evaluateGoals({
+            ...base,
+            days: new Map(),
+            goals: [goal({ id: 't', dueOn: '2026-10-07', dueMinutes: h(12) })],
+        });
+        expect(s.supplyMinutes).toBe(h(4));
     });
 });

@@ -11,7 +11,7 @@ const KIND_CLASS: Record<Exclude<SlotKind, 'free'>, string> = {
     estimated: 'bg-neutral-400 dark:bg-neutral-500',
     home: 'bg-neutral-300 dark:bg-neutral-600',
 };
-const DEEP_CLASS = 'bg-amber-500/20 dark:bg-amber-400/20';
+const DEEP_CLASS = 'bg-amber-500/20 dark:bg-amber-500/20';
 
 function percent(minutes: number): number {
     return Math.max(0, Math.min(100, ((minutes - AXIS_START) / AXIS_LENGTH) * 100));

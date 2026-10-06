@@ -19,7 +19,8 @@ CREATE TABLE public.plan_goals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
     name TEXT NOT NULL DEFAULT '',
-    due_on DATE NOT NULL,
+    -- 年の打ち間違い（9999 年）で両画面の計算と描画が膨らまないよう、上限を置く（画面側は今日から3年）。
+    due_on DATE NOT NULL CHECK (due_on < DATE '2100-01-01'),
     due_time TIME,
     need_minutes INTEGER NOT NULL DEFAULT 0 CHECK (need_minutes >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -39,3 +40,7 @@ CREATE TRIGGER update_plan_goals_updated_at
     BEFORE UPDATE ON public.plan_goals
     FOR EACH ROW
     EXECUTE FUNCTION public.update_updated_at_column();
+
+-- 既定の権限では anon にも付与されるので、他のテーブル（default_schedules 等）と同じく外す。
+REVOKE ALL ON public.plan_goals FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.plan_goals TO authenticated, service_role;

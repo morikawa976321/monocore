@@ -12,64 +12,79 @@ import { useLifeHours } from '@/src/hooks/useLifeHours';
 import { useNow } from '@/src/hooks/useNow';
 import { usePlanDayContents } from '@/src/hooks/usePlanDayContents';
 import { planGoalToInput, usePlanGoals } from '@/src/hooks/usePlanGoals';
+import { getDefaultTimezone } from '@/src/lib/date';
 import {
+    EMPTY_DAY,
     addDays,
     analyzeDayContent,
+    daysBetween,
     evaluateGoals,
+    placedCountStart,
     usableFreeMinutes,
     type DayAnalysis,
 } from '@/src/lib/schedules/free-time';
 import { createClient } from '@/src/lib/supabase/client';
 
-/** 予定を読む日数。目標の期日がこれより先なら、その先は予定の無い日（07:00〜23:30 が空き）として数える。 */
+/** 今日から先に予定を読む日数。期日がこれより先なら、その先は予定の無い日（07:00〜23:30 が空き）として数える。 */
 const HORIZON_DAYS = 120;
 /** 日ごとの空きの一覧に出す日数。 */
 const LIST_DAYS = 21;
-/** 累積グラフの最低の幅（日）。目標の期日がこれより先なら期日の3日後まで伸ばす。 */
+/** 累積グラフの幅（日）。目標の期日が先なら期日の3日後まで伸ばすが、予定を読んだ範囲で打ち切る。 */
 const CHART_MIN_DAYS = 21;
 const LIFE_HOUR_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
-/** 読んだ範囲より先の日（予定の無い日）。 */
-const EMPTY_DAY = analyzeDayContent('');
+/** 期日の入力の上限（年の打ち間違いを入口で止める）。 */
+const MAX_DUE_YEARS = 3;
 
 const CARD = 'rounded border border-neutral-400 bg-neutral-50 p-4 dark:border-neutral-600 dark:bg-neutral-900';
 
 /** 長期の計画。目標（この日までにこれを終える）と、締切までに使える空きを比べる。 */
 export default function PlanPage() {
     const supabase = useMemo(() => createClient(), []);
+    const timezone = useMemo(() => getDefaultTimezone(), []);
     const now = useNow();
     const [lifeHours, setLifeHours] = useLifeHours();
     const { goals, isLoading: goalsLoading, error: goalsError, reload: reloadGoals, addGoal, updateGoal, removeGoal } =
         usePlanGoals(supabase);
+    const goalInputs = useMemo(() => goals.map((g) => planGoalToInput(g, timezone)), [goals, timezone]);
+    // 置いた時間を数えるために、目標を作った日（最大 PLACED_LOOKBACK_DAYS 日前）から読む。
+    const startDay = now ? placedCountStart(goalInputs, now.today) : null;
     const {
         contents,
         isLoading: contentsLoading,
         error: contentsError,
         reload: reloadContents,
-    } = usePlanDayContents(supabase, now?.today ?? null, HORIZON_DAYS);
+    } = usePlanDayContents(
+        supabase,
+        startDay,
+        now && startDay ? daysBetween(startDay, now.today) + HORIZON_DAYS : 0
+    );
 
-    const analyze = useMemo(() => {
-        const analyses = new Map<string, DayAnalysis>();
-        for (const [date, content] of contents) analyses.set(date, analyzeDayContent(content));
-        return (date: string) => analyses.get(date) ?? EMPTY_DAY;
+    const analyses = useMemo(() => {
+        const map = new Map<string, DayAnalysis>();
+        for (const [date, content] of contents) map.set(date, analyzeDayContent(content));
+        return map;
     }, [contents]);
+    const analyze = useCallback((date: string) => analyses.get(date) ?? EMPTY_DAY, [analyses]);
 
     const statuses = useMemo(() => {
         if (!now) return [];
         return evaluateGoals({
-            goals: goals.map(planGoalToInput),
-            analyze,
-            knownDates: [...contents.keys()],
+            goals: goalInputs,
+            days: analyses,
             today: now.today,
             nowMinutes: now.nowMinutes,
             lifeMinutesPerDay: lifeHours * 60,
         });
-    }, [goals, analyze, contents, now, lifeHours]);
+    }, [goalInputs, analyses, now, lifeHours]);
 
     const chartDays = useMemo(() => {
         if (!now) return [];
         const lastDue = statuses.filter((s) => !s.past).reduce((m, s) => (s.goal.dueOn > m ? s.goal.dueOn : m), now.today);
+        const minEnd = addDays(now.today, CHART_MIN_DAYS - 1);
+        const maxEnd = addDays(now.today, HORIZON_DAYS - 1);
+        const wanted = lastDue > minEnd ? addDays(lastDue, 3) : minEnd;
+        const end = wanted > maxEnd ? maxEnd : wanted;
         const days: CapacityDay[] = [];
-        const end = lastDue > addDays(now.today, CHART_MIN_DAYS - 1) ? addDays(lastDue, 3) : addDays(now.today, CHART_MIN_DAYS - 1);
         for (let d = now.today; d <= end; d = addDays(d, 1)) {
             const a = analyze(d);
             days.push({
@@ -126,6 +141,7 @@ export default function PlanPage() {
                         </div>
                         <GoalEditor
                             goals={goals}
+                            maxDueOn={now ? addDays(now.today, 365 * MAX_DUE_YEARS) : undefined}
                             statuses={statuses}
                             onAdd={handleAdd}
                             onUpdate={(id, patch) => void updateGoal(id, patch)}

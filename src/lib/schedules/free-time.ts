@@ -20,6 +20,8 @@ const PERIOD_END_BY_START: Record<number, number> = { 650: 750, 810: 910, 920: 1
 const POINT_EVENT_MINUTES = 60;
 /** 「出発」は次の予定までの移動とみなす（上限つき）。 */
 const DEPARTURE_MAX_MINUTES = 120;
+/** 終了が開始より前の範囲を日付跨ぎとみなす、開始時刻の下限。 */
+const OVERNIGHT_START_MINUTES = 18 * 60;
 
 export type SegmentKind = 'fixed' | 'estimated' | 'home';
 export type SlotKind = 'off' | 'free' | SegmentKind;
@@ -71,8 +73,15 @@ function parseBlocks(content: string): Block[] {
         if (activity === '') continue;
         const start = hhmmToMinutes(m[1]);
         const rawEnd = m[3] ? hhmmToMinutes(m[3]) : null;
-        // 日付を跨ぐ範囲（2300-0100）はその日の終わりで切る。
-        const end = rawEnd === null ? null : rawEnd <= start ? 24 * 60 : rawEnd;
+        // 終了が開始より前のとき、夕方以降に始まるもの（2300-0100）だけを日付跨ぎとみなしてその日の
+        // 終わりで切る。それ以外（1500-1300 の打ち間違い、1000-1000）は最小の5分として扱い、14時間の
+        // 拘束に化けさせない。
+        const end =
+            rawEnd === null || rawEnd > start
+                ? rawEnd
+                : rawEnd < start && start >= OVERNIGHT_START_MINUTES
+                  ? 24 * 60
+                  : start;
         blocks.push({ start, end, activity });
     }
     return blocks;
@@ -167,6 +176,28 @@ export function addDays(dateStr: string, days: number): string {
     return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
 }
 
+/** a から b までの日数（b が後なら正）。 */
+export function daysBetween(a: string, b: string): number {
+    const toUtc = (s: string) => {
+        const [y, m, d] = s.split('-').map(Number);
+        return Date.UTC(y, m - 1, d);
+    };
+    return Math.round((toUtc(b) - toUtc(a)) / 86400000);
+}
+
+/** 「置いた時間」を数えるために過去の予定を読む上限の日数。両画面で同じ値を使う。 */
+export const PLACED_LOOKBACK_DAYS = 90;
+
+/** 置いた時間を数えるために読む過去の最初の日。目標が無い・今日作ったものだけなら今日。 */
+export function placedCountStart(goals: GoalInput[], today: string): string {
+    const earliest = goals.reduce((min, g) => (g.countFrom < min ? g.countFrom : min), today);
+    const floor = addDays(today, -PLACED_LOOKBACK_DAYS);
+    return earliest < floor ? floor : earliest;
+}
+
+/** 予定の無い日（07:00〜23:30 がすべて空き）。読み込んでいない日の代わりに使う。 */
+export const EMPTY_DAY = analyzeDayContent('');
+
 /** "HH:MM" または "HH:MM:SS" を分に。null は null。 */
 export function timeToMinutes(time: string | null): number | null {
     if (!time) return null;
@@ -181,6 +212,11 @@ export type GoalInput = {
     /** 期日の時刻（分）。null ならその日の終わりまで。 */
     dueMinutes: number | null;
     needMinutes: number;
+    /**
+     * 「置いた時間」を数え始める日（目標を作った日）。両画面で同じ値を使い、読み込んだ範囲で
+     * 数字が変わらないようにする（スクロールで過去を読むほど増える・日付が変わると戻る、を防ぐ）。
+     */
+    countFrom: string;
 };
 
 export type GoalStatus = {
@@ -203,16 +239,19 @@ export type GoalStatus = {
  */
 export function evaluateGoals(params: {
     goals: GoalInput[];
-    analyze: (date: string) => DayAnalysis;
-    /** 置いた時間を数える対象の日（予定を読み込んだ日）。 */
-    knownDates: string[];
+    /** 予定を読み込んだ日の解析。無い日は予定の無い日（EMPTY_DAY）として数える。 */
+    days: Map<string, DayAnalysis>;
     today: string;
     nowMinutes: number;
     lifeMinutesPerDay: number;
 }): GoalStatus[] {
-    const { goals, analyze, knownDates, today, nowMinutes, lifeMinutesPerDay } = params;
+    const { goals, days, today, nowMinutes, lifeMinutesPerDay } = params;
+    const knownDates = [...days.keys()].sort();
     const dueOf = (g: GoalInput) => g.dueMinutes ?? 24 * 60;
     const sorted = [...goals].sort((a, b) => (a.dueOn === b.dueOn ? dueOf(a) - dueOf(b) : a.dueOn < b.dueOn ? -1 : 1));
+    const usable = (date: string, from: number, to: number) =>
+        usableFreeMinutes(days.get(date) ?? EMPTY_DAY, from, to, lifeMinutesPerDay);
+    const emptyDayUsable = usableFreeMinutes(EMPTY_DAY, 0, 24 * 60, lifeMinutesPerDay);
     let cumulative = 0;
     return sorted.map((goal) => {
         const due = dueOf(goal);
@@ -221,9 +260,9 @@ export function evaluateGoals(params: {
         let placed = 0;
         if (name) {
             for (const date of knownDates) {
-                if (date > goal.dueOn) continue;
+                if (date < goal.countFrom || date > goal.dueOn) continue;
                 const limit = date === goal.dueOn ? due : 24 * 60;
-                for (const s of analyze(date).segments) {
+                for (const s of days.get(date)!.segments) {
                     if (s.kind !== 'fixed' || !s.ranged || !s.activity.includes(name)) continue;
                     placed += Math.max(0, Math.min(s.end, limit) - s.start);
                 }
@@ -232,14 +271,23 @@ export function evaluateGoals(params: {
         const remaining = Math.max(0, goal.needMinutes - placed);
         let supply = 0;
         if (!past) {
-            for (let date = today; date <= goal.dueOn; date = addDays(date, 1)) {
-                supply += usableFreeMinutes(
-                    analyze(date),
-                    date === today ? nowMinutes : 0,
-                    date === goal.dueOn ? due : 24 * 60,
-                    lifeMinutesPerDay
-                );
+            // 読み込んだ日は1日ずつ、それ以外は予定の無い日の空き × 日数。期日が何年先でも
+            // 日数に比例した計算をしない（年の打ち間違いで画面が固まらないように）。
+            const inRange = knownDates.filter((d) => d >= today && d <= goal.dueOn);
+            for (const date of inRange) {
+                supply += usable(date, date === today ? nowMinutes : 0, date === goal.dueOn ? due : 24 * 60);
             }
+            const known = new Set(inRange);
+            let unknownWholeDays = daysBetween(today, goal.dueOn) + 1 - inRange.length;
+            if (!known.has(today)) {
+                supply += usable(today, nowMinutes, today === goal.dueOn ? due : 24 * 60);
+                unknownWholeDays -= 1;
+            }
+            if (goal.dueOn !== today && !known.has(goal.dueOn)) {
+                supply += usable(goal.dueOn, 0, due);
+                unknownWholeDays -= 1;
+            }
+            supply += Math.max(0, unknownWholeDays) * emptyDayUsable;
             cumulative += remaining;
         }
         return {

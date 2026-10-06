@@ -23,6 +23,34 @@ export async function getSchedules(
     return { data, error }
 }
 
+/** PostgREST の1レスポンスの上限（supabase/config.toml の max_rows）。 */
+const PAGE_ROWS = 1000
+
+/**
+ * getSchedules と同じ範囲を、max_rows で黙って切れないようにページを分けて全件取得する。
+ * 読む範囲が広い /plan 用（docs/database.md §2）。
+ */
+export async function getSchedulesAllPages(
+    supabase: SupabaseClient<Database>,
+    start_at: string,
+    end_at: string,
+): Promise<{ data: ScheduleRow[] | null; error: Error | null }> {
+    const rows: ScheduleRow[] = []
+    for (let from = 0; ; from += PAGE_ROWS) {
+        const { data, error } = await supabase
+            .from('schedules')
+            .select('*')
+            .gte('start_at', start_at)
+            .lt('start_at', end_at)
+            .order('start_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, from + PAGE_ROWS - 1)
+        if (error) return { data: null, error }
+        rows.push(...(data ?? []))
+        if (!data || data.length < PAGE_ROWS) return { data: rows, error: null }
+    }
+}
+
 export async function getScheduleDayRevisions(
     supabase: SupabaseClient<Database>,
     startDay: string,

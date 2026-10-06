@@ -85,7 +85,8 @@ export function DaySection({
                                 {formatHours(freeTime.freeMinutes)}h
                             </span>
                         </span>
-                        <span>
+                        {/* スマホは日付・記法警告・元に戻すと並ぶと幅が足りないので「空き」だけ。 */}
+                        <span className="hidden sm:inline">
                             最大{' '}
                             <span className="font-medium text-neutral-900 dark:text-neutral-50">
                                 {formatHours(freeTime.maxGapMinutes)}h

@@ -10,9 +10,17 @@ import { useInbox } from '@/src/hooks/useInbox';
 import { useDayNotes } from '@/src/hooks/useDayNotes';
 import { useLifeHours } from '@/src/hooks/useLifeHours';
 import { useNow } from '@/src/hooks/useNow';
+import { usePlanDayContents } from '@/src/hooks/usePlanDayContents';
 import { planGoalToInput, usePlanGoals } from '@/src/hooks/usePlanGoals';
 import { useSchedules } from '@/src/hooks/useSchedules';
-import { analyzeDayContent, evaluateGoals, type DayAnalysis } from '@/src/lib/schedules/free-time';
+import { getDefaultTimezone } from '@/src/lib/date';
+import {
+    analyzeDayContent,
+    daysBetween,
+    evaluateGoals,
+    placedCountStart,
+    type DayAnalysis,
+} from '@/src/lib/schedules/free-time';
 import { dateLabelToDateStr } from '@/src/lib/schedules/text-format';
 import { Inbox } from 'lucide-react';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
@@ -57,31 +65,33 @@ export default function SchedulesPage() {
     });
 
     const { goals } = usePlanGoals(supabase);
+    const timezone = useMemo(() => getDefaultTimezone(), []);
     const now = useNow();
     const [lifeHours] = useLifeHours();
-    // 目標の帯の数字。読み込んだ範囲(概ね今日から2ヶ月先)の予定テキストから、打つたびに計算し直す。
-    // 範囲より先の日は予定の無い日(07:00〜23:30 が空き)として数える。
+    const goalInputs = useMemo(() => goals.map((g) => planGoalToInput(g, timezone)), [goals, timezone]);
+    // 置いた時間は目標を作った日から数える(/plan と同じ)。板が読んでいない過去の日は別に読む。
+    const pastStart = now ? placedCountStart(goalInputs, now.today) : null;
+    const { contents: pastContents } = usePlanDayContents(
+        supabase,
+        pastStart,
+        now && pastStart ? daysBetween(pastStart, now.today) : 0
+    );
+    // 目標の帯の数字。打つたびに計算し直す。板が読み込んだ範囲(概ね今日から2ヶ月先)より先の日は
+    // 予定の無い日(07:00〜23:30 が空き)として数える。
     const goalStatuses = useMemo(() => {
-        if (!now || isInitialSyncing || goals.length === 0) return [];
-        const contents = new Map(entries.map((e) => [dateLabelToDateStr(e.dateLabel), e.content]));
-        const cache = new Map<string, DayAnalysis>();
-        const analyze = (date: string) => {
-            let a = cache.get(date);
-            if (!a) {
-                a = analyzeDayContent(contents.get(date) ?? '');
-                cache.set(date, a);
-            }
-            return a;
-        };
+        if (!now || isInitialSyncing || goalInputs.length === 0) return [];
+        const days = new Map<string, DayAnalysis>();
+        for (const [date, content] of pastContents) days.set(date, analyzeDayContent(content));
+        // 板が読んだ日は、打ちかけの内容を優先する。
+        for (const e of entries) days.set(dateLabelToDateStr(e.dateLabel), analyzeDayContent(e.content));
         return evaluateGoals({
-            goals: goals.map(planGoalToInput),
-            analyze,
-            knownDates: [...contents.keys()],
+            goals: goalInputs,
+            days,
             today: now.today,
             nowMinutes: now.nowMinutes,
             lifeMinutesPerDay: lifeHours * 60,
         });
-    }, [entries, goals, now, lifeHours, isInitialSyncing]);
+    }, [entries, pastContents, goalInputs, now, lifeHours, isInitialSyncing]);
 
     // /plan の日ごとの一覧から ?day=YYYY-MM-DD で来たら、初回の同期の後にその日へ移る(1回だけ)。
     const dayTargetHandledRef = useRef(false);

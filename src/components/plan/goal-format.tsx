@@ -17,7 +17,7 @@ export function formatDue(dueOn: string, dueMinutes: number | null): string {
 /** 余裕（締切までの空き − 残り必要時間の累計）か、不足を出す。 */
 export function GoalVerdict({ status }: { status: GoalStatus }) {
     if (status.past) {
-        return <span className="text-neutral-500">期日を過ぎました</span>;
+        return <span className="text-neutral-700 dark:text-neutral-300">期日を過ぎました（終わったら削除）</span>;
     }
     if (status.ok) {
         return (
@@ -43,7 +43,7 @@ export function PlacedBar({ status }: { status: GoalStatus }) {
     const ratio = need > 0 ? Math.min(1, status.placedMinutes / need) : 0;
     return (
         <div className="h-1 w-24 shrink-0 overflow-hidden rounded-sm bg-neutral-200 dark:bg-neutral-800">
-            <div className="h-1 bg-amber-500 dark:bg-amber-400" style={{ width: `${Math.round(ratio * 100)}%` }} />
+            <div className="h-1 bg-amber-500 dark:bg-amber-500" style={{ width: `${Math.round(ratio * 100)}%` }} />
         </div>
     );
 }
