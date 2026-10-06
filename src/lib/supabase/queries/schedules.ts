@@ -36,7 +36,9 @@ export async function getSchedulesAllPages(
     end_at: string,
 ): Promise<{ data: ScheduleRow[] | null; error: Error | null }> {
     const rows: ScheduleRow[] = []
-    for (let from = 0; ; from += PAGE_ROWS) {
+    // 返ってきた件数ぶん進め、空のページで終える。サーバ側の max_rows が PAGE_ROWS より小さくても
+    // 「足りなかった＝最後のページ」と誤判定しない。
+    for (;;) {
         const { data, error } = await supabase
             .from('schedules')
             .select('*')
@@ -44,10 +46,10 @@ export async function getSchedulesAllPages(
             .lt('start_at', end_at)
             .order('start_at', { ascending: true })
             .order('id', { ascending: true })
-            .range(from, from + PAGE_ROWS - 1)
+            .range(rows.length, rows.length + PAGE_ROWS - 1)
         if (error) return { data: null, error }
-        rows.push(...(data ?? []))
-        if (!data || data.length < PAGE_ROWS) return { data: rows, error: null }
+        if (!data || data.length === 0) return { data: rows, error: null }
+        rows.push(...data)
     }
 }
 

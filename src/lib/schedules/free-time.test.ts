@@ -113,6 +113,11 @@ describe('evaluateGoals', () => {
 
         const [fromEarlier] = evaluateGoals({ ...base, goals: [{ ...goals[0], countFrom: '2026-10-01' }] });
         expect(fromEarlier.placedMinutes).toBe(h(5));
+
+        // 90日より前は、作った日が古くても数えない（/plan はそこまで読まないので両画面で揃える）
+        const withOld = new Map(days).set('2026-06-01', analyzeDayContent('1300-1900 論文の図'));
+        const [old] = evaluateGoals({ ...base, days: withOld, goals: [{ ...goals[0], countFrom: '2026-01-01' }] });
+        expect(old.placedMinutes).toBe(h(5));
     });
 
     it('compares cumulative remaining time by earliest deadline', () => {

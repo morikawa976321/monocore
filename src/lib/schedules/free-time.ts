@@ -252,6 +252,8 @@ export function evaluateGoals(params: {
     const usable = (date: string, from: number, to: number) =>
         usableFreeMinutes(days.get(date) ?? EMPTY_DAY, from, to, lifeMinutesPerDay);
     const emptyDayUsable = usableFreeMinutes(EMPTY_DAY, 0, 24 * 60, lifeMinutesPerDay);
+    // 置いた時間を数える範囲は両画面とも PLACED_LOOKBACK_DAYS 日前まで（それより前は /plan が読まない）。
+    const countFloor = addDays(today, -PLACED_LOOKBACK_DAYS);
     let cumulative = 0;
     return sorted.map((goal) => {
         const due = dueOf(goal);
@@ -260,7 +262,7 @@ export function evaluateGoals(params: {
         let placed = 0;
         if (name) {
             for (const date of knownDates) {
-                if (date < goal.countFrom || date > goal.dueOn) continue;
+                if (date < goal.countFrom || date < countFloor || date > goal.dueOn) continue;
                 const limit = date === goal.dueOn ? due : 24 * 60;
                 for (const s of days.get(date)!.segments) {
                     if (s.kind !== 'fixed' || !s.ranged || !s.activity.includes(name)) continue;

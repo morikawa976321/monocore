@@ -47,7 +47,8 @@ export default function PlanPage() {
         usePlanGoals(supabase);
     const goalInputs = useMemo(() => goals.map((g) => planGoalToInput(g, timezone)), [goals, timezone]);
     // 置いた時間を数えるために、目標を作った日（最大 PLACED_LOOKBACK_DAYS 日前）から読む。
-    const startDay = now ? placedCountStart(goalInputs, now.today) : null;
+    // 目標が届く前に今日から読み始めると、範囲が変わって2回読むことになるので待つ。
+    const startDay = now && !goalsLoading ? placedCountStart(goalInputs, now.today) : null;
     const {
         contents,
         isLoading: contentsLoading,
