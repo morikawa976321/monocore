@@ -5,10 +5,6 @@ export type ScheduleDayRevision = {
     revision: number;
 };
 
-type SupabaseErrorLike = {
-    code?: string;
-};
-
 export class ScheduleSaveQueue {
     private readonly pendingByDay = new Map<string, Promise<unknown>>();
 
@@ -43,10 +39,6 @@ export function applyScheduleRevisions(
         ...entry,
         revision: revisionByDay.get(dateLabelToDateStr(entry.dateLabel)) ?? 0,
     }));
-}
-
-export function isScheduleRevisionConflict(error: SupabaseErrorLike | null): boolean {
-    return error?.code === '40001';
 }
 
 /** `replace_schedules_for_day` の1回の呼び出しがどう終わったか。 */

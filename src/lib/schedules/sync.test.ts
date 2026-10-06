@@ -3,7 +3,6 @@ import {
     ScheduleSaveQueue,
     applyScheduleRevisions,
     decodeScheduleSaveOutcome,
-    isScheduleRevisionConflict,
 } from './sync';
 
 describe('ScheduleSaveQueue', () => {
@@ -96,14 +95,6 @@ describe('applyScheduleRevisions', () => {
             { dateLabel: '2026/08/03 (月)', content: '0900 work', revision: 4 },
             { dateLabel: '2026/08/04 (火)', content: '', revision: 0 },
         ]);
-    });
-});
-
-describe('isScheduleRevisionConflict', () => {
-    it('recognizes the database conflict error code', () => {
-        expect(isScheduleRevisionConflict({ code: '40001' })).toBe(true);
-        expect(isScheduleRevisionConflict({ code: '23505' })).toBe(false);
-        expect(isScheduleRevisionConflict(null)).toBe(false);
     });
 });
 
