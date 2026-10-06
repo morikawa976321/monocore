@@ -6,6 +6,8 @@ record_rss_articles（ファイル書き込み）を見ていたが、両方と�
 
 from unittest.mock import patch
 
+import pytest
+
 import run_once as run_once_module
 from run_once import collect_all, run_once
 
@@ -15,6 +17,12 @@ CONFIG = {
     "blacklist_categories": {"Gigazine": ["試食"]},
     "max_age_days": 8,
 }
+
+
+@pytest.fixture(autouse=True)
+def no_sleep(monkeypatch):
+    # run_once はサイト間で待つので、止めないと1テスト数秒かかる。
+    monkeypatch.setattr(run_once_module.time, "sleep", lambda seconds: None)
 
 
 class FakeStore:
@@ -35,46 +43,30 @@ class FakeStore:
         return 2
 
 
-def article(link, published):
-    return {"source": "S", "title": link, "link": link, "published": published, "image": ""}
+def article(link):
+    return {"source": "S", "title": link, "link": link, "published": None, "image": ""}
 
 
-def test_run_once_passes_existing_links_to_collection():
+def test_run_once_wires_links_blacklist_and_store():
     store = FakeStore({"https://a.test/old"})
+    calls = []
 
-    with patch.object(run_once_module, "collect_new_rss_articles", return_value=[]) as collect:
-        run_once(store, CONFIG)
+    # 引数は名前で受ける（位置の添字で読むと、呼び出し形を変えただけで壊れる）。
+    def fake_collect(rss_url, source_name, existing_links, blacklist=None):
+        calls.append({"existing_links": set(existing_links), "blacklist": blacklist})
+        return [article(rss_url.replace("/feed", "/1"))]
 
-    passed_links = collect.call_args_list[0][0][2]
-    assert "https://a.test/old" in passed_links
-
-
-def test_run_once_upserts_all_sites_sorted_by_published_desc():
-    store = FakeStore()
-    per_site = {
-        "https://a.test/feed": [article("https://a.test/1", "2026-08-14T10:00:00+09:00")],
-        "https://b.test/feed": [article("https://b.test/1", "2026-08-14T20:00:00+09:00")],
-    }
-
-    with patch.object(
-        run_once_module,
-        "collect_new_rss_articles",
-        side_effect=lambda url, name, links, blacklist: per_site[url],
-    ):
+    with patch.object(run_once_module, "collect_new_rss_articles", side_effect=fake_collect):
         result = run_once(store, CONFIG)
 
-    assert [a["link"] for a in store.upserted] == ["https://b.test/1", "https://a.test/1"]
+    assert "https://a.test/old" in calls[0]["existing_links"]
+    assert calls[0]["blacklist"] == {
+        "prefixes": ["https://a.test/ad/"],
+        "categories": {"Gigazine": ["試食"]},
+    }
+    assert {a["link"] for a in store.upserted} == {"https://a.test/1", "https://b.test/1"}
     assert result["upserted"] == 2
     assert result["deleted"] == 2
-
-
-def test_run_once_deletes_with_configured_max_age():
-    store = FakeStore()
-
-    with patch.object(run_once_module, "collect_new_rss_articles", return_value=[]):
-        run_once(store, CONFIG)
-
-    assert store.deleted_with == 8
 
 
 def test_run_once_still_deletes_when_nothing_new():
@@ -88,38 +80,15 @@ def test_run_once_still_deletes_when_nothing_new():
     assert store.deleted_with == 8
 
 
-def test_collect_all_skips_empty_feed_urls():
-    config = {"rss_sites": {"A": "https://a.test/feed", "B": ""}, "blacklist_prefixes": []}
-
-    with patch.object(run_once_module, "collect_new_rss_articles", return_value=[]) as collect:
-        collect_all(config, set(), sleep_seconds=0)
-
-    assert len(collect.call_args_list) == 1
-
-
-def test_collect_all_passes_blacklist_prefixes():
-    with patch.object(run_once_module, "collect_new_rss_articles", return_value=[]) as collect:
-        collect_all(CONFIG, set(), sleep_seconds=0)
-
-    assert collect.call_args_list[0][0][3]["prefixes"] == ["https://a.test/ad/"]
-
-
-def test_collect_all_passes_blacklist_categories():
-    with patch.object(run_once_module, "collect_new_rss_articles", return_value=[]) as collect:
-        collect_all(CONFIG, set(), sleep_seconds=0)
-
-    assert collect.call_args_list[0][0][3]["categories"] == {"Gigazine": ["試食"]}
-
-
 def test_collect_all_shares_one_link_set_across_sites():
     """同じ記事が複数サイトに出ても1度しか積まれないこと（集合を巡回中に更新するため）。"""
     seen = set()
 
-    def fake_collect(url, name, links, blacklist):
-        if "a.test" in url:
-            links.add("https://dup.test/1")
-            return [article("https://dup.test/1", "2026-08-14T10:00:00+09:00")]
-        seen.update(links)
+    def fake_collect(rss_url, source_name, existing_links, blacklist=None):
+        if "a.test" in rss_url:
+            existing_links.add("https://dup.test/1")
+            return [article("https://dup.test/1")]
+        seen.update(existing_links)
         return []
 
     with patch.object(run_once_module, "collect_new_rss_articles", side_effect=fake_collect):

@@ -47,7 +47,10 @@ def entry_categories(entry):
 
 
 def _resolve_blocked_categories(source_name, blacklist_categories):
-    """blacklist_categories からそのサイトに適用するブロック対象カテゴリの集合を求める。"""
+    """blacklist_categories からそのサイトに適用するブロック対象カテゴリの集合を求める。
+
+    blacklist_categories は { "サイト名": ["カテゴリ", ...], "*": [...] }。"*" は全サイトに効く。
+    """
     if not isinstance(blacklist_categories, dict):
         return set()
 
@@ -64,7 +67,10 @@ def _resolve_blocked_categories(source_name, blacklist_categories):
 
 
 def _entry_matches_blocked_categories(entry, blocked):
-    """記事のカテゴリがすべて blocked に含まれるときだけ True（保存しない）。"""
+    """記事のカテゴリがすべて blocked に含まれるときだけ True（保存しない）。
+
+    カテゴリが1つでもリスト外にあれば False（保存する）。カテゴリなしは False。
+    """
     if not blocked:
         return False
 
@@ -73,16 +79,6 @@ def _entry_matches_blocked_categories(entry, blocked):
         return False
 
     return all(category in blocked for category in categories)
-
-
-def entry_matches_category_blacklist(entry, source_name, blacklist_categories):
-    """
-    blacklist_categories は { "サイト名": ["カテゴリ", ...], "*": [...] }。
-    記事のカテゴリがすべてブロックリストに含まれるときだけ True（保存しない）。
-    カテゴリが1つでもリスト外にあれば False（保存する）。カテゴリなしは False。
-    """
-    blocked = _resolve_blocked_categories(source_name, blacklist_categories)
-    return _entry_matches_blocked_categories(entry, blocked)
 
 
 def get_article_image(entry):
