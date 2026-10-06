@@ -43,7 +43,8 @@
 #   自動導入は試みない: Windows では導入に管理者権限か対話が要り、無人実行では誰も操作できない。
 
 param(
-    [int]$RetentionDays = 30
+    # 2026-10-07本人判断で30日から14日へ短縮した(同時に取る回数を毎時から1日2回へ減らした。taskbox/lib/backup.ps1)。
+    [int]$RetentionDays = 14
 )
 
 $ErrorActionPreference = 'Continue'
