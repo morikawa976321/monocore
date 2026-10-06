@@ -234,12 +234,21 @@ export function isQuietSkip(row) {
  * 両方が静かな起動なしなら、新しい行が回数と最初の時刻を引き継ぎ、latest は消す対象として返す。
  * 1時間おきの drain は大半が起動なしで、保持48件の枠を食って実働の行を約2日で押し出していた。
  */
+function sameInstant(a, b) {
+    const ta = Date.parse(a)
+    const tb = Date.parse(b)
+    if (Number.isNaN(ta) || Number.isNaN(tb)) return a === b
+    return ta === tb
+}
+
 export function foldQuietSkip(row, latest) {
     if (!isQuietSkip(row)) {
         return { row, deleteStartedAt: null }
     }
     // 同じ回の再送(投入の再試行など)は、まとめ済みの回数と最初の時刻をそのまま保つ。
-    if (isQuietSkip(latest) && latest.started_at === row.started_at) {
+    // 同じ回かは文字列ではなく瞬間で比べる: payload は +09:00、DB が返す値は UTC 表記なので文字列は一致しない。
+    // 文字列で比べると再送を「直前の回と連続」と誤判定し、いま書いた行を自分で消していた(2026-10-07 レビュー指摘)。
+    if (isQuietSkip(latest) && sameInstant(latest.started_at, row.started_at)) {
         return {
             row: { ...row, skip_count: latest.skip_count ?? 1, skip_since: latest.skip_since ?? row.started_at },
             deleteStartedAt: null,

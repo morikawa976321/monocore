@@ -227,6 +227,14 @@ describe('foldQuietSkip', () => {
         expect(foldQuietSkip(done, quiet('t2'))).toEqual({ row: done, deleteStartedAt: null })
     })
 
+    it('recognizes a re-send even when the DB returns the same instant in UTC', () => {
+        const sent = quiet('2026-10-07T01:00:02+09:00')
+        const stored = quiet('2026-10-06T16:00:02+00:00', { skip_count: 3, skip_since: '2026-10-06T13:00:02+00:00' })
+        const { deleteStartedAt, row } = foldQuietSkip(sent, stored)
+        expect(deleteStartedAt).toBeNull()
+        expect(row.skip_count).toBe(3)
+    })
+
     it('keeps the folded count when the same run is re-sent, and does not delete it', () => {
         const { deleteStartedAt, row } = foldQuietSkip(quiet('t2'), quiet('t2', { skip_count: 3, skip_since: 't0' }))
         expect(deleteStartedAt).toBeNull()
