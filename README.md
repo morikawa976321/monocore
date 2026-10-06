@@ -184,11 +184,7 @@ npx supabase db reset
 - **命名:** `filename.test.ts` / `filename.test.tsx`
 - **例:** `src/lib/date.ts` → `src/lib/date.test.ts`
 
-**`scraper/` は pytest で別に回す。** `npm test`（Vitest）は Python のテストを拾いません。
-
-```bash
-cd scraper && .venv\Scripts\python.exe -m pytest -q
-```
+**`npm test` は Vitest のあとに `scraper/` の pytest も回す**（`npm run test:py` で pytest だけ）。`scraper/.venv` が無いと失敗するので、先に venv を作って `requirements-dev.txt` を入れておく。
 
 ### 方針（小規模個人開発）
 

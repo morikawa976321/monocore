@@ -10,7 +10,7 @@ AI coding agents: follow this file for build commands, architecture, code style,
 
 - Install: `npm install`
 - Dev: `npm run dev`
-- Test: `npm test` (Vitest)
+- Test: `npm test` (Vitest, then `scraper/` pytest via `scripts/run-pytest.mjs`)
 - DB migrations (local): `npx supabase migration up`
 - DB migrations (remote): `npx supabase db push`
 - Migration list: `npx supabase migration list`
