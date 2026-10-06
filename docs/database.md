@@ -27,6 +27,7 @@
 
 - **本番へ push する前に `npx supabase migration list`(または `db push --dry-run`)で差分を見る。** 2026-07-17 に 2026-04-13 の migration が3ヶ月間本番未適用のまま隠れていた(ローカルは applied、本番には関数が無い)。「今回追加した分だけ」の思い込みで push すると、古い未適用分を見落とすか想定外に巻き込む。
 - **リモートへの `supabase db push` は、Claude Code のセッションから通るときと自動許可のゲートに拒否されるときがある**(2026-07 時点は Bash/PowerShell とも拒否、2026-09-28 は `--dry-run` の後に通った。ローカルの `migration up` は常に通る)。拒否されうる前提で、DDL を含む作業は「本人が1コマンド打つ」工程が挟まっても成立するように組む: リモート適用後にしか検証できないこと(本番データ確認・投入スクリプトの実走)を完了条件に混ぜない/列の RENAME は DB とアプリのどちらが先でも画面が落ちるので、指示にはコマンドだけでなく順序(適用→デプロイ)を書く/無人 drain と同時間帯なら、失敗しても安全な失敗の仕方を用意しておく。
+- **migration はコミットした時点で、他のセッションの `db push` に乗って本番へ当たりうる**。2026-10-07 に `20261007120000_add_plan_goals.sql` が、レビューの指摘(期日の上限 CHECK)を書き足す前の版のまま別セッションの push で適用された。適用済みのファイルを後から直しても本番には当たらないので、差分は冪等な追いかけの migration で当てる(`20261007130000`)。直したら `npx supabase db query --linked` で本番の制約・権限を読み直して確かめる。
 - 履歴の drift(スキーマは適用済みだが `supabase_migrations.schema_migrations` に記録が無く、`migration up` が再実行しようとして失敗する)は `npx supabase migration repair --status applied <version> --local` で帳簿だけ合わせる。スキーマもデータも触らない。非冪等な migration(`CREATE TRIGGER`、`sort_order` のバックフィル UPDATE)は再実行すると手動並び順が壊れるので、repair が正解。
 - ローカル Supabase の `postgres` ロールは superuser ではない(`rolbypassrls` のみ。拡張の導入で `permission denied to create extension`)。superuser は `supabase_admin`: `docker exec -i -e PGPASSWORD=postgres <db_container> psql -U supabase_admin -d postgres`。
 
