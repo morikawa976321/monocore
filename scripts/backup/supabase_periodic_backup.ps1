@@ -1,8 +1,8 @@
 ﻿# monocore 本番Supabase — 定期バックアップ(スキーマ+データ)
 #
-# 起動: taskbox drain.ps1 が毎run終了時に呼ぶ(Invoke-MonocoreDbBackup)。枠は drain と同じ
-#       毎時24枠+ログオン時(2026-09-11に1日4回から変更)。判断が要らない機械工程なので
-#       claude は起動しない。
+# 起動: taskbox drain.ps1 が毎run終了時に呼ぶ(Invoke-MonocoreDbBackup)が、取るのは 00:00 と 12:00 の
+#       枠ごとに1回(2026-10-07〜。判定は taskbox の lib/backup.ps1 の Test-DbBackupDue)。判断が要らない
+#       機械工程なので claude は起動しない。
 #       手動: pwsh -ExecutionPolicy Bypass -File C:\Users\tm976\mf\monocore\scripts\backup\supabase_periodic_backup.ps1
 #
 # 経緯(2026-08-30): inboxes.contentが空文字列で上書きされ、直近の手動バックアップ
@@ -526,7 +526,7 @@ if ($problems.Count -gt 0) {
 Write-Log ("ダンプ成功: schema=${schemaBytes} bytes, data=${dataBytes} bytes, dir=${runDir}")
 
 # ---------------------------------------------------------------
-# 4. 保持期間を超えた古い定期バックアップを削除(既定30日)
+# 4. 保持期間を超えた古い定期バックアップを削除(既定14日。2026-10-07に30日から短縮)
 #    backups/manual(手動バックアップ)には触れない — 別ディレクトリ。
 # ---------------------------------------------------------------
 $cutoff = (Get-Date).AddDays(-$RetentionDays)
