@@ -224,6 +224,39 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_goals: {
+        Row: {
+          created_at: string
+          due_on: string
+          due_time: string | null
+          id: string
+          name: string
+          need_minutes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          due_on: string
+          due_time?: string | null
+          id?: string
+          name?: string
+          need_minutes?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          due_on?: string
+          due_time?: string | null
+          id?: string
+          name?: string
+          need_minutes?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reports: {
         Row: {
           body_html: string

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Undo2 } from 'lucide-react';
+import { FreeTimeStrip } from '@/src/components/plan/FreeTimeStrip';
 import { AutoHeightTextarea } from '@/src/components/schedules/AutoHeightTextarea';
 import { Button } from '@/src/components/ui/Button';
-import { hasOrphanLines, type DayEntry } from '@/src/lib/schedules/text-format';
+import { analyzeDayContent, formatHours } from '@/src/lib/schedules/free-time';
+import { dateLabelToDateStr, hasOrphanLines, type DayEntry } from '@/src/lib/schedules/text-format';
 
 type DaySectionProps = {
     // 1日分の表示データ（見出し日付 + 本文）。
@@ -21,6 +23,8 @@ type DaySectionProps = {
     onBlur: () => void;
     // DB同期中は編集を無効化する。
     isReadOnly?: boolean;
+    // 今日だけ渡す。空きの帯に今の時刻の線を引く。
+    nowMinutes?: number;
 };
 
 export function DaySection({
@@ -33,8 +37,11 @@ export function DaySection({
     onFocus,
     onBlur,
     isReadOnly = false,
+    nowMinutes,
 }: DaySectionProps) {
     const [previousContent, setPreviousContent] = useState<string | null>(null);
+    // 打つたびに再計算する（1日分なので軽い）。/plan の目標の判定と同じ計算。
+    const freeTime = useMemo(() => analyzeDayContent(entry.content), [entry.content]);
 
     const handleUndo = () => {
         if (previousContent === null) return;
@@ -47,6 +54,8 @@ export function DaySection({
         <section
             // 今日のセクションだけ親から渡されたrefを当て、初期スクロール先に使う。
             ref={isToday ? todayRef : null}
+            // /plan の日ごとの一覧から ?day=YYYY-MM-DD で飛んでくる先。
+            id={`day-${dateLabelToDateStr(entry.dateLabel)}`}
             className={`group rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden ${isToday
                     ? 'border-2 border-amber-500 dark:border-amber-500'
                     : 'border border-neutral-400 dark:border-neutral-600'
@@ -63,19 +72,40 @@ export function DaySection({
                         </span>
                     )}
                 </div>
-                {previousContent !== null && previousContent !== entry.content && (
-                    <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150">
-                        <Button
-                            color="ghost"
-                            size="icon"
-                            title="元に戻す"
-                            onClick={handleUndo}
-                            className="-mr-2"
-                        >
-                            <Undo2 className="w-4 h-4" />
-                        </Button>
+                {/* 空きの帯は見出し行の中に置き、カードの高さを増やさない(下の最低高のコメントと同じ理由で、
+                    60日分のスクロール長が伸びるのを避ける)。スマホは幅が無いので数値だけ。 */}
+                <div className="hidden sm:block min-w-0 flex-1 px-4">
+                    <FreeTimeStrip analysis={freeTime} nowMinutes={isToday ? nowMinutes : undefined} />
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 text-neutral-700 dark:text-neutral-300">
+                        <span>
+                            空き{' '}
+                            <span className="font-medium text-neutral-900 dark:text-neutral-50">
+                                {formatHours(freeTime.freeMinutes)}h
+                            </span>
+                        </span>
+                        <span>
+                            最大{' '}
+                            <span className="font-medium text-neutral-900 dark:text-neutral-50">
+                                {formatHours(freeTime.maxGapMinutes)}h
+                            </span>
+                        </span>
                     </div>
-                )}
+                    {previousContent !== null && previousContent !== entry.content && (
+                        <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150">
+                            <Button
+                                color="ghost"
+                                size="icon"
+                                title="元に戻す"
+                                onClick={handleUndo}
+                                className="-mr-2"
+                            >
+                                <Undo2 className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    )}
+                </div>
             </header>
             {/* 予定と自由記述メモ。高さはそれぞれ入力量に合わせて自動調整。
                 PC は横並びで予定:メモ = 3:2(2026-08-05 本人指定)、スマホは縦積み(375px で横2分割は両方使えない)。 */}

@@ -1,13 +1,18 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/src/lib/supabase/client';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
+import { GoalBar } from '@/src/components/plan/GoalBar';
 import { DaySection } from '@/src/components/schedules/DaySection';
 import { Button } from '@/src/components/ui/Button';
 import { useInbox } from '@/src/hooks/useInbox';
 import { useDayNotes } from '@/src/hooks/useDayNotes';
+import { useLifeHours } from '@/src/hooks/useLifeHours';
+import { useNow } from '@/src/hooks/useNow';
+import { planGoalToInput, usePlanGoals } from '@/src/hooks/usePlanGoals';
 import { useSchedules } from '@/src/hooks/useSchedules';
+import { analyzeDayContent, evaluateGoals, type DayAnalysis } from '@/src/lib/schedules/free-time';
 import { dateLabelToDateStr } from '@/src/lib/schedules/text-format';
 import { Inbox } from 'lucide-react';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
@@ -51,6 +56,44 @@ export default function SchedulesPage() {
         saveInboxNow,
     });
 
+    const { goals } = usePlanGoals(supabase);
+    const now = useNow();
+    const [lifeHours] = useLifeHours();
+    // 目標の帯の数字。読み込んだ範囲(概ね今日から2ヶ月先)の予定テキストから、打つたびに計算し直す。
+    // 範囲より先の日は予定の無い日(07:00〜23:30 が空き)として数える。
+    const goalStatuses = useMemo(() => {
+        if (!now || isInitialSyncing || goals.length === 0) return [];
+        const contents = new Map(entries.map((e) => [dateLabelToDateStr(e.dateLabel), e.content]));
+        const cache = new Map<string, DayAnalysis>();
+        const analyze = (date: string) => {
+            let a = cache.get(date);
+            if (!a) {
+                a = analyzeDayContent(contents.get(date) ?? '');
+                cache.set(date, a);
+            }
+            return a;
+        };
+        return evaluateGoals({
+            goals: goals.map(planGoalToInput),
+            analyze,
+            knownDates: [...contents.keys()],
+            today: now.today,
+            nowMinutes: now.nowMinutes,
+            lifeMinutesPerDay: lifeHours * 60,
+        });
+    }, [entries, goals, now, lifeHours, isInitialSyncing]);
+
+    // /plan の日ごとの一覧から ?day=YYYY-MM-DD で来たら、初回の同期の後にその日へ移る(1回だけ)。
+    const dayTargetHandledRef = useRef(false);
+    useEffect(() => {
+        if (dayTargetHandledRef.current || isInitialSyncing || entries.length === 0) return;
+        dayTargetHandledRef.current = true;
+        const day = new URLSearchParams(window.location.search).get('day');
+        if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+        document.getElementById(`day-${day}`)?.scrollIntoView({ block: 'start' });
+        window.history.replaceState(null, '', window.location.pathname);
+    }, [isInitialSyncing, entries]);
+
     const handleInboxToggle = () => {
         if (inboxOpen) saveInboxNow();
         setInboxOpen((prev) => !prev);
@@ -89,6 +132,8 @@ export default function SchedulesPage() {
                     </Button>
                 </div>
             </PageHeader>
+
+            <GoalBar statuses={goalStatuses} />
 
             <div className="flex-1 overflow-hidden relative">
                 <Button
@@ -130,6 +175,7 @@ export default function SchedulesPage() {
                             }}
                             onFocus={() => focusDay(entry.dateLabel)}
                             onBlur={() => blurDay(entry.dateLabel)}
+                            nowMinutes={now?.nowMinutes}
                         />
                     ))}
 
