@@ -4,6 +4,8 @@ import {
     MAX_TASK_SUMMARY_LENGTH,
     buildAsks,
     buildRow,
+    foldQuietSkip,
+    isQuietSkip,
     truncateReportText,
     validateRun,
 } from './drain-run-payload.mjs'
@@ -186,5 +188,49 @@ describe('truncateReportText', () => {
         const truncated = truncateReportText(text)
         expect(truncated.length).toBeGreaterThan(MAX_REPORT_TEXT_LENGTH)
         expect(truncated).toContain('切り捨て')
+    })
+})
+
+describe('foldQuietSkip', () => {
+    const quiet = (startedAt, extra = {}) => ({
+        started_at: startedAt,
+        outcome: 'skipped',
+        steps: [{ did: '起動判定', result: 'やることが無い', status: 'ok' }],
+        ...extra,
+    })
+
+    it('treats only skipped runs without warn/error steps as quiet', () => {
+        expect(isQuietSkip(quiet('a'))).toBe(true)
+        expect(isQuietSkip(quiet('a', { steps: [{ did: 'USBバックアップ', status: 'error' }] }))).toBe(false)
+        expect(isQuietSkip(quiet('a', { outcome: 'completed' }))).toBe(false)
+        expect(isQuietSkip(null)).toBe(false)
+    })
+
+    it('starts a streak when the latest row is not a quiet skip', () => {
+        const { row, deleteStartedAt } = foldQuietSkip(quiet('t2'), { started_at: 't1', outcome: 'completed', steps: [] })
+        expect(deleteStartedAt).toBeNull()
+        expect(row.skip_count).toBe(1)
+        expect(row.skip_since).toBe('t2')
+    })
+
+    it('folds into the previous quiet skip, carrying the count and the first time', () => {
+        const { row, deleteStartedAt } = foldQuietSkip(quiet('t3'), quiet('t2', { skip_count: 4, skip_since: 't0' }))
+        expect(deleteStartedAt).toBe('t2')
+        expect(row.skip_count).toBe(5)
+        expect(row.skip_since).toBe('t0')
+    })
+
+    it('does not fold a skip that has a warn/error step, and leaves non-skips untouched', () => {
+        const noisy = quiet('t3', { steps: [{ did: 'USBバックアップ', status: 'error' }] })
+        expect(foldQuietSkip(noisy, quiet('t2'))).toEqual({ row: noisy, deleteStartedAt: null })
+        const done = { started_at: 't3', outcome: 'completed', steps: [] }
+        expect(foldQuietSkip(done, quiet('t2'))).toEqual({ row: done, deleteStartedAt: null })
+    })
+
+    it('keeps the folded count when the same run is re-sent, and does not delete it', () => {
+        const { deleteStartedAt, row } = foldQuietSkip(quiet('t2'), quiet('t2', { skip_count: 3, skip_since: 't0' }))
+        expect(deleteStartedAt).toBeNull()
+        expect(row.skip_count).toBe(3)
+        expect(row.skip_since).toBe('t0')
     })
 })

@@ -9,7 +9,7 @@ export type DrainRunRow = Database['public']['Tables']['drain_runs']['Row']
 export type DrainRunListRow = Omit<DrainRunRow, 'report_text' | 'created_at'>
 
 const LIST_COLUMNS =
-    'started_at,ended_at,outcome,trigger_reasons,model,effort,exit_code,steps,tasks'
+    'started_at,ended_at,outcome,trigger_reasons,model,effort,exit_code,steps,tasks,skip_count,skip_since'
 
 /** 一覧の件数。投入スクリプトの保持上限も同じ値（scripts/upsert-drain-run.mjs）。
  *  taskbox drainが1日4回(6時間おき)から1時間おきへ変更されたのに伴い、

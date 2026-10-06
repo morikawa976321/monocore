@@ -217,6 +217,48 @@ function buildTask(task) {
     }
 }
 
+/**
+ * 「静かな起動なし」か: claude を起動しなかった回(skipped)で、注意・異常の工程が1つも無い。
+ * 注意・異常のある起動なし(バックアップ失敗・保留の停滞など)は本人が見るべき回なので、まとめない。
+ */
+export function isQuietSkip(row) {
+    return (
+        isPlainObject(row) &&
+        row.outcome === 'skipped' &&
+        asArray(row.steps).every((step) => isPlainObject(step) && (step.status ?? 'ok') === 'ok')
+    )
+}
+
+/**
+ * 連続する静かな起動なしを1行にまとめる(2026-10-07)。latest は投入前のいちばん新しい行(無ければ null)。
+ * 両方が静かな起動なしなら、新しい行が回数と最初の時刻を引き継ぎ、latest は消す対象として返す。
+ * 1時間おきの drain は大半が起動なしで、保持48件の枠を食って実働の行を約2日で押し出していた。
+ */
+export function foldQuietSkip(row, latest) {
+    if (!isQuietSkip(row)) {
+        return { row, deleteStartedAt: null }
+    }
+    // 同じ回の再送(投入の再試行など)は、まとめ済みの回数と最初の時刻をそのまま保つ。
+    if (isQuietSkip(latest) && latest.started_at === row.started_at) {
+        return {
+            row: { ...row, skip_count: latest.skip_count ?? 1, skip_since: latest.skip_since ?? row.started_at },
+            deleteStartedAt: null,
+        }
+    }
+    if (!isQuietSkip(latest)) {
+        return { row: { ...row, skip_count: 1, skip_since: row.started_at }, deleteStartedAt: null }
+    }
+    const previousCount = Number.isInteger(latest.skip_count) && latest.skip_count >= 1 ? latest.skip_count : 1
+    return {
+        row: {
+            ...row,
+            skip_count: previousCount + 1,
+            skip_since: asStringOrNull(latest.skip_since) ?? latest.started_at,
+        },
+        deleteStartedAt: latest.started_at,
+    }
+}
+
 /** 上限を超えた報告本文を、切り捨てたと分かる形で短くする。 */
 export function truncateReportText(text) {
     if (typeof text !== 'string' || text.length === 0) return null

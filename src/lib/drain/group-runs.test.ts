@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DrainRunListRow } from '@/src/lib/supabase/queries/drain-runs'
-import { groupDrainRuns } from './group-runs'
+import { countRuns, groupDrainRuns } from './group-runs'
 
 function makeRun(startedAt: string, outcome: string): DrainRunListRow {
     return {
@@ -13,6 +13,8 @@ function makeRun(startedAt: string, outcome: string): DrainRunListRow {
         exit_code: 0,
         steps: [],
         tasks: [],
+        skip_count: 1,
+        skip_since: null,
     }
 }
 
@@ -60,5 +62,15 @@ describe('groupDrainRuns', () => {
 
     it('returns an empty list for no runs', () => {
         expect(groupDrainRuns([])).toEqual([])
+    })
+
+    it('shows a lone folded row (skip_count > 1) as a group so the count is visible', () => {
+        const folded = { ...makeRun('2026-10-07T05:00:00+09:00', 'skipped'), skip_count: 5, skip_since: '2026-10-07T01:00:00+09:00' }
+        expect(groupDrainRuns([folded])).toEqual([{ kind: 'skipped-group', runs: [folded] }])
+    })
+
+    it('counts folded rows by skip_count', () => {
+        const folded = { ...makeRun('b', 'skipped'), skip_count: 4 }
+        expect(countRuns([makeRun('a', 'skipped'), folded])).toBe(5)
     })
 })

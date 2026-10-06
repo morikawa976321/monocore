@@ -9,7 +9,11 @@ import type { DrainRunListRow } from '@/src/lib/supabase/queries/drain-runs'
  * 対象外 — 'crashed' はそれ自体が異常の合図なので、畳んで埋もれさせない。
  *
  * runs は getDrainRuns と同じ started_at 降順(新しい順)を前提とする。
+ *
+ * 2026-10-07 から、注意・異常の無い連続の起動なしは投入時に1行へまとめる(skip_count が回数。
+ * scripts/drain-run-payload.mjs の foldQuietSkip)。ここではその行も連続の一部として畳む。
  */
+
 export type DrainRunDisplayItem =
     | { kind: 'run'; run: DrainRunListRow }
     | { kind: 'skipped-group'; runs: DrainRunListRow[] }
@@ -20,7 +24,8 @@ export function groupDrainRuns(runs: DrainRunListRow[]): DrainRunDisplayItem[] {
 
     const flush = () => {
         if (buffer.length === 0) return
-        if (buffer.length === 1) {
+        // 投入時にまとめた行(skip_count > 1)は1行でも連続なので、要約カードで回数を出す。
+        if (buffer.length === 1 && (buffer[0].skip_count ?? 1) <= 1) {
             items.push({ kind: 'run', run: buffer[0] })
         } else {
             items.push({ kind: 'skipped-group', runs: buffer })
@@ -39,4 +44,9 @@ export function groupDrainRuns(runs: DrainRunListRow[]): DrainRunDisplayItem[] {
     flush()
 
     return items
+}
+
+/** 連続の起動なしが代表する回数(まとめた行は skip_count 回ぶん)。要約カードの「×N」に使う。 */
+export function countRuns(runs: DrainRunListRow[]): number {
+    return runs.reduce((total, run) => total + Math.max(run.skip_count ?? 1, 1), 0)
 }

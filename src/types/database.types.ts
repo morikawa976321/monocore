@@ -102,6 +102,8 @@ export type Database = {
           model: string | null
           outcome: string
           report_text: string | null
+          skip_count: number
+          skip_since: string | null
           started_at: string
           steps: Json
           tasks: Json
@@ -115,6 +117,8 @@ export type Database = {
           model?: string | null
           outcome: string
           report_text?: string | null
+          skip_count?: number
+          skip_since?: string | null
           started_at: string
           steps?: Json
           tasks?: Json
@@ -128,6 +132,8 @@ export type Database = {
           model?: string | null
           outcome?: string
           report_text?: string | null
+          skip_count?: number
+          skip_since?: string | null
           started_at?: string
           steps?: Json
           tasks?: Json

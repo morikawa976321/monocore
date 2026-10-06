@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useId, useState } from 'react'
 import { DrainRunCard } from '@/src/components/drain/DrainRunCard'
 import { Button } from '@/src/components/ui/Button'
+import { countRuns } from '@/src/lib/drain/group-runs'
 import type { DrainRunListRow } from '@/src/lib/supabase/queries/drain-runs'
 
 type DrainRunGroupCardProps = {
@@ -23,9 +24,11 @@ export function DrainRunGroupCard({ runs, timezone, onLoadReport }: DrainRunGrou
 
     const oldest = runs[runs.length - 1]
     const newest = runs[0]
-    const rangeLabel = [oldest, newest]
-        .map((run) => format(toZonedTime(parseISO(run.started_at), timezone), 'MM/dd HH:mm'))
+    // まとめた行(skip_count > 1)は skip_since が連続の最初の回。
+    const rangeLabel = [oldest.skip_since ?? oldest.started_at, newest.started_at]
+        .map((startedAt) => format(toZonedTime(parseISO(startedAt), timezone), 'MM/dd HH:mm'))
         .join('〜')
+    const total = countRuns(runs)
 
     return (
         <div className="rounded border border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900 overflow-hidden">
@@ -41,7 +44,7 @@ export function DrainRunGroupCard({ runs, timezone, onLoadReport }: DrainRunGrou
                     <span className="flex min-w-0 items-center gap-2">
                         <span className="shrink-0 tabular-nums">{rangeLabel}</span>
                         <span className="shrink-0 px-1 py-0.5 rounded-sm border border-neutral-400 text-neutral-700 text-sm font-medium leading-none dark:border-neutral-600 dark:text-neutral-300">
-                            起動なし ×{runs.length}
+                            起動なし ×{total}
                         </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">

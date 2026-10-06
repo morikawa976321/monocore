@@ -20,7 +20,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
-import { buildAsks, buildRow, validateRun } from './drain-run-payload.mjs'
+import { buildAsks, buildRow, foldQuietSkip, validateRun } from './drain-run-payload.mjs'
 import {
     DEFAULT_REQUEST_TIMEOUT_MS,
     armWatchdog,
@@ -117,14 +117,31 @@ async function main() {
         fail(`payload rejected (${errors.length}):\n  - ${errors.join('\n  - ')}`)
     }
 
-    const row = buildRow(payload)
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
         global: { fetch: createTimeoutFetch(REQUEST_TIMEOUT_MS) },
     })
 
+    // 連続する静かな起動なしは1行にまとめる(foldQuietSkip)。新しい行を書いてから古い行を消す
+    // (逆順だと、書き込みに失敗した回に連続の記録ごと失う)。
+    const { data: latestRows, error: latestError } = await supabase
+        .from('drain_runs')
+        .select('started_at,outcome,steps,skip_count,skip_since')
+        .order('started_at', { ascending: false })
+        .limit(1)
+    if (latestError) {
+        fail(`latest select failed: ${latestError.message}`)
+    }
+    const { row, deleteStartedAt } = foldQuietSkip(buildRow(payload), latestRows?.[0] ?? null)
+
     const { error } = await supabase.from('drain_runs').upsert(row, { onConflict: 'started_at' })
     if (error) {
         fail(`upsert failed: ${error.message}`)
+    }
+    if (deleteStartedAt) {
+        const { error: foldError } = await supabase.from('drain_runs').delete().eq('started_at', deleteStartedAt)
+        if (foldError) {
+            fail(`fold delete failed: ${foldError.message}`)
+        }
     }
 
     // 依頼は既存の行を上書きしない(ignoreDuplicates = ON CONFLICT DO NOTHING)。
@@ -143,7 +160,8 @@ async function main() {
 
     console.log(
         `drain_run upserted: ${row.started_at} outcome=${row.outcome} ` +
-            `steps=${row.steps.length} tasks=${row.tasks.length} asks=${asks.length}`
+            `steps=${row.steps.length} tasks=${row.tasks.length} asks=${asks.length}` +
+            (deleteStartedAt ? ` folded=${row.skip_count}` : '')
     )
     if (pruned > 0) {
         console.log(`pruned ${pruned} drain_runs beyond keep=${DRAIN_RUNS_KEEP}`)
