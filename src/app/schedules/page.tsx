@@ -8,7 +8,6 @@ import { DaySection } from '@/src/components/schedules/DaySection';
 import { Button } from '@/src/components/ui/Button';
 import { useInbox } from '@/src/hooks/useInbox';
 import { useDayNotes } from '@/src/hooks/useDayNotes';
-import { useLifeHours } from '@/src/hooks/useLifeHours';
 import { useNow } from '@/src/hooks/useNow';
 import { usePlanDayContents } from '@/src/hooks/usePlanDayContents';
 import { planGoalToInput, usePlanGoals } from '@/src/hooks/usePlanGoals';
@@ -67,7 +66,6 @@ export default function SchedulesPage() {
     const { goals } = usePlanGoals(supabase);
     const timezone = useMemo(() => getDefaultTimezone(), []);
     const now = useNow();
-    const [lifeHours] = useLifeHours();
     const goalInputs = useMemo(() => goals.map((g) => planGoalToInput(g, timezone)), [goals, timezone]);
     // 置いた時間は目標を作った日から数える(/plan と同じ)。板が読んでいない過去の日は別に読む。
     const pastStart = now ? placedCountStart(goalInputs, now.today) : null;
@@ -89,9 +87,8 @@ export default function SchedulesPage() {
             days,
             today: now.today,
             nowMinutes: now.nowMinutes,
-            lifeMinutesPerDay: lifeHours * 60,
         });
-    }, [entries, pastContents, goalInputs, now, lifeHours, isInitialSyncing]);
+    }, [entries, pastContents, goalInputs, now, isInitialSyncing]);
 
     // /plan の日ごとの一覧から ?day=YYYY-MM-DD で来たら、初回の同期の後にその日へ移る(1回だけ)。
     const dayTargetHandledRef = useRef(false);

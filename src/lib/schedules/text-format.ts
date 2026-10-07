@@ -95,29 +95,46 @@ export function scheduleRowsToDayContent(
     return parts.join('\n');
 }
 
+export type DayContentIssue = {
+    /** 問題のある行の文字列（先頭行）。 */
+    line: string;
+    kind: 'orphan' | 'missing-end' | 'reversed';
+};
+
 /**
- * content 内に DB に保存されない孤立行（時刻ブロックに属さない非空行）があるか判定する。
- * 空行は無視。時刻行の後続行（継続行）は孤立扱いしない。
+ * 1日分のテキストの不正な行を返す。1件でもあればその日は保存しない（useSchedules.saveDay）。
+ * - orphan: 時刻ブロックに属さない非空行（DB に保存できない）
+ * - missing-end: 起床以外で終了時刻の無い予定（空き時間の計算は全予定の開始・終了を前提にする）
+ * - reversed: 終了が開始より前の予定（日付を跨ぐ予定は日ごとに分けて書く）
  */
-export function hasOrphanLines(content: string): boolean {
+export function findDayContentIssues(content: string): DayContentIssue[] {
     const lines = content.split(/\r?\n/);
-    let inBlock = false;
-    for (const line of lines) {
+    const issues: DayContentIssue[] = [];
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i];
         const m = line.match(TIME_LINE_REGEX);
-        if (m) {
-            const startHhmm = m[1];
-            const endHhmm = m[3] ?? null;
-            if (isValidHhmm(startHhmm) && (endHhmm === null || isValidHhmm(endHhmm))) {
-                inBlock = true;
-                continue;
-            }
-            inBlock = false;
-            if (line.trim() !== '') return true;
+        const startHhmm = m?.[1];
+        const endHhmm = m?.[3] ?? null;
+        if (!m || !startHhmm || !isValidHhmm(startHhmm) || (endHhmm !== null && !isValidHhmm(endHhmm))) {
+            if (line.trim() !== '') issues.push({ line, kind: 'orphan' });
+            i++;
             continue;
         }
-        if (!inBlock && line.trim() !== '') return true;
+        const activityLines = [(m[5] ?? '').trim()];
+        i++;
+        while (i < lines.length && !TIME_LINE_REGEX.test(lines[i])) {
+            activityLines.push(lines[i]);
+            i++;
+        }
+        const activity = activityLines.join('\n');
+        if (endHhmm === null) {
+            if (!activity.includes('起床')) issues.push({ line, kind: 'missing-end' });
+        } else if (endHhmm < startHhmm) {
+            issues.push({ line, kind: 'reversed' });
+        }
     }
-    return false;
+    return issues;
 }
 
 /**

@@ -6,9 +6,7 @@ import { CapacityChart, type CapacityDay } from '@/src/components/plan/CapacityC
 import { DayFreeList } from '@/src/components/plan/DayFreeList';
 import { FreeTimeLegend } from '@/src/components/plan/FreeTimeStrip';
 import { GoalEditor } from '@/src/components/plan/GoalEditor';
-import { Button } from '@/src/components/ui/Button';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
-import { useLifeHours } from '@/src/hooks/useLifeHours';
 import { useNow } from '@/src/hooks/useNow';
 import { usePlanDayContents } from '@/src/hooks/usePlanDayContents';
 import { planGoalToInput, usePlanGoals } from '@/src/hooks/usePlanGoals';
@@ -20,7 +18,7 @@ import {
     daysBetween,
     evaluateGoals,
     placedCountStart,
-    usableFreeMinutes,
+    freeMinutesBetween,
     type DayAnalysis,
 } from '@/src/lib/schedules/free-time';
 import { createClient } from '@/src/lib/supabase/client';
@@ -31,7 +29,6 @@ const HORIZON_DAYS = 120;
 const LIST_DAYS = 21;
 /** 累積グラフの幅（日）。目標の期日が先なら期日の3日後まで伸ばすが、予定を読んだ範囲で打ち切る。 */
 const CHART_MIN_DAYS = 21;
-const LIFE_HOUR_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 /** 期日の入力の上限（年の打ち間違いを入口で止める）。 */
 const MAX_DUE_YEARS = 3;
 
@@ -42,7 +39,6 @@ export default function PlanPage() {
     const supabase = useMemo(() => createClient(), []);
     const timezone = useMemo(() => getDefaultTimezone(), []);
     const now = useNow();
-    const [lifeHours, setLifeHours] = useLifeHours();
     const { goals, isLoading: goalsLoading, error: goalsError, reload: reloadGoals, addGoal, updateGoal, removeGoal } =
         usePlanGoals(supabase);
     const goalInputs = useMemo(() => goals.map((g) => planGoalToInput(g, timezone)), [goals, timezone]);
@@ -74,9 +70,8 @@ export default function PlanPage() {
             days: analyses,
             today: now.today,
             nowMinutes: now.nowMinutes,
-            lifeMinutesPerDay: lifeHours * 60,
         });
-    }, [goalInputs, analyses, now, lifeHours]);
+    }, [goalInputs, analyses, now]);
 
     const chartDays = useMemo(() => {
         if (!now) return [];
@@ -90,13 +85,13 @@ export default function PlanPage() {
             const a = analyze(d);
             days.push({
                 date: d,
-                usableMinutes: usableFreeMinutes(a, d === now.today ? now.nowMinutes : 0, 24 * 60, lifeHours * 60),
+                usableMinutes: freeMinutesBetween(a, d === now.today ? now.nowMinutes : 0, 24 * 60),
                 wake: a.wake,
                 sleep: a.sleep,
             });
         }
         return days;
-    }, [now, statuses, analyze, lifeHours]);
+    }, [now, statuses, analyze]);
 
     const listDays = useMemo(() => {
         if (!now) return [];
@@ -151,27 +146,12 @@ export default function PlanPage() {
                     </section>
 
                     <section className={`${CARD} space-y-2`}>
-                        <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
                             <h2 className="text-base font-medium">締切までの時間</h2>
-                            <div className="flex flex-wrap items-center gap-1 text-sm text-neutral-700 dark:text-neutral-300">
-                                <span>生活の時間を1日</span>
-                                {LIFE_HOUR_OPTIONS.map((h) => (
-                                    <Button
-                                        key={h}
-                                        color={h === lifeHours ? 'secondary' : 'ghost'}
-                                        size="icon"
-                                        aria-pressed={h === lifeHours}
-                                        onClick={() => setLifeHours(h)}
-                                    >
-                                        {h}
-                                    </Button>
-                                ))}
-                                <span>時間 差し引く</span>
-                            </div>
+                            <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                                自由時間 = 起床〜消灯から、予定と起床後の身支度（最大2時間）を除いた時間
+                            </span>
                         </div>
-                        <p className="text-sm text-neutral-700 dark:text-neutral-300">
-                            空きは起床〜消灯から予定を除いた時間で、食事・移動・風呂も含みます。差し引く時間は実感か実測で決めてください（この端末に保存）。
-                        </p>
                         {now && <CapacityChart days={chartDays} statuses={statuses} />}
                     </section>
 

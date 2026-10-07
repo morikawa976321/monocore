@@ -23,6 +23,7 @@ import { getDefaultTimezone, localTimeToUtc } from '@/src/lib/date';
 import {
     dateLabelToDateStr,
     dayContentToScheduleItems,
+    findDayContentIssues,
     generateDayEntries,
     mergeSchedulesIntoEntries,
     type DayEntry,
@@ -259,6 +260,9 @@ export function useSchedules(
                 if (!entry) return;
 
                 const savedContent = entry.content;
+                // 不正な行(終了時刻の無い予定・終了が開始より前・時刻の無い行)がある日は保存しない。
+                // dirty のまま残すので、直した編集で次の保存が走る。通信しないので再試行の嵐にもならない。
+                if (findDayContentIssues(savedContent).length > 0) return;
                 const day_start_utc = localTimeToUtc(dateStr, '0000', tz);
                 const nextDateStr = format(addDays(parseISO(dateStr), 1), 'yyyy-MM-dd');
                 const day_end_utc = localTimeToUtc(nextDateStr, '0000', tz);
@@ -347,7 +351,18 @@ export function useSchedules(
             flushPendingScheduleSave();
             flushPendingNoteSaves();
             if (hasPendingInboxChanges) saveInboxNow();
-            if (!hadScheduleDebounce && !hasPendingInboxChanges && !hasPendingNoteChangesRef.current) {
+            // 不正な行があって保存していない編集は、閉じると消えるので引き止める。
+            const hasUnsavedInvalidDay = entriesRef.current.some(
+                (entry) =>
+                    dirtyDateLabelsRef.current.has(entry.dateLabel) &&
+                    findDayContentIssues(entry.content).length > 0
+            );
+            if (
+                !hadScheduleDebounce &&
+                !hasPendingInboxChanges &&
+                !hasPendingNoteChangesRef.current &&
+                !hasUnsavedInvalidDay
+            ) {
                 return;
             }
             e.preventDefault();

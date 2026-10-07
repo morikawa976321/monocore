@@ -4,7 +4,18 @@ import { FreeTimeStrip } from '@/src/components/plan/FreeTimeStrip';
 import { AutoHeightTextarea } from '@/src/components/schedules/AutoHeightTextarea';
 import { Button } from '@/src/components/ui/Button';
 import { analyzeDayContent, formatHours } from '@/src/lib/schedules/free-time';
-import { dateLabelToDateStr, hasOrphanLines, type DayEntry } from '@/src/lib/schedules/text-format';
+import {
+    dateLabelToDateStr,
+    findDayContentIssues,
+    type DayContentIssue,
+    type DayEntry,
+} from '@/src/lib/schedules/text-format';
+
+const ISSUE_TEXT: Record<DayContentIssue['kind'], string> = {
+    orphan: '時刻の無い行',
+    'missing-end': '終了時刻が無い',
+    reversed: '終了が開始より前',
+};
 
 type DaySectionProps = {
     // 1日分の表示データ（見出し日付 + 本文）。
@@ -42,6 +53,8 @@ export function DaySection({
     const [previousContent, setPreviousContent] = useState<string | null>(null);
     // 打つたびに再計算する（1日分なので軽い）。/plan の目標の判定と同じ計算。
     const freeTime = useMemo(() => analyzeDayContent(entry.content), [entry.content]);
+    // 不正な行がある日は保存されない(useSchedules.saveDay)。何を直せばよいかを本文の上に出す。
+    const issues = useMemo(() => findDayContentIssues(entry.content), [entry.content]);
 
     const handleUndo = () => {
         if (previousContent === null) return;
@@ -65,8 +78,8 @@ export function DaySection({
             <header className="px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 flex items-center justify-between">
                 <div className="flex items-center text-neutral-700 dark:text-neutral-300">
                     <span>{entry.dateLabel}</span>
-                    {/* テキスト形式の解析で不正行がある日だけ警告表示する。 */}
-                    {hasOrphanLines(entry.content) && (
+                    {/* 不正な行がある日だけ警告表示する。その日は保存されない。 */}
+                    {issues.length > 0 && (
                         <span className="ml-2 px-1 py-0.5 rounded-sm border border-amber-500 dark:border-amber-400 text-amber-600 dark:text-amber-400 text-sm font-medium leading-none">
                             Invalid format
                         </span>
@@ -78,18 +91,11 @@ export function DaySection({
                     <FreeTimeStrip analysis={freeTime} nowMinutes={isToday ? nowMinutes : undefined} />
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 sm:gap-4 text-neutral-700 dark:text-neutral-300">
+                    <div className="text-neutral-700 dark:text-neutral-300">
                         <span>
                             空き{' '}
                             <span className="font-medium text-neutral-900 dark:text-neutral-50">
                                 {formatHours(freeTime.freeMinutes)}h
-                            </span>
-                        </span>
-                        {/* スマホは日付・記法警告・元に戻すと並ぶと幅が足りないので「空き」だけ。 */}
-                        <span className="hidden sm:inline">
-                            最大{' '}
-                            <span className="font-medium text-neutral-900 dark:text-neutral-50">
-                                {formatHours(freeTime.maxGapMinutes)}h
                             </span>
                         </span>
                     </div>
@@ -108,6 +114,16 @@ export function DaySection({
                     )}
                 </div>
             </header>
+            {issues.length > 0 && (
+                <p className="px-2 sm:px-4 pt-2 text-sm leading-6 text-amber-600 dark:text-amber-400">
+                    このままでは保存できません:{' '}
+                    {issues
+                        .slice(0, 3)
+                        .map((issue) => `${issue.line.trim()}（${ISSUE_TEXT[issue.kind]}）`)
+                        .join(' / ')}
+                    {issues.length > 3 ? ` ほか${issues.length - 3}件` : ''}
+                </p>
+            )}
             {/* 予定と自由記述メモ。高さはそれぞれ入力量に合わせて自動調整。
                 PC は横並びで予定:メモ = 3:2(2026-08-05 本人指定)、スマホは縦積み(375px で横2分割は両方使えない)。 */}
             {/* 仕切り線はセクションの外枠より一段濃くする。プレースホルダを置かないぶん、

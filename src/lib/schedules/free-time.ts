@@ -1,49 +1,36 @@
 import { TIME_LINE_REGEX, isValidHhmm } from './text-format';
 
 /**
- * 1日分の予定テキストから「空き時間」を求める。スケジュール画面の日カードと /plan の両方が使う。
+ * 1日分の予定テキストから「空き時間（自由時間）」を求める。スケジュール画面の日カードと /plan の両方が使う。
  *
- * 予定の多くは終了時刻を持たない（「1050 院生ゼミ」）ので、長さの推定ルールが数字を左右する。
- * ルールの由来と、数字が上限寄りになる理由は docs/decisions.md の /plan を参照。
+ * 予定は起床を除いてすべて開始と終了を持つ前提（終了の無い予定・終了が開始より前の予定は
+ * text-format.ts の findDayContentIssues が不正として保存前に弾く）。1日は3つに分かれる:
+ * - 睡眠: 起床より前と、消灯の予定が終わった後
+ * - 非自由: 予定の時間（消灯の予定を含む）と、起床から最初の予定までの身支度（最大2時間）
+ * - 自由: それ以外
+ * 規則の由来は docs/decisions.md の /plan。
  */
 
-/** 起床・消灯の行が無い日の持ち時間。既定予定（default_schedules）の 07:00 起床・23:30 消灯と同じ。 */
+/** 起床の行が無い日の起床時刻。既定予定（default_schedules）の 0700 起床と同じ。 */
 export const DEFAULT_WAKE_MINUTES = 7 * 60;
-export const DEFAULT_SLEEP_MINUTES = 23 * 60 + 30;
-/** これ以上続く空きを「まとまった枠」とする。 */
-export const DEEP_GAP_MINUTES = 120;
+/** 消灯の行が無い日の消灯。既定予定の 2200-2300 消灯と同じ。終わった時刻から睡眠。 */
+export const DEFAULT_LIGHTS_OUT = { start: 22 * 60, end: 23 * 60 } as const;
+/** 起床から最初の予定までを身支度として非自由にする。それより長く空いていても、この長さまで。 */
+export const MORNING_MAX_MINUTES = 120;
 
-const SLOT_MINUTES = 5;
-/** 開始時刻だけの予定が大学の時限の開始時刻に始まるなら、その時限の終わりまでとみなす。 */
-const PERIOD_END_BY_START: Record<number, number> = { 650: 750, 810: 910, 920: 1020 };
-/** それ以外の開始時刻だけの予定の長さ。次の予定が先に来ればそこまで。 */
-const POINT_EVENT_MINUTES = 60;
-/** 「出発」は次の予定までの移動とみなす（上限つき）。 */
-const DEPARTURE_MAX_MINUTES = 120;
-/** 終了が開始より前の範囲を日付跨ぎとみなす、開始時刻の下限。 */
-const OVERNIGHT_START_MINUTES = 18 * 60;
+const DAY_MINUTES = 24 * 60;
 
-export type SegmentKind = 'fixed' | 'estimated' | 'home';
-export type SlotKind = 'off' | 'free' | SegmentKind;
-
-export type Segment = {
-    start: number;
-    end: number;
-    kind: SegmentKind;
-    activity: string;
-    /** 終了時刻が書かれていたか（推定でない）。 */
-    ranged: boolean;
-};
+export type SlotKind = 'sleep' | 'busy' | 'free';
 export type Run = { kind: SlotKind; start: number; end: number };
-export type Gap = { start: number; end: number; minutes: number; deep: boolean };
+export type DayEvent = { start: number; end: number; activity: string };
 export type DayAnalysis = {
     wake: number;
+    /** 睡眠に入る時刻（消灯の予定の終わり）。 */
     sleep: number;
-    segments: Segment[];
+    /** 時刻範囲を持つ予定（起床を除く）。置いた時間の集計に使う。 */
+    events: DayEvent[];
     runs: Run[];
-    gaps: Gap[];
     freeMinutes: number;
-    maxGapMinutes: number;
 };
 
 type Block = { start: number; end: number | null; activity: string };
@@ -71,18 +58,7 @@ function parseBlocks(content: string): Block[] {
         }
         const activity = activityLines.join(' ').trim();
         if (activity === '') continue;
-        const start = hhmmToMinutes(m[1]);
-        const rawEnd = m[3] ? hhmmToMinutes(m[3]) : null;
-        // 終了が開始より前のとき、夕方以降に始まるもの（2300-0100）だけを日付跨ぎとみなしてその日の
-        // 終わりで切る。それ以外（1500-1300 の打ち間違い、1000-1000）は最小の5分として扱い、14時間の
-        // 拘束に化けさせない。
-        const end =
-            rawEnd === null || rawEnd > start
-                ? rawEnd
-                : rawEnd < start && start >= OVERNIGHT_START_MINUTES
-                  ? 24 * 60
-                  : start;
-        blocks.push({ start, end, activity });
+        blocks.push({ start: hhmmToMinutes(m[1]), end: m[3] ? hhmmToMinutes(m[3]) : null, activity });
     }
     return blocks;
 }
@@ -91,82 +67,50 @@ export function analyzeDayContent(content: string): DayAnalysis {
     const blocks = parseBlocks(content);
     const wakeBlock = blocks.find((b) => b.activity.includes('起床'));
     const wake = wakeBlock ? wakeBlock.start : DEFAULT_WAKE_MINUTES;
-    // 起床より前の「消灯」は前夜の就寝なので、その日の終わりには使わない。
-    const sleepBlocks = blocks.filter((b) => b.activity.includes('消灯') && b.start > wake);
-    const sleep = sleepBlocks.length > 0 ? sleepBlocks[sleepBlocks.length - 1].start : DEFAULT_SLEEP_MINUTES;
-
-    const events = blocks
-        .filter((b) => !b.activity.includes('起床') && !b.activity.includes('消灯'))
+    // 時刻範囲を持つ予定だけを数える。終了の無い行・終了が開始より前の行は保存前に弾かれるが、
+    // 規則を入れる前に保存された古い行が残っていても数えない。
+    const events: DayEvent[] = blocks
+        .filter((b): b is Block & { end: number } => b !== wakeBlock && b.end !== null && b.end > b.start)
+        .map((b) => ({ start: b.start, end: b.end, activity: b.activity }))
         .sort((a, b) => a.start - b.start);
-    const segments: Segment[] = events.map((b) => {
-        const kind: SegmentKind = b.activity.includes('受け取り') ? 'home' : b.end === null ? 'estimated' : 'fixed';
-        let end = b.end;
-        if (end === null) {
-            const next = events.find((o) => o.start > b.start);
-            const nextStart = next ? next.start : 24 * 60;
-            if (b.activity.startsWith('出発')) end = Math.min(nextStart, b.start + DEPARTURE_MAX_MINUTES);
-            else if (PERIOD_END_BY_START[b.start] !== undefined) end = Math.min(PERIOD_END_BY_START[b.start], nextStart);
-            else end = Math.min(b.start + POINT_EVENT_MINUTES, nextStart);
-        }
-        return { start: b.start, end: Math.max(end, b.start + SLOT_MINUTES), kind, activity: b.activity, ranged: b.end !== null };
-    });
 
-    const slots: SlotKind[] = [];
-    for (let m = 0; m < 24 * 60; m += SLOT_MINUTES) {
-        let kind: SlotKind = 'free';
-        if (m < wake || m >= sleep) {
-            kind = 'off';
-        } else {
-            for (const s of segments) {
-                if (m < s.start || m >= s.end) continue;
-                if (s.kind === 'fixed') {
-                    kind = 'fixed';
-                    break;
-                }
-                if (s.kind === 'estimated') kind = 'estimated';
-                else if (kind === 'free') kind = 'home';
-            }
-        }
-        slots.push(kind);
+    // 消灯の予定（起床より後の最後のもの）が終わった時刻から睡眠。無ければ既定の 2200-2300。
+    const lightsOut = [...events].reverse().find((e) => e.activity.includes('消灯') && e.start > wake);
+    const sleep = lightsOut ? lightsOut.end : DEFAULT_LIGHTS_OUT.end;
+    const busy: { start: number; end: number }[] = lightsOut ? [...events] : [...events, DEFAULT_LIGHTS_OUT];
+
+    // 起床から最初の予定まで（最大2時間）は身支度として非自由。起床の時点で続いている予定があれば0。
+    const firstStart = busy
+        .filter((e) => e.end > wake)
+        .reduce((min, e) => Math.min(min, Math.max(e.start, wake)), sleep);
+    busy.push({ start: wake, end: Math.min(wake + MORNING_MAX_MINUTES, firstStart) });
+
+    const slots: SlotKind[] = Array.from({ length: DAY_MINUTES }, (_, m) => (m < wake || m >= sleep ? 'sleep' : 'free'));
+    for (const b of busy) {
+        for (let m = Math.max(b.start, wake); m < Math.min(b.end, sleep); m++) slots[m] = 'busy';
     }
 
     const runs: Run[] = [];
-    slots.forEach((kind, i) => {
+    slots.forEach((kind, m) => {
         const last = runs[runs.length - 1];
-        if (last && last.kind === kind) last.end = (i + 1) * SLOT_MINUTES;
-        else runs.push({ kind, start: i * SLOT_MINUTES, end: (i + 1) * SLOT_MINUTES });
+        if (last && last.kind === kind) last.end = m + 1;
+        else runs.push({ kind, start: m, end: m + 1 });
     });
-    const gaps: Gap[] = runs
-        .filter((r) => r.kind === 'free')
-        .map((r) => ({ start: r.start, end: r.end, minutes: r.end - r.start, deep: r.end - r.start >= DEEP_GAP_MINUTES }));
 
     return {
         wake,
         sleep,
-        segments,
+        events,
         runs,
-        gaps,
-        freeMinutes: gaps.reduce((sum, g) => sum + g.minutes, 0),
-        maxGapMinutes: gaps.reduce((max, g) => Math.max(max, g.minutes), 0),
+        freeMinutes: runs.filter((r) => r.kind === 'free').reduce((sum, r) => sum + r.end - r.start, 0),
     };
 }
 
-/**
- * [from, to) のうち使える空きの分数。lifeMinutesPerDay（食事・移動・風呂など予定に書かない
- * 生活の時間）を、持ち時間に占める割合で按分して差し引く。
- */
-export function usableFreeMinutes(
-    day: DayAnalysis,
-    from: number,
-    to: number,
-    lifeMinutesPerDay: number
-): number {
-    const start = Math.max(from, day.wake);
-    const end = Math.min(to, day.sleep);
-    if (end <= start) return 0;
-    const free = day.gaps.reduce((sum, g) => sum + Math.max(0, Math.min(g.end, end) - Math.max(g.start, start)), 0);
-    const window = Math.max(1, day.sleep - day.wake);
-    return Math.max(0, free - (lifeMinutesPerDay * (end - start)) / window);
+/** [from, to) に含まれる自由時間の分数。 */
+export function freeMinutesBetween(day: DayAnalysis, from: number, to: number): number {
+    return day.runs
+        .filter((r) => r.kind === 'free')
+        .reduce((sum, r) => sum + Math.max(0, Math.min(r.end, to) - Math.max(r.start, from)), 0);
 }
 
 /** YYYY-MM-DD に日数を足す（タイムゾーンに依存しない暦の計算）。 */
@@ -195,7 +139,7 @@ export function placedCountStart(goals: GoalInput[], today: string): string {
     return earliest < floor ? floor : earliest;
 }
 
-/** 予定の無い日（07:00〜23:30 がすべて空き）。読み込んでいない日の代わりに使う。 */
+/** 予定の無い日（0700 起床・2200-2300 消灯だけの日）。読み込んでいない日の代わりに使う。 */
 export const EMPTY_DAY = analyzeDayContent('');
 
 /** "HH:MM" または "HH:MM:SS" を分に。null は null。 */
@@ -223,19 +167,19 @@ export type GoalStatus = {
     goal: GoalInput;
     /** 期日が今より前。間に合うかの判定から外す。 */
     past: boolean;
-    /** 予定の行のうち、時刻範囲つきで名前を含むものの合計（期日まで）。 */
+    /** 予定のうち、名前を含むものの合計（数え始めの日から期日まで）。 */
     placedMinutes: number;
     remainingMinutes: number;
     /** 期日の早い順に並べたときの、この目標までの残り必要時間の累計。 */
     cumulativeMinutes: number;
-    /** 今から期日までに使える空き（生活時間を差し引いた後）。 */
+    /** 今から期日までの自由時間。 */
     supplyMinutes: number;
     ok: boolean;
 };
 
 /**
- * 締切の早い順に「残り必要時間の累計 ≦ 締切までに使える空き」を確かめる。
- * 個別に足りていても、先の締切の目標が同じ空きを食うので、累計で比べる。
+ * 締切の早い順に「残り必要時間の累計 ≦ 締切までの自由時間」を確かめる。
+ * 個別に足りていても、先の締切の目標が同じ自由時間を食うので、累計で比べる。
  */
 export function evaluateGoals(params: {
     goals: GoalInput[];
@@ -243,15 +187,12 @@ export function evaluateGoals(params: {
     days: Map<string, DayAnalysis>;
     today: string;
     nowMinutes: number;
-    lifeMinutesPerDay: number;
 }): GoalStatus[] {
-    const { goals, days, today, nowMinutes, lifeMinutesPerDay } = params;
+    const { goals, days, today, nowMinutes } = params;
     const knownDates = [...days.keys()].sort();
-    const dueOf = (g: GoalInput) => g.dueMinutes ?? 24 * 60;
+    const dueOf = (g: GoalInput) => g.dueMinutes ?? DAY_MINUTES;
     const sorted = [...goals].sort((a, b) => (a.dueOn === b.dueOn ? dueOf(a) - dueOf(b) : a.dueOn < b.dueOn ? -1 : 1));
-    const usable = (date: string, from: number, to: number) =>
-        usableFreeMinutes(days.get(date) ?? EMPTY_DAY, from, to, lifeMinutesPerDay);
-    const emptyDayUsable = usableFreeMinutes(EMPTY_DAY, 0, 24 * 60, lifeMinutesPerDay);
+    const freeOn = (date: string, from: number, to: number) => freeMinutesBetween(days.get(date) ?? EMPTY_DAY, from, to);
     // 置いた時間を数える範囲は両画面とも PLACED_LOOKBACK_DAYS 日前まで（それより前は /plan が読まない）。
     const countFloor = addDays(today, -PLACED_LOOKBACK_DAYS);
     let cumulative = 0;
@@ -263,33 +204,33 @@ export function evaluateGoals(params: {
         if (name) {
             for (const date of knownDates) {
                 if (date < goal.countFrom || date < countFloor || date > goal.dueOn) continue;
-                const limit = date === goal.dueOn ? due : 24 * 60;
-                for (const s of days.get(date)!.segments) {
-                    if (s.kind !== 'fixed' || !s.ranged || !s.activity.includes(name)) continue;
-                    placed += Math.max(0, Math.min(s.end, limit) - s.start);
+                const limit = date === goal.dueOn ? due : DAY_MINUTES;
+                for (const e of days.get(date)!.events) {
+                    if (!e.activity.includes(name)) continue;
+                    placed += Math.max(0, Math.min(e.end, limit) - e.start);
                 }
             }
         }
         const remaining = Math.max(0, goal.needMinutes - placed);
         let supply = 0;
         if (!past) {
-            // 読み込んだ日は1日ずつ、それ以外は予定の無い日の空き × 日数。期日が何年先でも
+            // 読み込んだ日は1日ずつ、それ以外は予定の無い日の自由時間 × 日数。期日が何年先でも
             // 日数に比例した計算をしない（年の打ち間違いで画面が固まらないように）。
             const inRange = knownDates.filter((d) => d >= today && d <= goal.dueOn);
             for (const date of inRange) {
-                supply += usable(date, date === today ? nowMinutes : 0, date === goal.dueOn ? due : 24 * 60);
+                supply += freeOn(date, date === today ? nowMinutes : 0, date === goal.dueOn ? due : DAY_MINUTES);
             }
             const known = new Set(inRange);
             let unknownWholeDays = daysBetween(today, goal.dueOn) + 1 - inRange.length;
             if (!known.has(today)) {
-                supply += usable(today, nowMinutes, today === goal.dueOn ? due : 24 * 60);
+                supply += freeOn(today, nowMinutes, today === goal.dueOn ? due : DAY_MINUTES);
                 unknownWholeDays -= 1;
             }
             if (goal.dueOn !== today && !known.has(goal.dueOn)) {
-                supply += usable(goal.dueOn, 0, due);
+                supply += freeOn(goal.dueOn, 0, due);
                 unknownWholeDays -= 1;
             }
-            supply += Math.max(0, unknownWholeDays) * emptyDayUsable;
+            supply += Math.max(0, unknownWholeDays) * EMPTY_DAY.freeMinutes;
             cumulative += remaining;
         }
         return {

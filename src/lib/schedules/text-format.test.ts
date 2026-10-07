@@ -3,7 +3,7 @@ import type { Database } from '@/src/types/database.types';
 import {
     dateLabelToDateStr,
     dayContentToScheduleItems,
-    hasOrphanLines,
+    findDayContentIssues,
     scheduleRowsToDayContent,
 } from './text-format';
 
@@ -30,11 +30,21 @@ describe('text-format', () => {
     });
 
     it('detects orphan lines but ignores continuation lines', () => {
-        const continuationOnly = ['0900 start', 'detail line', 'another detail'].join('\n');
-        const orphanIncluded = ['memo before', '0900 start'].join('\n');
+        const continuationOnly = ['0900-1000 start', 'detail line', 'another detail'].join('\n');
+        const orphanIncluded = ['memo before', '0900-1000 start'].join('\n');
 
-        expect(hasOrphanLines(continuationOnly)).toBe(false);
-        expect(hasOrphanLines(orphanIncluded)).toBe(true);
+        expect(findDayContentIssues(continuationOnly)).toEqual([]);
+        expect(findDayContentIssues(orphanIncluded)).toEqual([{ line: 'memo before', kind: 'orphan' }]);
+    });
+
+    it('requires an end time except for the wake line, and rejects reversed ranges', () => {
+        const content = ['0700 起床 朝食', '1050 院生ゼミ', '1300-1500 作業', '1500-1300 逆', '1000-1000 同時刻', '2200-2300 消灯'].join('\n');
+
+        expect(findDayContentIssues(content)).toEqual([
+            { line: '1050 院生ゼミ', kind: 'missing-end' },
+            { line: '1500-1300 逆', kind: 'reversed' },
+        ]);
+        expect(findDayContentIssues('')).toEqual([]);
     });
 
     it('formats rows to day content and supports round-trip-like parsing', () => {

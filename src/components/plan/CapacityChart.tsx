@@ -2,7 +2,7 @@ import type { GoalStatus } from '@/src/lib/schedules/free-time';
 
 export type CapacityDay = {
     date: string;
-    /** その日に使える空き（今日は今以降、生活時間を差し引いた後）。 */
+    /** その日の自由時間（今日は今以降）。 */
     usableMinutes: number;
     wake: number;
     sleep: number;
@@ -70,7 +70,7 @@ export function CapacityChart({ days, statuses }: { days: CapacityDay[]; statuse
                 {cols.map((c, i) => (
                     <div key={c.date} className="absolute inset-y-0" style={{ left: `${x(i)}%`, width: `${100 / n}%` }}>
                         <div
-                            title={`${shortDate(c.date)} 使える空き ${(c.usableMinutes / 60).toFixed(1)}h → 累計 ${(c.c1 / 60).toFixed(1)}h`}
+                            title={`${shortDate(c.date)} 自由時間 ${(c.usableMinutes / 60).toFixed(1)}h → 累計 ${(c.c1 / 60).toFixed(1)}h`}
                             className="absolute inset-x-px bottom-0 bg-neutral-200 dark:bg-neutral-800"
                             style={{ height: `${y(c.c0)}%` }}
                         />
@@ -110,7 +110,7 @@ export function CapacityChart({ days, statuses }: { days: CapacityDay[]; statuse
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-700 dark:text-neutral-300">
                 <span className="inline-flex items-center gap-1">
                     <span className="inline-block h-2 w-4 rounded-sm bg-neutral-600 dark:bg-neutral-400" />
-                    1日の使える空き（累計の段）
+                    1日の自由時間（累計の段）
                 </span>
                 <span className="inline-flex items-center gap-1">
                     <span className="inline-block h-0.5 w-4 bg-amber-500 dark:bg-amber-500" />
