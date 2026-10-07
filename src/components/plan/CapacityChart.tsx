@@ -110,11 +110,11 @@ export function CapacityChart({ days, statuses }: { days: CapacityDay[]; statuse
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-700 dark:text-neutral-300">
                 <span className="inline-flex items-center gap-1">
                     <span className="inline-block h-2 w-4 rounded-sm bg-neutral-600 dark:bg-neutral-400" />
-                    1日の自由時間（累計の段）
+                    自由時間の累計
                 </span>
                 <span className="inline-flex items-center gap-1">
                     <span className="inline-block h-0.5 w-4 bg-amber-500 dark:bg-amber-500" />
-                    目標の残り必要時間の累計（線が段より下なら間に合う）
+                    必要時間の累計
                 </span>
             </div>
         </div>

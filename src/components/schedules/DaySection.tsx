@@ -4,12 +4,7 @@ import { FreeTimeStrip } from '@/src/components/plan/FreeTimeStrip';
 import { AutoHeightTextarea } from '@/src/components/schedules/AutoHeightTextarea';
 import { Button } from '@/src/components/ui/Button';
 import { analyzeDayContent, formatHours } from '@/src/lib/schedules/free-time';
-import {
-    dateLabelToDateStr,
-    findDayContentIssues,
-    type DayContentIssue,
-    type DayEntry,
-} from '@/src/lib/schedules/text-format';
+import { findDayContentIssues, type DayContentIssue, type DayEntry } from '@/src/lib/schedules/text-format';
 
 const ISSUE_TEXT: Record<DayContentIssue['kind'], string> = {
     orphan: '時刻の無い行',
@@ -68,8 +63,6 @@ export function DaySection({
         <section
             // 今日のセクションだけ親から渡されたrefを当て、初期スクロール先に使う。
             ref={isToday ? todayRef : null}
-            // /plan の日ごとの一覧から ?day=YYYY-MM-DD で飛んでくる先。
-            id={`day-${dateLabelToDateStr(entry.dateLabel)}`}
             className={`group rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden ${isToday
                     ? 'border-2 border-amber-500 dark:border-amber-500'
                     : 'border border-neutral-400 dark:border-neutral-600'

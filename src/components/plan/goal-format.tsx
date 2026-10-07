@@ -17,7 +17,7 @@ export function formatDue(dueOn: string, dueMinutes: number | null): string {
 /** 余裕（締切までの空き − 残り必要時間の累計）か、不足を出す。 */
 export function GoalVerdict({ status }: { status: GoalStatus }) {
     if (status.past) {
-        return <span className="text-neutral-700 dark:text-neutral-300">期日を過ぎました（終わったら削除）</span>;
+        return <span className="text-neutral-700 dark:text-neutral-300">期日を過ぎました</span>;
     }
     if (status.ok) {
         return (

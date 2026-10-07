@@ -56,23 +56,3 @@ export function FreeTimeStrip({ analysis, nowMinutes }: FreeTimeStripProps) {
         </div>
     );
 }
-
-/** 帯の凡例。 */
-export function FreeTimeLegend() {
-    const items: [SlotKind, string][] = [
-        ['free', '自由'],
-        ['busy', '非自由（予定・起床後の身支度）'],
-        ['sleep', '睡眠'],
-    ];
-    return (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-700 dark:text-neutral-300">
-            <span>帯は 0:00〜24:00（目盛り 1時間、太線 6時間）</span>
-            {items.map(([kind, label]) => (
-                <span key={kind} className="inline-flex items-center gap-1">
-                    <span className={`inline-block h-2 w-4 rounded-sm ${KIND_CLASS[kind]}`} />
-                    {label}
-                </span>
-            ))}
-        </div>
-    );
-}

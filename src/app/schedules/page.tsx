@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { createClient } from '@/src/lib/supabase/client';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
 import { GoalBar } from '@/src/components/plan/GoalBar';
@@ -89,17 +89,6 @@ export default function SchedulesPage() {
             nowMinutes: now.nowMinutes,
         });
     }, [entries, pastContents, goalInputs, now, isInitialSyncing]);
-
-    // /plan の日ごとの一覧から ?day=YYYY-MM-DD で来たら、初回の同期の後にその日へ移る(1回だけ)。
-    const dayTargetHandledRef = useRef(false);
-    useEffect(() => {
-        if (dayTargetHandledRef.current || isInitialSyncing || entries.length === 0) return;
-        dayTargetHandledRef.current = true;
-        const day = new URLSearchParams(window.location.search).get('day');
-        if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
-        document.getElementById(`day-${day}`)?.scrollIntoView({ block: 'start' });
-        window.history.replaceState(null, '', window.location.pathname);
-    }, [isInitialSyncing, entries]);
 
     const handleInboxToggle = () => {
         if (inboxOpen) saveInboxNow();

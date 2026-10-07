@@ -3,8 +3,6 @@
 import { useCallback, useMemo } from 'react';
 import { PageHeader } from '@/src/components/layout/PageHeader';
 import { CapacityChart, type CapacityDay } from '@/src/components/plan/CapacityChart';
-import { DayFreeList } from '@/src/components/plan/DayFreeList';
-import { FreeTimeLegend } from '@/src/components/plan/FreeTimeStrip';
 import { GoalEditor } from '@/src/components/plan/GoalEditor';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { useNow } from '@/src/hooks/useNow';
@@ -23,10 +21,8 @@ import {
 } from '@/src/lib/schedules/free-time';
 import { createClient } from '@/src/lib/supabase/client';
 
-/** 今日から先に予定を読む日数。期日がこれより先なら、その先は予定の無い日（07:00〜23:30 が空き）として数える。 */
+/** 今日から先に予定を読む日数。期日がこれより先なら、その先は予定の無い日（EMPTY_DAY）として数える。 */
 const HORIZON_DAYS = 120;
-/** 日ごとの空きの一覧に出す日数。 */
-const LIST_DAYS = 21;
 /** 累積グラフの幅（日）。目標の期日が先なら期日の3日後まで伸ばすが、予定を読んだ範囲で打ち切る。 */
 const CHART_MIN_DAYS = 21;
 /** 期日の入力の上限（年の打ち間違いを入口で止める）。 */
@@ -93,20 +89,6 @@ export default function PlanPage() {
         return days;
     }, [now, statuses, analyze]);
 
-    const listDays = useMemo(() => {
-        if (!now) return [];
-        return Array.from({ length: LIST_DAYS }, (_, i) => {
-            const date = addDays(now.today, i);
-            return { date, analysis: analyze(date) };
-        });
-    }, [now, analyze]);
-
-    const deadlines = useMemo(() => {
-        const map = new Map<string, string[]>();
-        for (const g of goals) map.set(g.due_on, [...(map.get(g.due_on) ?? []), g.name || '（名前なし）']);
-        return map;
-    }, [goals]);
-
     const handleAdd = useCallback(() => {
         if (!now) return;
         void addGoal({ name: '', due_on: addDays(now.today, 14), due_time: null, need_minutes: 0 });
@@ -130,41 +112,28 @@ export default function PlanPage() {
 
             <div className="flex-1 overflow-y-auto px-2 py-2 sm:px-6 sm:py-4">
                 <div className="mx-auto max-w-5xl space-y-4">
-                    <section className={`${CARD} space-y-2`}>
-                        <div className="flex items-baseline justify-between gap-2">
+                    {now && (
+                        <section className={`${CARD} space-y-2`}>
                             <h2 className="text-base font-medium">目標</h2>
-                            <span className="text-sm text-neutral-700 dark:text-neutral-300">この日までにこれを終える</span>
-                        </div>
-                        <GoalEditor
-                            goals={goals}
-                            maxDueOn={now ? addDays(now.today, 365 * MAX_DUE_YEARS) : undefined}
-                            statuses={statuses}
-                            onAdd={handleAdd}
-                            onUpdate={(id, patch) => void updateGoal(id, patch)}
-                            onRemove={(id) => void removeGoal(id)}
-                        />
-                    </section>
+                            <GoalEditor
+                                goals={goals}
+                                today={now.today}
+                                nowMinutes={now.nowMinutes}
+                                maxDueOn={addDays(now.today, 365 * MAX_DUE_YEARS)}
+                                statuses={statuses}
+                                onAdd={handleAdd}
+                                onUpdate={(id, patch) => void updateGoal(id, patch)}
+                                onRemove={(id) => void removeGoal(id)}
+                            />
+                        </section>
+                    )}
 
-                    <section className={`${CARD} space-y-2`}>
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    {now && (
+                        <section className={`${CARD} space-y-2`}>
                             <h2 className="text-base font-medium">締切までの時間</h2>
-                            <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                                自由時間 = 起床〜消灯から、予定と起床後の身支度（最大2時間）を除いた時間
-                            </span>
-                        </div>
-                        {now && <CapacityChart days={chartDays} statuses={statuses} />}
-                    </section>
-
-                    <section className={`${CARD} space-y-2`}>
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <h2 className="text-base font-medium">日ごとの空き</h2>
-                            <span className="text-sm text-neutral-700 dark:text-neutral-300">押すとスケジュールのその日へ</span>
-                        </div>
-                        <FreeTimeLegend />
-                        {now && (
-                            <DayFreeList days={listDays} today={now.today} nowMinutes={now.nowMinutes} deadlines={deadlines} />
-                        )}
-                    </section>
+                            <CapacityChart days={chartDays} statuses={statuses} />
+                        </section>
+                    )}
                 </div>
             </div>
         </div>

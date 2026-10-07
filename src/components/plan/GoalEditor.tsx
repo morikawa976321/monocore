@@ -1,16 +1,25 @@
 'use client';
 
+import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { formatHours, type GoalStatus } from '@/src/lib/schedules/free-time';
+import { parseDueInput, parseNeedInput, toDueInputString } from '@/src/lib/plan/goal-input';
 import { GoalVerdict } from '@/src/components/plan/goal-format';
 import type { PlanGoalRow, PlanGoalUpdate } from '@/src/lib/supabase/queries/plan-goals';
 
+/** 必要時間の欄の表示（時間、小数2桁まで）。 */
+function needText(minutes: number): string {
+    return String(Math.round((minutes / 60) * 100) / 100);
+}
+
 type GoalEditorProps = {
     goals: PlanGoalRow[];
-    /** 期日の入力の上限（YYYY-MM-DD）。 */
-    maxDueOn?: string;
+    /** 年の無い期日の補完と、期日の上限（YYYY-MM-DD）に使う。 */
+    today: string;
+    nowMinutes: number;
+    maxDueOn: string;
     statuses: GoalStatus[];
     onAdd: () => void;
     onUpdate: (id: string, patch: PlanGoalUpdate) => void;
@@ -20,9 +29,20 @@ type GoalEditorProps = {
 /**
  * 目標の一覧と編集。どの欄も入力欄を離れたときに保存する（年を打つ途中の値を1打ごとに送らない）。
  * 入力欄は非制御で、key に保存済みの値を含める。保存に失敗して読み直したら、欄も保存済みの値に戻る。
+ * 読めない値は保存せず、欄に残して枠を琥珀色にする（予定の板の Invalid と同じく、黙って捨てない）。
  * 進捗の入力欄は持たない（予定の板に名前を含む時刻範囲つきの行を書くと「置いた」に入る）。
  */
-export function GoalEditor({ goals, maxDueOn, statuses, onAdd, onUpdate, onRemove }: GoalEditorProps) {
+export function GoalEditor({ goals, today, nowMinutes, maxDueOn, statuses, onAdd, onUpdate, onRemove }: GoalEditorProps) {
+    const [invalid, setInvalid] = useState<ReadonlySet<string>>(new Set());
+    const markInvalid = (key: string, isInvalid: boolean) =>
+        setInvalid((prev) => {
+            if (prev.has(key) === isInvalid) return prev;
+            const next = new Set(prev);
+            if (isInvalid) next.add(key);
+            else next.delete(key);
+            return next;
+        });
+
     const statusById = new Map(statuses.map((s) => [s.goal.id, s]));
     const sorted = [...goals].sort((a, b) =>
         a.due_on === b.due_on ? (a.due_time ?? '99').localeCompare(b.due_time ?? '99') : a.due_on < b.due_on ? -1 : 1
@@ -30,14 +50,10 @@ export function GoalEditor({ goals, maxDueOn, statuses, onAdd, onUpdate, onRemov
 
     return (
         <div className="space-y-2">
-            {sorted.length === 0 && (
-                <p className="text-sm text-neutral-700 dark:text-neutral-300">
-                    目標はまだありません。「この日までにこれを終える」を追加してください。
-                </p>
-            )}
             <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
                 {sorted.map((g) => {
                     const s = statusById.get(g.id);
+                    const savedDue = toDueInputString(g.due_on, g.due_time);
                     return (
                         <li key={g.id} className="space-y-1 py-2">
                             <div className="flex flex-wrap items-center gap-2">
@@ -46,55 +62,47 @@ export function GoalEditor({ goals, maxDueOn, statuses, onAdd, onUpdate, onRemov
                                     <Input
                                         key={`name-${g.name}`}
                                         defaultValue={g.name}
-                                        placeholder="名前（予定の行にこの語を含めると数える）"
+                                        placeholder="名前"
                                         aria-label="目標の名前"
                                         onBlur={(e) => {
                                             if (e.target.value !== g.name) onUpdate(g.id, { name: e.target.value });
                                         }}
                                     />
                                 </div>
-                                <div className="w-40 shrink-0">
+                                <div className="w-36 shrink-0">
                                     <Input
-                                        key={`due-${g.due_on}`}
-                                        type="date"
-                                        defaultValue={g.due_on}
-                                        max={maxDueOn}
+                                        key={`due-${savedDue}`}
+                                        defaultValue={savedDue}
+                                        inputMode="numeric"
                                         aria-label="期日"
+                                        aria-invalid={invalid.has(`${g.id}:due`) || undefined}
+                                        title="MMDD / MMDDHHMM / YYYYMMDD / YYYYMMDDHHMM"
                                         onBlur={(e) => {
-                                            const v = e.target.value;
-                                            // 空・形式外・上限超えは保存せず、保存済みの値に戻す
-                                            if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || (maxDueOn && v > maxDueOn)) {
-                                                e.target.value = g.due_on;
-                                                return;
-                                            }
-                                            if (v !== g.due_on) onUpdate(g.id, { due_on: v });
-                                        }}
-                                    />
-                                </div>
-                                <div className="w-28 shrink-0">
-                                    <Input
-                                        key={`time-${g.due_time ?? ''}`}
-                                        type="time"
-                                        defaultValue={g.due_time ? g.due_time.slice(0, 5) : ''}
-                                        aria-label="期日の時刻（空ならその日の終わり）"
-                                        onBlur={(e) => {
-                                            const v = e.target.value || null;
-                                            if (v !== (g.due_time ? g.due_time.slice(0, 5) : null)) onUpdate(g.id, { due_time: v });
+                                            const due = parseDueInput(e.target.value, today, nowMinutes);
+                                            const ok = due !== null && due.dueOn <= maxDueOn;
+                                            markInvalid(`${g.id}:due`, !ok);
+                                            if (!ok) return;
+                                            // 補った年をその場で見せる（保存済みと同じ値なら key が変わらず欄が作り直されないため）
+                                            e.target.value = toDueInputString(due.dueOn, due.dueTime);
+                                            if (e.target.value !== savedDue) onUpdate(g.id, { due_on: due.dueOn, due_time: due.dueTime });
                                         }}
                                     />
                                 </div>
                                 <label className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-neutral-700 dark:text-neutral-300">
                                     必要
-                                    <span className="w-20">
+                                    <span className="w-16">
                                         <Input
                                             key={`need-${g.need_minutes}`}
-                                            type="number"
-                                            min={0}
-                                            step={0.5}
-                                            defaultValue={g.need_minutes / 60}
+                                            defaultValue={needText(g.need_minutes)}
+                                            inputMode="decimal"
+                                            aria-label="必要時間"
+                                            aria-invalid={invalid.has(`${g.id}:need`) || undefined}
                                             className="text-right"
                                             onBlur={(e) => {
-                                                const minutes = Math.max(0, Math.round(Number(e.target.value) * 60) || 0);
+                                                const minutes = parseNeedInput(e.target.value);
+                                                markInvalid(`${g.id}:need`, minutes === null);
+                                                if (minutes === null) return;
+                                                e.target.value = needText(minutes);
                                                 if (minutes !== g.need_minutes) onUpdate(g.id, { need_minutes: minutes });
                                             }}
                                         />
@@ -116,15 +124,10 @@ export function GoalEditor({ goals, maxDueOn, statuses, onAdd, onUpdate, onRemov
                     );
                 })}
             </ul>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <Button color="secondary" size="md" onClick={onAdd}>
-                    <Plus className="w-4 h-4" />
-                    目標を追加
-                </Button>
-                <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                    予定の板に「1300-1600 名前」のように時刻範囲つきで書くと「置いた」に入ります。終わった目標は削除してください。
-                </span>
-            </div>
+            <Button color="secondary" size="md" onClick={onAdd}>
+                <Plus className="w-4 h-4" />
+                目標を追加
+            </Button>
         </div>
     );
 }
