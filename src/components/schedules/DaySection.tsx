@@ -53,8 +53,9 @@ export function DaySection({
     const [previousContent, setPreviousContent] = useState<string | null>(null);
     // 打つたびに再計算する（1日分なので軽い）。/plan の目標の判定と同じ計算。
     const freeTime = useMemo(() => analyzeDayContent(entry.content), [entry.content]);
-    // 不正な行がある日は保存されない(useSchedules.saveDay)。何を直せばよいかを本文の上に出す。
+    // 不正な行がある日は保存されない(useSchedules.saveDay)。何を直せばよいかはバッジのツールチップに出す。
     const issues = useMemo(() => findDayContentIssues(entry.content), [entry.content]);
+    const canUndo = previousContent !== null && previousContent !== entry.content;
 
     const handleUndo = () => {
         if (previousContent === null) return;
@@ -78,12 +79,19 @@ export function DaySection({
             <header className="px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 flex items-center justify-between">
                 <div className="flex items-center text-neutral-700 dark:text-neutral-300">
                     <span>{entry.dateLabel}</span>
-                    {/* 不正な行がある日だけ警告表示する。その日は保存されない。 */}
-                    {issues.length > 0 && (
-                        <span className="ml-2 px-1 py-0.5 rounded-sm border border-amber-500 dark:border-amber-400 text-amber-600 dark:text-amber-400 text-sm font-medium leading-none">
-                            Invalid format
-                        </span>
-                    )}
+                    {/* 不正な行がある日だけ警告表示する。その日は保存されない。PC では帯の左端が日ごとに
+                        ずれないよう、バッジの無い日も同じ幅を見えない形で空けておく(スマホは帯が無いので空けない)。 */}
+                    <span
+                        title={
+                            issues.length > 0
+                                ? issues.map((issue) => `${issue.line.trim()}（${ISSUE_TEXT[issue.kind]}）`).join(' / ')
+                                : undefined
+                        }
+                        aria-hidden={issues.length > 0 ? undefined : true}
+                        className={`ml-2 px-1 py-0.5 rounded-sm border border-amber-500 dark:border-amber-400 text-amber-600 dark:text-amber-400 text-sm font-medium leading-none ${issues.length > 0 ? '' : 'hidden sm:inline sm:invisible'}`}
+                    >
+                        Invalid format
+                    </span>
                 </div>
                 {/* 空きの帯は見出し行の中に置き、カードの高さを増やさない(下の最低高のコメントと同じ理由で、
                     60日分のスクロール長が伸びるのを避ける)。スマホは幅が無いので数値だけ。 */}
@@ -91,7 +99,8 @@ export function DaySection({
                     <FreeTimeStrip analysis={freeTime} nowMinutes={isToday ? nowMinutes : undefined} />
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="text-neutral-700 dark:text-neutral-300">
+                    {/* 数値と元に戻すボタンも幅を固定し、帯の右端をずらさない。 */}
+                    <div className="sm:w-20 sm:text-right text-neutral-700 dark:text-neutral-300">
                         <span>
                             空き{' '}
                             <span className="font-medium text-neutral-900 dark:text-neutral-50">
@@ -99,7 +108,7 @@ export function DaySection({
                             </span>
                         </span>
                     </div>
-                    {previousContent !== null && previousContent !== entry.content && (
+                    {canUndo ? (
                         <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150">
                             <Button
                                 color="ghost"
@@ -111,19 +120,11 @@ export function DaySection({
                                 <Undo2 className="w-4 h-4" />
                             </Button>
                         </div>
+                    ) : (
+                        <div className="hidden sm:block w-8 h-8 -mr-2" aria-hidden="true" />
                     )}
                 </div>
             </header>
-            {issues.length > 0 && (
-                <p className="px-2 sm:px-4 pt-2 text-sm leading-6 text-amber-600 dark:text-amber-400">
-                    このままでは保存できません:{' '}
-                    {issues
-                        .slice(0, 3)
-                        .map((issue) => `${issue.line.trim()}（${ISSUE_TEXT[issue.kind]}）`)
-                        .join(' / ')}
-                    {issues.length > 3 ? ` ほか${issues.length - 3}件` : ''}
-                </p>
-            )}
             {/* 予定と自由記述メモ。高さはそれぞれ入力量に合わせて自動調整。
                 PC は横並びで予定:メモ = 3:2(2026-08-05 本人指定)、スマホは縦積み(375px で横2分割は両方使えない)。 */}
             {/* 仕切り線はセクションの外枠より一段濃くする。プレースホルダを置かないぶん、
