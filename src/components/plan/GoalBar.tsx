@@ -22,7 +22,9 @@ export function GoalBar({ statuses }: { statuses: GoalStatus[] }) {
     const rest = upcoming.length - MAX_ROWS;
 
     return (
-        <div className="shrink-0 border-b border-neutral-200 bg-neutral-50 px-2 py-2 text-sm leading-6 dark:border-neutral-800 dark:bg-neutral-900 sm:px-6">
+        // 下の線は日カードの枠と同じ濃さにする。ヘッダーと同じ薄い線では、下へ潜り込む日カードの本文と同じ背景色が
+        // 線をまたいで続き、帯とカードの境目が分からなかった(2026-10-07 本人指摘)。
+        <div className="shrink-0 border-b border-neutral-400 bg-neutral-50 px-2 py-2 text-sm leading-6 dark:border-neutral-600 dark:bg-neutral-900 sm:px-6">
             <div className="flex items-center justify-between gap-2">
                 <span className="text-neutral-700 dark:text-neutral-300">
                     目標 <span className="font-medium text-neutral-900 dark:text-neutral-50">{upcoming.length}</span>

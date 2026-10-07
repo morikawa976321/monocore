@@ -130,6 +130,9 @@ export default function SchedulesPage() {
             </PageHeader>
 
             <GoalBar statuses={goalStatuses} />
+            {/* 一覧の上の余白はスクロールの外に置く。中に置くとスクロールで消え、日カードが上の帯に直接接して
+                境目が分からなくなる(2026-10-07 本人指摘)。 */}
+            <div className="h-1 sm:h-4 shrink-0" aria-hidden="true" />
 
             <div className="flex-1 overflow-hidden relative">
                 <Button
@@ -145,7 +148,7 @@ export default function SchedulesPage() {
                 </Button>
                 <div
                     ref={scrollContainerRef}
-                    className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4"
+                    className="h-full overflow-y-auto px-2 sm:px-6 pb-1 sm:pb-4 space-y-2 sm:space-y-4"
                     style={{ overflowAnchor: 'none' }}
                 >
                     <div ref={topSentinelRef} />

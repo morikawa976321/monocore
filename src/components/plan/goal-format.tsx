@@ -42,7 +42,7 @@ export function PlacedBar({ status }: { status: GoalStatus }) {
     const need = status.goal.needMinutes;
     const ratio = need > 0 ? Math.min(1, status.placedMinutes / need) : 0;
     return (
-        <div className="h-1 w-24 shrink-0 overflow-hidden rounded-sm bg-neutral-200 dark:bg-neutral-800">
+        <div className="h-1 w-24 shrink-0 overflow-hidden rounded-sm bg-neutral-300 dark:bg-neutral-700">
             <div className="h-1 bg-amber-500 dark:bg-amber-500" style={{ width: `${Math.round(ratio * 100)}%` }} />
         </div>
     );
