@@ -2,7 +2,7 @@
 
 ## 定期バックアップ（自動）
 
-`scripts/backup/supabase_periodic_backup.ps1` を taskbox の `drain.ps1` が毎 run の終了時に呼ぶ（`Invoke-MonocoreDbBackup`。2026-08-30 導入）が、取るのは 00:00 と 12:00 の枠ごとに1回（2026-10-07〜。それまでは毎時）。保存先は `backups/auto/<timestamp>/{schema.sql,data.sql}`、保持 14 日（2026-10-07に30日から短縮）で超過分は自動削除。結果は `backups/auto/backup-status.json` と `taskbox/drain.log` で確認する。失敗した回だけ `/drain` 板の run カードに「monocore DBバックアップ」の error 行が出る（2026-10-05〜。それまでは板に出さず、taskbox の queue に調査タスクを積んでいた）。Docker も WSL も使わず Windows ネイティブの `pg_dump.exe`（PostgreSQL 17 以上。`C:\Program Files\PostgreSQL\<メジャー>\bin`）で取る理由・資格情報を永続化しない仕組みは、スクリプト冒頭のコメントが正。`pg_dump.exe` が無い・動かないと `pgdump_missing` で失敗する（自動導入はしない）。エラー文は `LC_MESSAGES=C` で英語に固定している（日本語ロケールだと CP932 で出て、ログ・調査タスクで文字化けするため）。失敗した回の `backups/auto/<日時>/` には `FAILED.txt` が入る（タイムアウト等で不完全なダンプが残りうるので、復元に使わない）。
+`scripts/backup/supabase_periodic_backup.ps1` を mf/ops の定時ジョブ `ops-daily`(毎日04:00。`C:\Users\tm976\mf\ops\daily.ps1`)が1日1回呼ぶ(2026-08-30 導入。2026-10-09 までは taskbox の drain が呼び、1日2回取っていた)。保存先は `backups/auto/<timestamp>/{schema.sql,data.sql}`、保持 14 日で超過分は自動削除。結果は `backups/auto/backup-status.json` と `ops/logs/daily.log` で確認する。失敗した回は monocore の inbox に1行で通知される。Docker も WSL も使わず Windows ネイティブの `pg_dump.exe`（PostgreSQL 17 以上。`C:\Program Files\PostgreSQL\<メジャー>\bin`）で取る理由・資格情報を永続化しない仕組みは、スクリプト冒頭のコメントが正。`pg_dump.exe` が無い・動かないと `pgdump_missing` で失敗する（自動導入はしない）。エラー文は `LC_MESSAGES=C` で英語に固定している（日本語ロケールだと CP932 で出て、ログ・調査タスクで文字化けするため）。失敗した回の `backups/auto/<日時>/` には `FAILED.txt` が入る（タイムアウト等で不完全なダンプが残りうるので、復元に使わない）。
 
 導入前の手動バックアップは 2026-08-11 が最後で、2026-08-29 の inbox 空文字上書きでは以後の追記を取り戻せなかった。手動取得は以下の手順で引き続き使える。
 

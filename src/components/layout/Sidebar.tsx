@@ -6,7 +6,6 @@ import {
     Clock,
     Target,
     FileText,
-    ListChecks,
     Menu,
     Newspaper,
     LogOut,
@@ -20,7 +19,6 @@ const MENU_ITEMS = [
     { href: "/plan", icon: Target, label: "Plan" },
     { href: "/reports", icon: FileText, label: "Reports" },
     { href: "/news", icon: Newspaper, label: "News" },
-    { href: "/drain", icon: ListChecks, label: "Drain" },
 ] as const;
 
 export function Sidebar() {

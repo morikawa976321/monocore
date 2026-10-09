@@ -4,11 +4,11 @@
  * 背景: taskbox の drain パイプラインは、報告板投入(upsert-drain-run.mjs)と reports 同期
  * (upsert-reports.mjs)を `node <script>` で呼んで**その終了を待つ**。supabase-js の
  * `.upsert()/.select()/.delete()` にはタイムアウトが無いため、ネットワーク越しの応答が
- * 返らないとこの node プロセスが居座り、呼び出し元の drain wrapper ごと止まる。すると
- * `drain.lock` が解放されず、次の枠が「生きている別drainのロック」と誤認してスキップし続ける。
+ * 返らないとこの node プロセスが居座り、呼び出し元(定時ジョブ)ごと止まる(taskbox の drain 時代は
+ * `drain.lock` が解放されず、次の枠がスキップし続けた)。
  *
  * ここが保証するのは「**返ってくること**」だけで、失敗の扱いは呼び出し元
- * (taskbox/lib/board.ps1・ops/sync-reports.ps1)の既存のエラーハンドリングに委ねる。
+ * (ops/sync-reports.ps1)の既存のエラーハンドリングに委ねる。
  *
  * @module supabase-timeout
  */

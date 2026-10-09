@@ -13,7 +13,6 @@
 | `/schedules` | 予定の一覧・編集。日別メモ欄と inbox パネルを同居 |
 | `/reports` | `mf/reports/` の読み取り専用ミラー |
 | `/news` | RSS で集めた記事の一覧（ソース別。読み取り専用） |
-| `/drain` | taskbox drain の実行記録（1枠=1カード。読み取り専用） |
 
 実装が守る設計制約と、未決の論点は `docs/design.md`。
 
@@ -29,13 +28,6 @@
 - 収集は**このリポジトリの `scraper/`（Python）**が行う。タスクスケジューラが `pythonw.exe` で毎時 `run_once.py` を実行し、`link` 単位で upsert したあと保持期間（`scraper/config.json` の `max_age_days` = 8日）を過ぎた行を消す。取得先とブラックリストも `scraper/config.json`。
 - 2026-08-14 に別リポジトリ `mf/news_scraping`（JSONL 保存 + LAN 内 Flask）から移設した（**移設元はローカル・GitHub とも削除済み**。以降このリポジトリ内の記述にある「旧 news_scraping」は、コードがそう書かれている理由の説明であって、参照先ではない）。**`articles` は既存の導出物3つと違い、消えても再生成できない**（RSS は過去記事を配らない）。詳細は「データの正と書き込み規約」。
 - **スクレーパーは `service_role` キーを持つ。** 認証情報はリポジトリではなく `~/.monocore/config.json` の `envs.remote` から読む。
-
-### Drain（`/drain`）
-
-- taskbox の drain は 1 時間おき 24 枠で無人稼働している。その結果を**尋ねずに**読むための面。1 枠 = 1 カードで、各カードは「何をして／どうなったか」の組を並べる。
-- **起動しなかった枠・使用量制限で死んだ枠も 1 行残る。** 「静かだったのか、動かなかっただけなのか」が一覧で判別できることがこの面の要件（drain.log は 7 日で消えるため、ここが実質のアーカイブになる）。
-- **投入は `taskbox/drain.ps1` が直接行う（LLM の自己申告を経由しない）**。組の材料は既にあるものだけを使う: ①ラッパーが持つ機械値（起動理由・exit・マーカー・バックアップ・件数の前後差）②セッションの最終報告の全文（カードを開いたときだけ取得）。`taskbox/traces/<task-id>.json` 由来のタスク別詳細（`tasks` 列）は 2026-09-12 に表示をやめ、taskbox は空配列を送る（列と検証は残してある。暫定で、報告全文も含め今後さらに減らす可能性がある）。
-- 投入スクリプトは `scripts/upsert-drain-run.mjs`（検証・整形の純関数は `scripts/drain-run-payload.mjs`）。キーは `started_at` で slug 単位 upsert と同じく行を消さない。
 
 ---
 
@@ -121,11 +113,10 @@ monocore は AI 活用基盤（context-engine / taskbox）の**人間向け窓�
 | `schedules` | 画面 / AI スキル | monocore |
 | `schedule_day_notes` / `schedule_day_revisions` | 画面 | monocore |
 | `inboxes` | 画面（単一 TEXT blob） | monocore |
-| `drain_runs` | `service_role` のみ（`drain.ps1` が毎run投入） | **taskbox** |
 | `articles` | `service_role` のみ（`scraper/` が毎時投入） | **このDB自身** |
 
 - **`articles` だけは「人間が書いたもの」でも「再生成できる導出物」でもない。** RSS は過去記事を配らないので、消えた記事は戻らない。保持は8日と決めたので失われうる最大値は「8日以内に読み逃した記事」であり、バックアップは持たない（2026-08-14・本人判断）。この分類がもう1つ増えるなら、そのとき改めて考える。
-- **導出物に手入力欄を作らない。** `drain_runs` は消えても再生成できるものとして扱う。
+- **導出物に手入力欄を作らない。**
 - **`replace_*` 系 RPC を新規に使わない。** 空配列で実データを消した事故があるため、投入は slug 単位の upsert にする。既存の `replace_schedules_for_day` / `replace_schedules_for_day_as` は日単位の全置換なので、呼ぶ前にローカルバックアップを取る。
 - **AI が書いた行は `updated_by = 'agent'`** で識別する（現状 schedules のみ。UI 表示は未実装）。
 - **AI の書き込みは read→modify→write を 1 操作で行い、`updated_at` 不一致なら再読込する**（2 デバイス編集の競合対策）。
@@ -190,7 +181,7 @@ npx supabase db reset
 
 手動確認が難しい領域・壊れやすい変換ロジック・影響の大きい挙動に絞る。薄いラッパーや目視で足りる UI は過剰にテストしない。
 
-言語の境界（PowerShell → node の drain ペイロード、Python → PostgREST の articles 行）で手写しの型を突き合わせる検査は、**キー名の集合だけで書かない**。名前が同じで型だけ壊れる食い違い（配列かどうか・`null` 許容・オプショナル・素の型）を全部素通りさせる。実際の値から「配列か」「`None` か」「キーが欠けたか」「素の型は何か」を見るだけで足りる。「オプショナルの要否」だけは 1 回の実行では判定できず、そのメンバを出す全経路の観測を束ねて初めて言える。検出できないものは検査の docstring に明記する。
+言語の境界（Python → PostgREST の articles 行など）で手写しの型を突き合わせる検査は、**キー名の集合だけで書かない**。名前が同じで型だけ壊れる食い違い（配列かどうか・`null` 許容・オプショナル・素の型）を全部素通りさせる。実際の値から「配列か」「`None` か」「キーが欠けたか」「素の型は何か」を見るだけで足りる。「オプショナルの要否」だけは 1 回の実行では判定できず、そのメンバを出す全経路の観測を束ねて初めて言える。検出できないものは検査の docstring に明記する。
 
 ---
 
