@@ -92,7 +92,7 @@ function Write-Status([bool]$ok) {
 # 失敗経路の集約(2026-09-09追加。2026-09-10に汎用名へ改め、定義位置を1節の前へ移した —
 # WSL関連の失敗もこの経路へ合流させるため。中身は変えていない)。
 # 理由コードを1つ取り、Write-Status(backup-status.json)
-# → exit 1 という**このスクリプト唯一の異常終了経路**を通す。失敗は呼び出し側(ops\backup.ps1)が monocore の
+# → exit 1 という**このスクリプト唯一の異常終了経路**を通す。失敗は呼び出し側(ops\daily.ps1)が monocore の
 # inbox へ通知する(2026-10-09。それまでは taskbox の drain 報告板の run カードに error 行で出していた)。
 # 2026-09-05〜10-05 は板に出さず、ここから taskbox の queue へ調査タスクを積んでいた。
 function Complete-BackupFailure([string]$ReasonCode, [string]$Message, [int]$ProcId) {
@@ -366,7 +366,7 @@ Write-Log ('pg_dump: ' + $pgDumpVersion + ' (' + $pgDumpBin + ')')
 #       無期限に塞がない」ことだけを優先する(ジョブオブジェクト(Win32 API)を使えば
 #       確実な後始末も可能だが、今回は見送った)。
 #   `ReadToEndAsync`が例外(faulted task)を投げるケースは、`$ErrorActionPreference='Continue'`
-#   を自スコープに置いていても呼び出し元(当時の taskbox `Invoke-BackupJob`。現在は ops\backup.ps1)まで貫通し、
+#   を自スコープに置いていても呼び出し元(当時の taskbox `Invoke-BackupJob`。現在の ops\daily.ps1 は別プロセスで起動する)まで貫通し、
 #   backup-status.jsonの更新もqueueタスクの積み込みも両方スキップされる実害を確認したため、
 #   明示的にtry/catchで拾って同じ失敗経路へ合流させている(2026-09-09レビューで発覚)。
 # ---------------------------------------------------------------
