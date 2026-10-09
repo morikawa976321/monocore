@@ -1,9 +1,8 @@
 ﻿# monocore 本番Supabase — 定期バックアップ(スキーマ+データ)
 #
-# 起動: スケジュールタスク ops-backup の入口 C:\Users\tm976\mf\ops\backup.ps1 が毎時呼ぶが、取るのは 00:00 と 12:00 の
-#       枠ごとに1回(2026-10-07〜。判定は ops\backup.ps1 の Test-DbBackupDue)。判断が要らない
-#       機械工程なので claude は起動しない。2026-10-09 までは taskbox の drain.ps1 が毎run終了時に呼んでいた
-#       (ops のタスクが登録されるまでは drain が引き続き呼ぶ)。
+# 起動: スケジュールタスク ops-daily の入口 C:\Users\tm976\mf\ops\daily.ps1 が毎日04:00に1回呼ぶ(2026-10-09本人指示で
+#       1日1回に。それまでは 00:00 と 12:00 の枠ごとに1回)。判断が要らない機械工程なので claude は起動しない。
+#       2026-10-09 までは taskbox の drain.ps1 が毎run終了時に呼んでいた(ops-daily が登録されるまでは drain が引き続き呼ぶ)。
 #       手動: pwsh -ExecutionPolicy Bypass -File C:\Users\tm976\mf\monocore\scripts\backup\supabase_periodic_backup.ps1
 #
 # 経緯(2026-08-30): inboxes.contentが空文字列で上書きされ、直近の手動バックアップ
