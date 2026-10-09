@@ -8,7 +8,7 @@
  * `drain.lock` が解放されず、次の枠が「生きている別drainのロック」と誤認してスキップし続ける。
  *
  * ここが保証するのは「**返ってくること**」だけで、失敗の扱いは呼び出し元
- * (taskbox/lib/board.ps1・taskbox/sync-reports.ps1)の既存のエラーハンドリングに委ねる。
+ * (taskbox/lib/board.ps1・ops/sync-reports.ps1)の既存のエラーハンドリングに委ねる。
  *
  * @module supabase-timeout
  */

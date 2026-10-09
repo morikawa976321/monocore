@@ -1,8 +1,9 @@
 ﻿# monocore 本番Supabase — 定期バックアップ(スキーマ+データ)
 #
-# 起動: taskbox drain.ps1 が毎run終了時に呼ぶ(Invoke-MonocoreDbBackup)が、取るのは 00:00 と 12:00 の
-#       枠ごとに1回(2026-10-07〜。判定は taskbox の lib/backup.ps1 の Test-DbBackupDue)。判断が要らない
-#       機械工程なので claude は起動しない。
+# 起動: スケジュールタスク ops-backup の入口 C:\Users\tm976\mf\ops\backup.ps1 が毎時呼ぶが、取るのは 00:00 と 12:00 の
+#       枠ごとに1回(2026-10-07〜。判定は ops\backup.ps1 の Test-DbBackupDue)。判断が要らない
+#       機械工程なので claude は起動しない。2026-10-09 までは taskbox の drain.ps1 が毎run終了時に呼んでいた
+#       (ops のタスクが登録されるまでは drain が引き続き呼ぶ)。
 #       手動: pwsh -ExecutionPolicy Bypass -File C:\Users\tm976\mf\monocore\scripts\backup\supabase_periodic_backup.ps1
 #
 # 経緯(2026-08-30): inboxes.contentが空文字列で上書きされ、直近の手動バックアップ
@@ -92,8 +93,8 @@ function Write-Status([bool]$ok) {
 # 失敗経路の集約(2026-09-09追加。2026-09-10に汎用名へ改め、定義位置を1節の前へ移した —
 # WSL関連の失敗もこの経路へ合流させるため。中身は変えていない)。
 # 理由コードを1つ取り、Write-Status(backup-status.json)
-# → exit 1 という**このスクリプト唯一の異常終了経路**を通す。失敗は呼び出し側(taskbox lib/backup.ps1 →
-# lib/board.ps1 の New-DbBackupStep)が drain 報告板の run カードに error 行で出す(2026-10-05本人判断)。
+# → exit 1 という**このスクリプト唯一の異常終了経路**を通す。失敗は呼び出し側(ops\backup.ps1)が monocore の
+# inbox へ通知する(2026-10-09。それまでは taskbox の drain 報告板の run カードに error 行で出していた)。
 # 2026-09-05〜10-05 は板に出さず、ここから taskbox の queue へ調査タスクを積んでいた。
 function Complete-BackupFailure([string]$ReasonCode, [string]$Message, [int]$ProcId) {
     # $ProcId は「taskkillに意味がある」呼び出し元だけが正の値を渡す(下の2節のコメント参照)。
@@ -366,7 +367,7 @@ Write-Log ('pg_dump: ' + $pgDumpVersion + ' (' + $pgDumpBin + ')')
 #       無期限に塞がない」ことだけを優先する(ジョブオブジェクト(Win32 API)を使えば
 #       確実な後始末も可能だが、今回は見送った)。
 #   `ReadToEndAsync`が例外(faulted task)を投げるケースは、`$ErrorActionPreference='Continue'`
-#   を自スコープに置いていても呼び出し元(taskbox `Invoke-BackupJob`)まで貫通し、
+#   を自スコープに置いていても呼び出し元(当時の taskbox `Invoke-BackupJob`。現在は ops\backup.ps1)まで貫通し、
 #   backup-status.jsonの更新もqueueタスクの積み込みも両方スキップされる実害を確認したため、
 #   明示的にtry/catchで拾って同じ失敗経路へ合流させている(2026-09-09レビューで発覚)。
 # ---------------------------------------------------------------

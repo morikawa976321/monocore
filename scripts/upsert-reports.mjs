@@ -54,7 +54,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const DEFAULT_REPORTS_DIR = resolve(scriptDir, '..', '..', 'reports')
 
 /**
- * 呼び出し元(taskbox/sync-reports.ps1)はこのスクリプトの終了を待つ。claudeを起動しない回でも
+ * 呼び出し元(ops/sync-reports.ps1。2026-10-09まで taskbox/sync-reports.ps1)はこのスクリプトの終了を待つ。claudeを起動しない回でも
  * 通る経路なので、ここが返らないと drain.lock を抱えたまま枠が潰れる。上限は
  * ./supabase-timeout.mjs を参照。環境変数はテストで実際に発火させるための口。
  */
