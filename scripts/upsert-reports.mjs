@@ -8,8 +8,8 @@
  * 環境変数は`~/.monocore/config.json`のenvs.remote（既定はremote）から
  * 呼び出し側が読み、このスクリプト自身は config.jsonを読まず、
  * 呼び出し側が値を環境変数として渡す
- * （taskbox/README.mdの `SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node ...`
- * という既存の呼び出し方に揃えるため。ローカルSupabaseを指す等の差し替えも
+ * （手動実行は mf/ops/sync-reports.ps1 を使う。reports/CLAUDE.md の手順。環境変数渡しの形に
+ * しているのは、ローカルSupabaseを指す等の差し替えも
  * この形なら環境変数を変えるだけで済む）。
  *
  * 同期の定義は「集合の一致」であって upsert だけではない: reportsDir 直下
@@ -55,7 +55,7 @@ const DEFAULT_REPORTS_DIR = resolve(scriptDir, '..', '..', 'reports')
 
 /**
  * 呼び出し元(ops/sync-reports.ps1。2026-10-09まで taskbox/sync-reports.ps1)はこのスクリプトの終了を待つ。claudeを起動しない回でも
- * 通る経路なので、ここが返らないと drain.lock を抱えたまま枠が潰れる。上限は
+ * 通る経路なので、ここが返らないと ops-daily がこの工程の上限(30分)まで待たされ、後続の工程が遅れる。上限は
  * ./supabase-timeout.mjs を参照。環境変数はテストで実際に発火させるための口。
  */
 const REQUEST_TIMEOUT_MS = resolveTimeoutMs(

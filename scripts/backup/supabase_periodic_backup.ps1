@@ -2,7 +2,7 @@
 #
 # 起動: スケジュールタスク ops-daily の入口 C:\Users\tm976\mf\ops\daily.ps1 が毎日04:00に1回呼ぶ(2026-10-09本人指示で
 #       1日1回に。それまでは 00:00 と 12:00 の枠ごとに1回)。判断が要らない機械工程なので claude は起動しない。
-#       2026-10-09 までは taskbox の drain.ps1 が毎run終了時に呼んでいた(ops-daily が登録されるまでは drain が引き続き呼ぶ)。
+#       2026-10-09 までは taskbox の drain.ps1 が毎run終了時に呼んでいた(taskbox は同日廃止)。
 #       手動: pwsh -ExecutionPolicy Bypass -File C:\Users\tm976\mf\monocore\scripts\backup\supabase_periodic_backup.ps1
 #
 # 経緯(2026-08-30): inboxes.contentが空文字列で上書きされ、直近の手動バックアップ
@@ -39,11 +39,11 @@
 #   Windows に PostgreSQL 17 以上のクライアントツール(pg_dump.exe)があること。探索先は
 #   <ProgramFiles>\PostgreSQL\<メジャー>\bin\pg_dump.exe で、17以上のうち最大のメジャーを使う。
 #   本番がPostgreSQL 17系のため、pg_dumpが古いと `aborting because of server version mismatch` で
-#   拒否される(新しい分には問題ない)。見つからなければ pgdump_missing で失敗する(drain 報告板の run カードに error 行で出る)。
+#   拒否される(新しい分には問題ない)。見つからなければ pgdump_missing で失敗する(ops-daily が monocore の inbox へ通知する)。
 #   自動導入は試みない: Windows では導入に管理者権限か対話が要り、無人実行では誰も操作できない。
 
 param(
-    # 2026-10-07本人判断で30日から14日へ短縮した(同時に取る回数を毎時から1日2回へ減らした。taskbox/lib/backup.ps1)。
+    # 2026-10-07本人判断で30日から14日へ短縮した(同時に取る回数を毎時から1日2回へ減らした。当時は taskbox/lib/backup.ps1 から呼ばれていた)。
     [int]$RetentionDays = 14
 )
 
@@ -93,8 +93,7 @@ function Write-Status([bool]$ok) {
 # WSL関連の失敗もこの経路へ合流させるため。中身は変えていない)。
 # 理由コードを1つ取り、Write-Status(backup-status.json)
 # → exit 1 という**このスクリプト唯一の異常終了経路**を通す。失敗は呼び出し側(ops\daily.ps1)が monocore の
-# inbox へ通知する(2026-10-09。それまでは taskbox の drain 報告板の run カードに error 行で出していた)。
-# 2026-09-05〜10-05 は板に出さず、ここから taskbox の queue へ調査タスクを積んでいた。
+# inbox へ通知する(2026-10-09。それ以前は taskbox の drain 報告板の run カードに出していた)。
 function Complete-BackupFailure([string]$ReasonCode, [string]$Message, [int]$ProcId) {
     # $ProcId は「taskkillに意味がある」呼び出し元だけが正の値を渡す(下の2節のコメント参照)。
     # 0 なら taskkill 自体を試みない(実害は無いが呼んでも何も終了できない段階のため)。
@@ -154,8 +153,8 @@ function ConvertTo-BoundedArgumentLine {
 # 下の「2. 本番の接続情報を解決」節にある dry-run のインライン実装と同じ設計。あちらは
 # 2026-09-09のインシデント対応で書いた**動作実績のあるコード**なので、共通化のために
 # 書き換えることはしない(このスクリプトは無人バックアップの本体で、書き換えの利得より
-# 退行のほうが高くつく)。taskbox 側に同型の実装(lib/proc.ps1)があるが**dot-sourceしない** —
-# 別リポジトリのファイルへ実行時依存すると、taskbox が無い環境でこのスクリプトが動かなくなる。
+# 退行のほうが高くつく)。ops 側に同型の実装(`ops\lib\proc.ps1`)があるが**dot-sourceしない** —
+# 別リポジトリのファイルへ実行時依存すると、ops が無い環境でこのスクリプトが動かなくなる。
 #
 # 戻り値: @{ ok; timedOut; exitCode; stdout; stderr; output; failure; message }
 #   failure は $null / spawn_failed / io_setup_failed / timeout / read_timeout / read_failed /
@@ -261,9 +260,9 @@ function Set-EnvVar {
 
 # pg_dump.exe の呼び出し。LC_MESSAGES=C で英語のメッセージを出させる(2026-09-30、独立レビューの指摘)。
 # 日本語ロケールの pg_dump.exe はエラー文を CP932 で出し、Invoke-BoundedProcess は UTF-8 として読むので
-# 文字化けする。エラー文はログ・backup-status.json・drain 報告板の run カードに載る(本人に届く唯一の経路)ので、
+# 文字化けする。エラー文はログ・backup-status.json・ops-daily の通知(monocore の inbox。本人に届く唯一の経路)に載るので、
 # 読めなければ意味が無い(旧 WSL 版は英語で出ていた)。ダンプ本文(SQL)はメッセージ翻訳の対象ではない
-# ので出力は変わらない。呼び出しの間だけ設定し、終わったら元へ戻す(drain と同じプロセスで動くため)。
+# ので出力は変わらない。呼び出しの間だけ設定し、終わったら元へ戻す(ops-daily の子プロセスだが、同じプロセス内の他の呼び出しに影響させないため)。
 function Invoke-PgDump {
     param([string]$Bin, [string[]]$Arguments, [int]$TimeoutSeconds, [string]$Label)
     $prev = $env:LC_MESSAGES
@@ -340,8 +339,8 @@ Write-Log ('pg_dump: ' + $pgDumpVersion + ' (' + $pgDumpBin + ')')
 #
 # ■ `npx`は.cmdファイルなので `[Diagnostics.Process]::Start` に直接渡せず(実測: FileNotFound)、
 #   `cmd.exe /c` 経由で起動する。`.Arguments`(単一文字列)を使う — `.ArgumentList` は
-#   Windows PowerShell 5.1に無く(実測)、taskbox READMEが5.1での手動実行を明示的に
-#   想定しているため避けた(今回の引数はどれもスペースを含まないので単純結合で安全)。
+#   Windows PowerShell 5.1に無く(実測)、5.1での手動実行も
+#   ありうるため避けた(今回の引数はどれもスペースを含まないので単純結合で安全)。
 #
 # ■ タイムアウト・失敗経路は複数箇所あり、`Complete-BackupFailure` に集約している
 #   (a) プロセス起動自体の失敗(`dryrun_spawn_failed`、taskkill無し=起動していないので不要)。
@@ -454,7 +453,7 @@ New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 $schemaPath = Join-Path $runDir 'schema.sql'
 $dataPath = Join-Path $runDir 'data.sql'
 
-# 環境の隔離(2026-09-30、独立レビューの指摘): Windows 側や drain のプロセスに PGSSLMODE / PGSERVICE /
+# 環境の隔離(2026-09-30、独立レビューの指摘): Windows 側や呼び出し元(ops-daily)のプロセスに PGSSLMODE / PGSERVICE /
 # PGOPTIONS / PGPASSFILE などがあると、pg_dump.exe がそれを受け継いでダンプの接続が黙って変わる。
 # 旧 WSL 版は WSLENV で渡した5つだけが見えていたので、それと同じにするため、既存の PG* をいったん
 # 全部退避して消し、終わったら戻す。
@@ -483,7 +482,7 @@ try {
     }
 
     if ($schemaRun.timedOut) {
-        # DB が応答していない可能性が高い。データも同じ上限だけ待つと、最悪 上限の2倍ぶん drain を塞ぐ。
+        # DB が応答していない可能性が高い。データも同じ上限だけ待つと、最悪 上限の2倍ぶん ops-daily の後続工程を待たせる。
         $problems += 'データダンプは、スキーマダンプがタイムアウトしたため省略した'
     } else {
         Write-Log 'データダンプ開始(pg_dump.exe)'
