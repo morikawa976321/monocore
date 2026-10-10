@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { formatHours, type GoalStatus } from '@/src/lib/schedules/free-time';
-import { GoalVerdict, PlacedBar, formatDue } from '@/src/components/plan/goal-format';
+import { GoalVerdict, PlacedBar } from '@/src/components/plan/goal-format';
+import { formatDue } from '@/src/lib/plan/goal-format';
 
 /** 帯に並べる目標の数。増えると予定の板が押し下げられるので、締切の近い順にここまで。 */
 const MAX_ROWS = 3;

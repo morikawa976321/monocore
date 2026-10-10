@@ -2,13 +2,14 @@
 
 import { useCallback, useMemo } from 'react';
 import { PageHeader } from '@/src/components/layout/PageHeader';
-import { CapacityChart, type CapacityDay } from '@/src/components/plan/CapacityChart';
+import { CapacityChart } from '@/src/components/plan/CapacityChart';
 import { GoalEditor } from '@/src/components/plan/GoalEditor';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { useNow } from '@/src/hooks/useNow';
 import { usePlanDayContents } from '@/src/hooks/usePlanDayContents';
 import { planGoalToInput, usePlanGoals } from '@/src/hooks/usePlanGoals';
 import { getDefaultTimezone } from '@/src/lib/date';
+import type { CapacityDay } from '@/src/lib/plan/capacity-chart';
 import {
     EMPTY_DAY,
     addDays,
