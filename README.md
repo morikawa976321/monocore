@@ -10,7 +10,8 @@
 
 | ルート | 役割 |
 | :--- | :--- |
-| `/schedules` | 予定の一覧・編集。日別メモ欄と inbox パネルを同居 |
+| `/schedules` | 予定の一覧・編集。日別メモ欄と inbox パネルを同居。ページ上部に期日前の目標の帯 |
+| `/plan` | 長期の計画。目標（この日までにこれを終える）の編集と、締切までの空きと必要時間の累計グラフ |
 | `/reports` | `mf/reports/` の読み取り専用ミラー |
 | `/news` | RSS で集めた記事の一覧（ソース別。読み取り専用） |
 
@@ -22,11 +23,17 @@
 - 各日セクションに記法制約なしの自由記述メモ欄（`schedule_day_notes`）。本人が読んで使う（回収してクリアする自動の主体は無い）。
 - inbox パネルを同居。ラップトップ（＝AI 側）が寝ている間に成立する唯一のモバイル書き込み経路なので、独立ルートは持たせていない。
 
+### Plan（`/plan`）
+
+- 目標は名前・期日・必要時間だけ（`plan_goals`）。進捗の列は持たず、「置いた時間」は名前を含む予定の合計を画面側で数える（目標を作った日から期日まで。過去は最大90日）。
+- 判定は締切の早い順の累計で「残り必要時間の累計 ≦ 今から締切までの自由時間」。自由時間の数え方（睡眠・非自由・自由の3区分）は `src/lib/schedules/free-time.ts`、規則の由来は `docs/decisions.md`。
+- 予定は読むだけで書き込まない。読み込んでいない日は既定予定どおり 0700 起床・2200-2300 消灯の予定の無い日として数える。
+
 ### News（`/news`）
 
 - RSS で集めた記事を `published` の新しい順に並べ、ソース別に絞り込んで読む面。記事のリンクは別タブで開く。
 - 収集は**このリポジトリの `scraper/`（Python）**が行う。タスクスケジューラが `pythonw.exe` で毎時 `run_once.py` を実行し、`link` 単位で upsert したあと保持期間（`scraper/config.json` の `max_age_days` = 8日）を過ぎた行を消す。取得先とブラックリストも `scraper/config.json`。
-- 2026-08-14 に別リポジトリ `mf/news_scraping`（JSONL 保存 + LAN 内 Flask）から移設した（**移設元はローカル・GitHub とも削除済み**。以降このリポジトリ内の記述にある「旧 news_scraping」は、コードがそう書かれている理由の説明であって、参照先ではない）。**`articles` は既存の導出物3つと違い、消えても再生成できない**（RSS は過去記事を配らない）。詳細は「データの正と書き込み規約」。
+- 2026-08-14 に別リポジトリ `mf/news_scraping`（JSONL 保存 + LAN 内 Flask）から移設した（**移設元はローカル・GitHub とも削除済み**。以降このリポジトリ内の記述にある「旧 news_scraping」は、コードがそう書かれている理由の説明であって、参照先ではない）。**`articles` は導出物（`reports`）と違い、消えても再生成できない**（RSS は過去記事を配らない）。詳細は「データの正と書き込み規約」。
 - **スクレーパーは `service_role` キーを持つ。** 認証情報はリポジトリではなく `~/.monocore/config.json` の `envs.remote` から読む。
 
 ---
@@ -46,7 +53,8 @@ npm run dev
 | :--- | :--- |
 | `npm run build` | 本番ビルド |
 | `npm start` | 本番サーバー起動 |
-| `npm test` | Vitest（単発） |
+| `npm test` | Vitest（単発）のあと `scraper/` の pytest（下記「Testing」） |
+| `npm run test:py` | `scraper/` の pytest だけ |
 | `npm run test:watch` | Vitest（ウォッチ） |
 | `npm run lint` | ESLint |
 
@@ -74,7 +82,7 @@ npm run dev
 
 ### Dev Tools
 
-- **Test:** Vitest
+- **Test:** Vitest（TypeScript）＋ pytest（`scraper/`）
 - **Lint:** ESLint（`eslint-config-next`）
 
 ---
@@ -113,6 +121,8 @@ monocore は AI 活用基盤（context-engine）の**人間向け窓口**であ�
 | `schedules` | 画面 / AI スキル | monocore |
 | `schedule_day_notes` / `schedule_day_revisions` | 画面 | monocore |
 | `inboxes` | 画面（単一 TEXT blob） | monocore |
+| `plan_goals` | 画面（`/plan`） | monocore |
+| `reports` | `service_role` のみ（`scripts/upsert-reports.mjs` が `mf/reports/*.md` を HTML にして upsert。ops-daily の `sync-reports.ps1` が毎日呼ぶ） | `mf/reports/` |
 | `articles` | `service_role` のみ（`scraper/` が毎時投入） | **このDB自身** |
 
 - **`articles` だけは「人間が書いたもの」でも「再生成できる導出物」でもない。** RSS は過去記事を配らないので、消えた記事は戻らない。保持は8日と決めたので失われうる最大値は「8日以内に読み逃した記事」であり、バックアップは持たない（2026-08-14・本人判断）。この分類がもう1つ増えるなら、そのとき改めて考える。
