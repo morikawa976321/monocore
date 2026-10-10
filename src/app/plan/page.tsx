@@ -29,7 +29,11 @@ const CHART_MIN_DAYS = 21;
 /** 期日の入力の上限（年の打ち間違いを入口で止める）。 */
 const MAX_DUE_YEARS = 3;
 
-const CARD = 'rounded border border-neutral-400 bg-neutral-50 p-4 dark:border-neutral-600 dark:bg-neutral-900';
+/** 囲みの外枠と見出しの帯は、予定の板の日付セクション（DaySection）に揃える。 */
+const CARD = 'rounded overflow-hidden border border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900';
+const CARD_HEADER =
+    'px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 font-normal text-neutral-700 dark:text-neutral-300';
+const CARD_BODY = 'px-2 sm:px-4 py-2';
 
 /** 長期の計画。目標（この日までにこれを終える）と、締切までに使える空きを比べる。 */
 export default function PlanPage() {
@@ -95,7 +99,9 @@ export default function PlanPage() {
         void addGoal({ name: '', due_on: addDays(now.today, 14), due_time: null, need_minutes: 0 });
     }, [addGoal, now]);
 
-    const isLoading = !now || goalsLoading || contentsLoading;
+    // 予定は読み直しても前の内容を持ったままなので、覆いを出すのは最初の読み込みだけにする（他のページと同じ）。
+    const isInitialLoading = !now || goalsLoading || (contentsLoading && contents.size === 0);
+    const isRefreshing = contentsLoading && !isInitialLoading;
     const error = goalsError ?? contentsError;
 
     return (
@@ -106,36 +112,55 @@ export default function PlanPage() {
                     void reloadGoals();
                     void reloadContents();
                 }}
+                isRefreshing={isRefreshing}
             >
-                {isLoading && <LoadingIndicator />}
+                {isInitialLoading && (
+                    <div className="inline-flex items-center gap-2">
+                        <LoadingIndicator />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
+                    </div>
+                )}
                 {error && <span className="text-sm text-amber-600 dark:text-amber-400">{error}</span>}
             </PageHeader>
 
-            <div className="flex-1 overflow-y-auto px-2 py-2 sm:px-6 sm:py-4">
-                <div className="mx-auto max-w-5xl space-y-4">
+            <div className="flex-1 overflow-hidden relative">
+                <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4">
                     {now && (
-                        <section className={`${CARD} space-y-2`}>
-                            <h2 className="text-base font-medium">目標</h2>
-                            <GoalEditor
-                                goals={goals}
-                                today={now.today}
-                                nowMinutes={now.nowMinutes}
-                                maxDueOn={addDays(now.today, 365 * MAX_DUE_YEARS)}
-                                statuses={statuses}
-                                onAdd={handleAdd}
-                                onUpdate={(id, patch) => void updateGoal(id, patch)}
-                                onRemove={(id) => void removeGoal(id)}
-                            />
+                        <section className={CARD}>
+                            <h2 className={CARD_HEADER}>目標</h2>
+                            <div className={CARD_BODY}>
+                                <GoalEditor
+                                    goals={goals}
+                                    today={now.today}
+                                    nowMinutes={now.nowMinutes}
+                                    maxDueOn={addDays(now.today, 365 * MAX_DUE_YEARS)}
+                                    statuses={statuses}
+                                    onAdd={handleAdd}
+                                    onUpdate={(id, patch) => void updateGoal(id, patch)}
+                                    onRemove={(id) => void removeGoal(id)}
+                                />
+                            </div>
                         </section>
                     )}
 
                     {now && (
-                        <section className={`${CARD} space-y-2`}>
-                            <h2 className="text-base font-medium">締切までの時間</h2>
-                            <CapacityChart days={chartDays} statuses={statuses} />
+                        <section className={CARD}>
+                            <h2 className={CARD_HEADER}>締切までの時間</h2>
+                            <div className={CARD_BODY}>
+                                <CapacityChart days={chartDays} statuses={statuses} />
+                            </div>
                         </section>
                     )}
                 </div>
+
+                {isInitialLoading && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-100/80 dark:bg-neutral-950/80">
+                        <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 rounded p-4">
+                            <LoadingIndicator />
+                            <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
