@@ -1,11 +1,12 @@
 /**
  * Supabase 呼び出しに上限を与えるための共通部品（2026-09-10追加）。
  *
- * 背景: taskbox の drain パイプラインは、報告板投入(upsert-drain-run.mjs)と reports 同期
- * (upsert-reports.mjs)を `node <script>` で呼んで**その終了を待つ**。supabase-js の
- * `.upsert()/.select()/.delete()` にはタイムアウトが無いため、ネットワーク越しの応答が
- * 返らないとこの node プロセスが居座り、呼び出し元(定時ジョブ)ごと止まる(taskbox の drain 時代は
- * `drain.lock` が解放されず、次の枠がスキップし続けた)。
+ * 背景: このリポジトリの DB 投入スクリプト(reports 同期 upsert-reports.mjs)は、定時ジョブ
+ * (mf/ops の ops-daily → sync-reports.ps1)が `node <script>` で呼んで**その終了を待つ**。
+ * supabase-js の `.upsert()/.select()/.delete()` にはタイムアウトが無いため、ネットワーク越しの
+ * 応答が返らないとこの node プロセスが居座り、呼び出し元の工程ごと止まる。実際に起きた例:
+ * この部品を足した 2026-09-10 当時の定時ジョブ(taskbox。2026-10-09 に廃止)は多重起動防止の
+ * ロックファイルを持っていて、node が返らないままロックが解放されず、次の枠が毎回スキップし続けた。
  *
  * ここが保証するのは「**返ってくること**」だけで、失敗の扱いは呼び出し元
  * (ops/sync-reports.ps1)の既存のエラーハンドリングに委ねる。

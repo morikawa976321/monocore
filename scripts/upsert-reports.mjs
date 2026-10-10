@@ -65,10 +65,12 @@ const REQUEST_TIMEOUT_MS = resolveTimeoutMs(
 const WATCHDOG_MS = resolveTimeoutMs(process.env.UPSERT_WATCHDOG_MS, 10 * 60_000)
 
 /**
- * process.exit() は使わない。2026-08-12から taskbox/sync-reports.ps1（drainの工程）が
- * 出力をパイプで受けて呼ぶようになったため、保留中のstdioハンドルを抱えたまま即時終了すると
- * Windowsのlibuvが "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)" を吐き、
- * 本当の失敗理由の隣に並んで原因の切り分けを鈍らせる（upsert-drain-run.mjs と同じ対処）。
+ * process.exit() は使わない。呼び出し元(ops/sync-reports.ps1。2026-08-12 の導入時は taskbox 側の
+ * 同名スクリプト)がこのスクリプトの出力を**パイプで受けて**呼ぶため、保留中の stdio ハンドルを
+ * 抱えたまま即時終了すると Windows の libuv が
+ * "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)" を吐き、本当の失敗理由の隣に並んで
+ * 原因の切り分けを鈍らせる。代わりに失敗はこの例外で最上位まで上げ、process.exitCode に 1 を
+ * 入れて自然に終了させる(stdio を書き切ってから終わるので上の assertion は出ない)。
  */
 class ReportSyncError extends Error {}
 
