@@ -19,8 +19,6 @@ export type CapacityColumn = CapacityDay & { c0: number; c1: number };
 /** 締切の点。位置は % で、線は前の点（fromX, fromY）から階段状に引く。 */
 export type CapacityMark = {
     status: GoalStatus;
-    /** 締切の早い順の番号。ラベルを2段に交互に置くのに使う。 */
-    k: number;
     mx: number;
     my: number;
     fromX: number;
@@ -102,13 +100,12 @@ export function layoutCapacityChart(days: CapacityDay[], statuses: GoalStatus[])
 
     // 必要時間の線は前の締切の点から次の締切の点へ階段状に引く。最初の点は原点から。
     const marks: CapacityMark[] = [];
-    upcoming.forEach((status, k) => {
+    upcoming.forEach((status) => {
         const i = days.findIndex((d) => d.date === status.goal.dueOn);
         const within = positionWithinDay(days[i], status.goal.dueMinutes);
         const prev = marks[marks.length - 1];
         marks.push({
             status,
-            k,
             mx: x(i + within),
             my: y(status.cumulativeMinutes),
             fromX: prev ? prev.mx : 0,
@@ -117,4 +114,27 @@ export function layoutCapacityChart(days: CapacityDay[], statuses: GoalStatus[])
     });
 
     return { cols, step, yMax, ticks, upcoming, marks, y, x, columnWidthPercent: 100 / n };
+}
+
+/** ラベル1つ。anchor は締切の線の横位置（px）、width は描いた幅（px）。 */
+export type LabelBox = { anchor: number; width: number };
+export type LabelPlacement = { left: number[]; row: number[]; rows: number };
+
+/**
+ * 締切のラベルを、重ならない段に振り分ける。ラベルは右端を締切の線に揃え、
+ * はみ出すなら [minLeft, maxRight] に押し戻す。左から順に、置ける一番下の段（0 が線に最も近い）へ置く。
+ * 段の数は必要なだけ増える（固定の2段交互では、締切が近い日に3つ以上あると重なった）。
+ */
+export function placeLabels(labels: LabelBox[], minLeft: number, maxRight: number, gap: number): LabelPlacement {
+    const left = labels.map(({ anchor, width }) => Math.max(minLeft, Math.min(anchor, maxRight) - width));
+    const row = labels.map(() => 0);
+    const rowEnds: number[] = [];
+    const order = labels.map((_, i) => i).sort((a, b) => left[a] - left[b] || a - b);
+    for (const i of order) {
+        let r = rowEnds.findIndex((end) => end + gap <= left[i]);
+        if (r === -1) r = rowEnds.push(0) - 1;
+        row[i] = r;
+        rowEnds[r] = left[i] + labels[i].width;
+    }
+    return { left, row, rows: rowEnds.length };
 }

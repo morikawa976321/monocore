@@ -6,6 +6,7 @@ import {
     isMonday,
     layoutCapacityChart,
     niceStep,
+    placeLabels,
     positionWithinDay,
     shortDate,
 } from './capacity-chart';
@@ -175,13 +176,11 @@ describe('layoutCapacityChart', () => {
         // 6h total → yMax 10h.
         expect(layout.yMax).toBe(10);
         const [m1, m2] = layout.marks;
-        expect(m1.k).toBe(0);
         expect(m1.fromX).toBe(0);
         expect(m1.fromY).toBe(0);
         // 15:00 is halfway between 07:00 and 23:00 → middle of the first column.
         expect(m1.mx).toBeCloseTo((0.5 / 3) * 100);
         expect(m1.my).toBeCloseTo(10);
-        expect(m2.k).toBe(1);
         expect(m2.fromX).toBe(m1.mx);
         expect(m2.fromY).toBe(m1.my);
         // No time → end of the third column, which is the right edge.
@@ -194,5 +193,42 @@ describe('layoutCapacityChart', () => {
         const layout = layoutCapacityChart([day('2026-10-10', 60), late], [status('a', '2026-10-11', 12 * 60, 30)])!;
         // 12:00 is a quarter of the way from 09:00 to 21:00 → 1.25 days of 2.
         expect(layout.marks[0].mx).toBeCloseTo((1.25 / 2) * 100);
+    });
+});
+
+describe('placeLabels', () => {
+    it('right-aligns each label to its line and keeps separated labels on the bottom row', () => {
+        const p = placeLabels([{ anchor: 100, width: 50 }, { anchor: 300, width: 50 }], -48, 600, 8);
+        expect(p.left).toEqual([50, 250]);
+        expect(p.row).toEqual([0, 0]);
+        expect(p.rows).toBe(1);
+    });
+
+    it('stacks as many rows as overlapping labels need, reusing a lower row once it is free', () => {
+        // 3 labels on nearly the same day overlap each other; the 4th is far enough to go back to row 0.
+        const p = placeLabels(
+            [
+                { anchor: 200, width: 120 },
+                { anchor: 210, width: 120 },
+                { anchor: 220, width: 120 },
+                { anchor: 500, width: 100 },
+            ],
+            -48,
+            600,
+            8
+        );
+        expect(p.row).toEqual([0, 1, 2, 0]);
+        expect(p.rows).toBe(3);
+    });
+
+    it('requires the gap between labels on the same row', () => {
+        const p = placeLabels([{ anchor: 100, width: 100 }, { anchor: 205, width: 100 }], 0, 600, 8);
+        // ends at 100, next starts at 105 → less than the 8px gap → next row.
+        expect(p.row).toEqual([0, 1]);
+    });
+
+    it('pushes a label that would stick out back inside the bounds', () => {
+        const p = placeLabels([{ anchor: 10, width: 120 }, { anchor: 700, width: 50 }], -48, 600, 8);
+        expect(p.left).toEqual([-48, 550]);
     });
 });
