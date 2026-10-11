@@ -373,6 +373,16 @@ $dryRunTimeoutSeconds = 120  # 通常は数十秒未満で終わる工程(実測
                               # 約11秒)。無人パイプラインを何時間も塞がないための上限
 $dryRunReadTimeoutSeconds = 15  # プロセス終了後、標準出力/エラーの読み切りに許す追加の猶予
 
+# ■ 一過性の失敗だけ1回再試行する(2026-10-11、本人指示「DBバックアップだけ再試行をつけて」)
+#   2026-09-30・10-01(timeout)と 10-11 10:17(credentials_failed)の3回は、どれも数分後の再実行で通った。
+#   再試行するのは実際に起きたこの2種類だけ。起動・入出力の失敗は一過性の実績が無いので即失敗のまま
+#   (ops\lib\retry.ps1 と同じく、網を広げると直らない失敗に毎回撃つことになる)。
+#   回数・間隔は実測に基づかない暫定値。最悪でも 120+15+60 秒延びるだけで、ops-daily の上限(db=2400秒)に収まる。
+$dryRunMaxAttempts = 2
+$dryRunRetryDelaySeconds = 60
+for ($dryRunAttempt = 1; $dryRunAttempt -le $dryRunMaxAttempts; $dryRunAttempt++) {
+$canRetryDryRun = ($dryRunAttempt -lt $dryRunMaxAttempts)
+
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = "$env:ComSpec"
 $psi.Arguments = '/c npx --yes supabase db dump --linked --dry-run'
@@ -401,6 +411,13 @@ try {
 }
 
 $dryRunExited = $dryRunProc.WaitForExit($dryRunTimeoutSeconds * 1000)
+if (-not $dryRunExited -and $canRetryDryRun) {
+    try { & taskkill /T /F /PID $dryRunProc.Id 2>&1 | Out-Null } catch {}
+    Write-Log ("npx supabase db dump --linked --dry-run が{0}秒応答なし。{1}秒後に再試行({2}/{3})" -f `
+        $dryRunTimeoutSeconds, $dryRunRetryDelaySeconds, ($dryRunAttempt + 1), $dryRunMaxAttempts)
+    Start-Sleep -Seconds $dryRunRetryDelaySeconds
+    continue
+}
 if (-not $dryRunExited) {
     Complete-BackupFailure 'timeout' `
         ("npx supabase db dump --linked --dry-run が{0}秒応答なしのため打ち切った" -f $dryRunTimeoutSeconds) `
@@ -431,6 +448,16 @@ $pgPort = Get-DryRunVar 'PGPORT' $dryRunOut
 $pgUser = Get-DryRunVar 'PGUSER' $dryRunOut
 $pgPassword = Get-DryRunVar 'PGPASSWORD' $dryRunOut
 $pgDatabase = Get-DryRunVar 'PGDATABASE' $dryRunOut
+
+$dryRunResolved = ($pgHost -and $pgPort -and $pgUser -and $pgPassword -and $pgDatabase)
+if ($dryRunResolved) { break }
+if ($canRetryDryRun) {
+    Write-Log ("npx supabase db dump --linked --dry-run から接続情報を解決できなかった。{0}秒後に再試行({1}/{2})" -f `
+        $dryRunRetryDelaySeconds, ($dryRunAttempt + 1), $dryRunMaxAttempts)
+    Start-Sleep -Seconds $dryRunRetryDelaySeconds
+    continue
+}
+}  # for $dryRunAttempt(本体は2026-09-09の実装のまま字下げせず包んでいる。差分を再試行の分だけに留めるため)
 
 if (-not $pgHost -or -not $pgPort -or -not $pgUser -or -not $pgPassword -or -not $pgDatabase) {
     $reason = 'credentials_failed'
