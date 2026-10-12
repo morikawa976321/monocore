@@ -3,7 +3,7 @@ import { Undo2 } from 'lucide-react';
 import { FreeTimeStrip } from '@/src/components/plan/FreeTimeStrip';
 import { AutoHeightTextarea } from '@/src/components/schedules/AutoHeightTextarea';
 import { Button } from '@/src/components/ui/Button';
-import { analyzeDayContent, formatHours } from '@/src/lib/schedules/free-time';
+import { analyzeDayContent } from '@/src/lib/schedules/free-time';
 import { findDayContentIssues, type DayContentIssue, type DayEntry } from '@/src/lib/schedules/text-format';
 
 const ISSUE_TEXT: Record<DayContentIssue['kind'], string> = {
@@ -29,7 +29,7 @@ type DaySectionProps = {
     onBlur: () => void;
     // DB同期中は編集を無効化する。
     isReadOnly?: boolean;
-    // 今日だけ渡す。空きの帯に今の時刻の線を引く。
+    // 今日だけ渡す。3色の帯に今の時刻の線を引く。
     nowMinutes?: number;
 };
 
@@ -47,7 +47,7 @@ export function DaySection({
 }: DaySectionProps) {
     const [previousContent, setPreviousContent] = useState<string | null>(null);
     // 打つたびに再計算する（1日分なので軽い）。/plan の目標の判定と同じ計算。
-    const freeTime = useMemo(() => analyzeDayContent(entry.content), [entry.content]);
+    const dayAnalysis = useMemo(() => analyzeDayContent(entry.content), [entry.content]);
     // 不正な行がある日は保存されない(useSchedules.saveDay)。何を直せばよいかはバッジのツールチップに出す。
     const issues = useMemo(() => findDayContentIssues(entry.content), [entry.content]);
     const canUndo = previousContent !== null && previousContent !== entry.content;
@@ -86,21 +86,14 @@ export function DaySection({
                         Invalid format
                     </span>
                 </div>
-                {/* 空きの帯は見出し行の中に置き、カードの高さを増やさない(下の最低高のコメントと同じ理由で、
-                    60日分のスクロール長が伸びるのを避ける)。スマホは幅が無いので数値だけ。 */}
+                {/* 3色の帯は見出し行の中に置き、カードの高さを増やさない(下の最低高のコメントと同じ理由で、
+                    60日分のスクロール長が伸びるのを避ける)。スマホは幅が無いので出さない。
+                    空き時間の数値は出さない(本人指定 2026-10-13。計画の機能はこの帯だけ)。 */}
                 <div className="hidden sm:block min-w-0 flex-1 px-4">
-                    <FreeTimeStrip analysis={freeTime} nowMinutes={isToday ? nowMinutes : undefined} />
+                    <FreeTimeStrip analysis={dayAnalysis} nowMinutes={isToday ? nowMinutes : undefined} />
                 </div>
-                <div className="flex items-center gap-4">
-                    {/* 数値と元に戻すボタンも幅を固定し、帯の右端をずらさない。 */}
-                    <div className="sm:w-20 sm:text-right text-neutral-700 dark:text-neutral-300">
-                        <span>
-                            空き{' '}
-                            <span className="font-medium text-neutral-900 dark:text-neutral-50">
-                                {formatHours(freeTime.freeMinutes)}h
-                            </span>
-                        </span>
-                    </div>
+                {/* 元に戻すボタンは幅を固定し、帯の右端をずらさない。 */}
+                <div className="flex items-center">
                     {canUndo ? (
                         <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150">
                             <Button

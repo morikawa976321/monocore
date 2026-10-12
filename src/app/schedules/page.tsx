@@ -3,23 +3,12 @@
 import { useMemo } from 'react';
 import { createClient } from '@/src/lib/supabase/client';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
-import { GoalBar } from '@/src/components/plan/GoalBar';
 import { DaySection } from '@/src/components/schedules/DaySection';
 import { Button } from '@/src/components/ui/Button';
 import { useInbox } from '@/src/hooks/useInbox';
 import { useDayNotes } from '@/src/hooks/useDayNotes';
 import { useNow } from '@/src/hooks/useNow';
-import { usePlanDayContents } from '@/src/hooks/usePlanDayContents';
-import { planGoalToInput, usePlanGoals } from '@/src/hooks/usePlanGoals';
 import { useSchedules } from '@/src/hooks/useSchedules';
-import { getDefaultTimezone } from '@/src/lib/date';
-import {
-    analyzeDayContent,
-    daysBetween,
-    evaluateGoals,
-    placedCountStart,
-    type DayAnalysis,
-} from '@/src/lib/schedules/free-time';
 import { dateLabelToDateStr } from '@/src/lib/schedules/text-format';
 import { Inbox } from 'lucide-react';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
@@ -63,32 +52,7 @@ export default function SchedulesPage() {
         saveInboxNow,
     });
 
-    const { goals } = usePlanGoals(supabase);
-    const timezone = useMemo(() => getDefaultTimezone(), []);
     const now = useNow();
-    const goalInputs = useMemo(() => goals.map((g) => planGoalToInput(g, timezone)), [goals, timezone]);
-    // 置いた時間は目標を作った日から数える(/plan と同じ)。板が読んでいない過去の日は別に読む。
-    const pastStart = now ? placedCountStart(goalInputs, now.today) : null;
-    const { contents: pastContents } = usePlanDayContents(
-        supabase,
-        pastStart,
-        now && pastStart ? daysBetween(pastStart, now.today) : 0
-    );
-    // 目標の帯の数字。打つたびに計算し直す。板が読み込んだ範囲(概ね今日から2ヶ月先)より先の日は
-    // 予定の無い日(07:00〜23:30 が空き)として数える。
-    const goalStatuses = useMemo(() => {
-        if (!now || isInitialSyncing || goalInputs.length === 0) return [];
-        const days = new Map<string, DayAnalysis>();
-        for (const [date, content] of pastContents) days.set(date, analyzeDayContent(content));
-        // 板が読んだ日は、打ちかけの内容を優先する。
-        for (const e of entries) days.set(dateLabelToDateStr(e.dateLabel), analyzeDayContent(e.content));
-        return evaluateGoals({
-            goals: goalInputs,
-            days,
-            today: now.today,
-            nowMinutes: now.nowMinutes,
-        });
-    }, [entries, pastContents, goalInputs, now, isInitialSyncing]);
 
     const handleInboxToggle = () => {
         if (inboxOpen) saveInboxNow();
@@ -129,8 +93,7 @@ export default function SchedulesPage() {
                 </div>
             </PageHeader>
 
-            <GoalBar statuses={goalStatuses} />
-            {/* 一覧の上の余白はスクロールの外に置く。中に置くとスクロールで消え、日カードが上の帯に直接接して
+            {/* 一覧の上の余白はスクロールの外に置く。中に置くとスクロールで消え、日カードが上のヘッダーに直接接して
                 境目が分からなくなる(2026-10-07 本人指摘)。 */}
             <div className="h-1 sm:h-4 shrink-0" aria-hidden="true" />
 

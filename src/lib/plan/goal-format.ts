@@ -1,7 +1,7 @@
 /**
- * /plan とスケジュール画面の目標の帯が共有する、目標の表示用の計算。
+ * /plan の目標の表示用の計算。
  * 判定そのもの（累計・締切までの空き）は src/lib/schedules/free-time.ts の evaluateGoals が持ち、
- * ここはその結果を表示の形（期日の文字列・余裕か不足か・置いた割合）にするだけ。
+ * ここはその結果を表示の形（期日の文字列・余裕か不足か）にするだけ。
  */
 import type { GoalStatus } from '@/src/lib/schedules/free-time';
 
@@ -29,9 +29,4 @@ export function goalVerdict(status: GoalStatus): GoalVerdictResult {
     if (status.past) return { kind: 'past' };
     if (status.ok) return { kind: 'ok', marginMinutes: status.supplyMinutes - status.cumulativeMinutes };
     return { kind: 'short', deficitMinutes: status.cumulativeMinutes - status.supplyMinutes };
-}
-
-/** 置いた時間 / 必要な時間（0..1）。必要な時間が 0 なら 0、置きすぎは 1 で止める。 */
-export function placedRatio(placedMinutes: number, needMinutes: number): number {
-    return needMinutes > 0 ? Math.min(1, placedMinutes / needMinutes) : 0;
 }

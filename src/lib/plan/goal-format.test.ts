@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GoalStatus } from '@/src/lib/schedules/free-time';
-import { formatDue, goalVerdict, placedRatio } from './goal-format';
+import { formatDue, goalVerdict } from './goal-format';
 
 function status(partial: Partial<GoalStatus> & { needMinutes?: number }): GoalStatus {
     const { needMinutes = 0, ...rest } = partial;
@@ -65,22 +65,5 @@ describe('goalVerdict', () => {
             kind: 'short',
             deficitMinutes: 50,
         });
-    });
-});
-
-describe('placedRatio', () => {
-    it('is 0 when nothing is needed, even if time was placed', () => {
-        expect(placedRatio(0, 0)).toBe(0);
-        expect(placedRatio(60, 0)).toBe(0);
-    });
-
-    it('is the placed share of the need', () => {
-        expect(placedRatio(30, 120)).toBe(0.25);
-        expect(placedRatio(0, 120)).toBe(0);
-    });
-
-    it('caps at 1 when more was placed than needed', () => {
-        expect(placedRatio(120, 120)).toBe(1);
-        expect(placedRatio(180, 120)).toBe(1);
     });
 });
