@@ -46,22 +46,28 @@ describe('goalVerdict', () => {
         });
     });
 
+    it('reports done when nothing remains, even if earlier deadlines push the cumulative demand over the supply', () => {
+        expect(
+            goalVerdict(status({ needMinutes: 240, remainingMinutes: 0, ok: true, cumulativeMinutes: 240, supplyMinutes: 0 }))
+        ).toEqual({ kind: 'done' });
+    });
+
     it('reports the margin as supply minus cumulative demand', () => {
-        expect(goalVerdict(status({ ok: true, cumulativeMinutes: 90, supplyMinutes: 150 }))).toEqual({
+        expect(goalVerdict(status({ needMinutes: 60, ok: true, cumulativeMinutes: 90, supplyMinutes: 150 }))).toEqual({
             kind: 'ok',
             marginMinutes: 60,
         });
     });
 
     it('treats an exact fit as ok with zero margin', () => {
-        expect(goalVerdict(status({ ok: true, cumulativeMinutes: 120, supplyMinutes: 120 }))).toEqual({
+        expect(goalVerdict(status({ needMinutes: 60, ok: true, cumulativeMinutes: 120, supplyMinutes: 120 }))).toEqual({
             kind: 'ok',
             marginMinutes: 0,
         });
     });
 
     it('reports the deficit as cumulative demand minus supply', () => {
-        expect(goalVerdict(status({ ok: false, cumulativeMinutes: 200, supplyMinutes: 150 }))).toEqual({
+        expect(goalVerdict(status({ needMinutes: 60, ok: false, cumulativeMinutes: 200, supplyMinutes: 150 }))).toEqual({
             kind: 'short',
             deficitMinutes: 50,
         });

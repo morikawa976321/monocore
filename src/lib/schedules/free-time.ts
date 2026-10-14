@@ -241,7 +241,8 @@ export function evaluateGoals(params: {
             remainingMinutes: remaining,
             cumulativeMinutes: past ? 0 : cumulative,
             supplyMinutes: supply,
-            ok: past || cumulative <= supply,
+            // 自分の残りが 0 なら、足りないのは先の締切の目標であって、この目標ではない。
+            ok: past || remaining === 0 || cumulative <= supply,
         };
     });
 }

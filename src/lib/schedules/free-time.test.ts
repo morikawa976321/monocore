@@ -134,6 +134,20 @@ describe('evaluateGoals', () => {
         expect(late.ok).toBe(false);
     });
 
+    it('does not blame a goal whose remaining time is zero for an earlier deadline running short', () => {
+        const goals = [
+            // 10/7 の締切までは空きが 5h しか無いのに 20h 必要 → 不足
+            goal({ id: 'early', name: '課題A', dueOn: '2026-10-07', needMinutes: h(20) }),
+            // 10/8 の 論文の図 は 3h 置いてあり、必要 3h を満たしている → 先の不足を引き継がない
+            goal({ id: 'done', name: '論文の図', dueOn: '2026-10-08', needMinutes: h(3) }),
+        ];
+        const [early, done] = evaluateGoals({ ...base, goals });
+        expect(early.ok).toBe(false);
+        expect(done.remainingMinutes).toBe(0);
+        expect(done.cumulativeMinutes).toBe(h(20));
+        expect(done.ok).toBe(true);
+    });
+
     it('marks goals whose deadline has passed and leaves them out of the cumulative check', () => {
         const goals = [
             goal({ id: 'old', name: 'X', dueOn: '2026-10-06', needMinutes: h(100) }),

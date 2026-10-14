@@ -6,7 +6,10 @@ import { goalVerdict } from '@/src/lib/plan/goal-format';
 export function GoalVerdict({ status }: { status: GoalStatus }) {
     const verdict = goalVerdict(status);
     if (verdict.kind === 'past') {
-        return <span className="text-neutral-700 dark:text-neutral-300">期日を過ぎました</span>;
+        return <span className="text-neutral-500">期日を過ぎました</span>;
+    }
+    if (verdict.kind === 'done') {
+        return <span className="text-neutral-700 dark:text-neutral-300">必要時間を置きました</span>;
     }
     if (verdict.kind === 'ok') {
         return (

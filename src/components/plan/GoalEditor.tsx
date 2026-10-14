@@ -56,6 +56,9 @@ export function GoalEditor({ goals, today, nowMinutes, maxDueOn, statuses, onAdd
                     {sorted.map((g) => {
                         const s = statusById.get(g.id);
                         const savedDue = toDueInputString(g.due_on, g.due_time);
+                        // 期日を過ぎた目標は文字をグレーにして、有効なものと見分ける
+                        const expired = s?.past ?? false;
+                        const mutedText = expired ? 'text-neutral-500' : 'text-neutral-700 dark:text-neutral-300';
                         return (
                             <li key={g.id} className="space-y-1 py-2">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -63,6 +66,7 @@ export function GoalEditor({ goals, today, nowMinutes, maxDueOn, statuses, onAdd
                                     <div className="min-w-0 flex-1 basis-60">
                                         <Input
                                             key={`name-${g.name}`}
+                                            muted={expired}
                                             defaultValue={g.name}
                                             placeholder="名前"
                                             aria-label="目標の名前"
@@ -74,6 +78,7 @@ export function GoalEditor({ goals, today, nowMinutes, maxDueOn, statuses, onAdd
                                     <div className="w-36 shrink-0">
                                         <Input
                                             key={`due-${savedDue}`}
+                                            muted={expired}
                                             defaultValue={savedDue}
                                             inputMode="numeric"
                                             aria-label="期日"
@@ -90,11 +95,12 @@ export function GoalEditor({ goals, today, nowMinutes, maxDueOn, statuses, onAdd
                                             }}
                                         />
                                     </div>
-                                    <label className="inline-flex items-center gap-1 whitespace-nowrap text-sm text-neutral-700 dark:text-neutral-300">
+                                    <label className={`inline-flex items-center gap-1 whitespace-nowrap text-sm ${mutedText}`}>
                                         必要
                                         <span className="w-16">
                                             <Input
                                                 key={`need-${g.need_minutes}`}
+                                                muted={expired}
                                                 defaultValue={needText(g.need_minutes)}
                                                 inputMode="decimal"
                                                 aria-label="必要時間"
@@ -116,7 +122,7 @@ export function GoalEditor({ goals, today, nowMinutes, maxDueOn, statuses, onAdd
                                     </Button>
                                 </div>
                                 {s && (
-                                    <div className="flex flex-wrap items-center gap-x-4 text-sm text-neutral-700 dark:text-neutral-300">
+                                    <div className={`flex flex-wrap items-center gap-x-4 text-sm ${mutedText}`}>
                                         <span>置いた {formatHours(s.placedMinutes)}h</span>
                                         {!s.past && <span>締切までの空き {formatHours(s.supplyMinutes)}h</span>}
                                         <GoalVerdict status={s} />

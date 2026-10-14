@@ -20,6 +20,8 @@ export function formatDue(dueOn: string, dueMinutes: number | null): string {
 
 export type GoalVerdictResult =
     | { kind: 'past' }
+    /** 必要時間をすべて置いた。先の締切の目標が足りなくても、この目標の不足ではない。 */
+    | { kind: 'done' }
     /** 余裕 = 締切までの空き − 残り必要時間の累計（ちょうど 0 も余裕側）。 */
     | { kind: 'ok'; marginMinutes: number }
     | { kind: 'short'; deficitMinutes: number };
@@ -27,6 +29,7 @@ export type GoalVerdictResult =
 /** 余裕（締切までの空き − 残り必要時間の累計）か、不足を出す。 */
 export function goalVerdict(status: GoalStatus): GoalVerdictResult {
     if (status.past) return { kind: 'past' };
+    if (status.remainingMinutes === 0) return { kind: 'done' };
     if (status.ok) return { kind: 'ok', marginMinutes: status.supplyMinutes - status.cumulativeMinutes };
     return { kind: 'short', deficitMinutes: status.cumulativeMinutes - status.supplyMinutes };
 }
