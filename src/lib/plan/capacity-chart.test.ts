@@ -26,7 +26,7 @@ function status(
     extra: Partial<GoalStatus> = {}
 ): GoalStatus {
     return {
-        goal: { id, name: id, dueOn, dueMinutes, needMinutes: cumulativeMinutes, countFrom: '2026-10-01' },
+        goal: { id, name: id, dueOn, dueMinutes, needMinutes: cumulativeMinutes },
         past: false,
         placedMinutes: 0,
         remainingMinutes: cumulativeMinutes,

@@ -8,15 +8,12 @@ import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { useNow } from '@/src/hooks/useNow';
 import { usePlanDayContents } from '@/src/hooks/usePlanDayContents';
 import { planGoalToInput, usePlanGoals } from '@/src/hooks/usePlanGoals';
-import { getDefaultTimezone } from '@/src/lib/date';
 import type { CapacityDay } from '@/src/lib/plan/capacity-chart';
 import {
     EMPTY_DAY,
     addDays,
     analyzeDayContent,
-    daysBetween,
     evaluateGoals,
-    placedCountStart,
     freeMinutesBetween,
     type DayAnalysis,
 } from '@/src/lib/schedules/free-time';
@@ -38,24 +35,17 @@ const CARD_BODY = 'px-2 sm:px-4 py-2';
 /** 長期の計画。目標（この日までにこれを終える）と、締切までに使える空きを比べる。 */
 export default function PlanPage() {
     const supabase = useMemo(() => createClient(), []);
-    const timezone = useMemo(() => getDefaultTimezone(), []);
     const now = useNow();
     const { goals, isLoading: goalsLoading, error: goalsError, reload: reloadGoals, addGoal, updateGoal, removeGoal } =
         usePlanGoals(supabase);
-    const goalInputs = useMemo(() => goals.map((g) => planGoalToInput(g, timezone)), [goals, timezone]);
-    // 置いた時間を数えるために、目標を作った日（最大 PLACED_LOOKBACK_DAYS 日前）から読む。
-    // 目標が届く前に今日から読み始めると、範囲が変わって2回読むことになるので待つ。
-    const startDay = now && !goalsLoading ? placedCountStart(goalInputs, now.today) : null;
+    const goalInputs = useMemo(() => goals.map(planGoalToInput), [goals]);
+    // 置いた時間は現在時刻より後の予定だけを数えるので、今日から先だけ読む。
     const {
         contents,
         isLoading: contentsLoading,
         error: contentsError,
         reload: reloadContents,
-    } = usePlanDayContents(
-        supabase,
-        startDay,
-        now && startDay ? daysBetween(startDay, now.today) + HORIZON_DAYS : 0
-    );
+    } = usePlanDayContents(supabase, now?.today ?? null, now ? HORIZON_DAYS : 0);
 
     const analyses = useMemo(() => {
         const map = new Map<string, DayAnalysis>();

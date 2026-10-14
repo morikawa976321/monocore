@@ -129,14 +129,20 @@ export function daysBetween(a: string, b: string): number {
     return Math.round((toUtc(b) - toUtc(a)) / 86400000);
 }
 
-/** 「置いた時間」を数えるために過去の予定を読む上限の日数。両画面で同じ値を使う。 */
-export const PLACED_LOOKBACK_DAYS = 90;
-
-/** 置いた時間を数えるために読む過去の最初の日。目標が無い・今日作ったものだけなら今日。 */
-export function placedCountStart(goals: GoalInput[], today: string): string {
-    const earliest = goals.reduce((min, g) => (g.countFrom < min ? g.countFrom : min), today);
-    const floor = addDays(today, -PLACED_LOOKBACK_DAYS);
-    return earliest < floor ? floor : earliest;
+/**
+ * 予定の内容が目標の名前を「語として」含むか。名前の前後が行頭・行末か空白（スペース・改行）のときだけ
+ * 当たる。"xyz" に対して "xyz" "xyz abc" は当たり、"xyzabc" "abcxyz" は当たらない。
+ * 複数行の予定は parseBlocks が空白でつないでいるので、改行も空白として扱われる。
+ */
+export function activityMatchesName(activity: string, name: string): boolean {
+    if (!name) return false;
+    for (let i = activity.indexOf(name); i !== -1; i = activity.indexOf(name, i + 1)) {
+        const before = i === 0 || /\s/.test(activity[i - 1]);
+        const end = i + name.length;
+        const after = end === activity.length || /\s/.test(activity[end]);
+        if (before && after) return true;
+    }
+    return false;
 }
 
 /** 予定の無い日（0700 起床・2200-2300 消灯だけの日）。読み込んでいない日の代わりに使う。 */
@@ -156,18 +162,13 @@ export type GoalInput = {
     /** 期日の時刻（分）。null ならその日の終わりまで。 */
     dueMinutes: number | null;
     needMinutes: number;
-    /**
-     * 「置いた時間」を数え始める日（目標を作った日）。両画面で同じ値を使い、読み込んだ範囲で
-     * 数字が変わらないようにする（スクロールで過去を読むほど増える・日付が変わると戻る、を防ぐ）。
-     */
-    countFrom: string;
 };
 
 export type GoalStatus = {
     goal: GoalInput;
     /** 期日が今より前。間に合うかの判定から外す。 */
     past: boolean;
-    /** 予定のうち、名前を含むものの合計（数え始めの日から期日まで）。 */
+    /** 予定のうち、名前を語として含むものの、現在時刻から期日までの合計。 */
     placedMinutes: number;
     remainingMinutes: number;
     /** 期日の早い順に並べたときの、この目標までの残り必要時間の累計。 */
@@ -193,21 +194,21 @@ export function evaluateGoals(params: {
     const dueOf = (g: GoalInput) => g.dueMinutes ?? DAY_MINUTES;
     const sorted = [...goals].sort((a, b) => (a.dueOn === b.dueOn ? dueOf(a) - dueOf(b) : a.dueOn < b.dueOn ? -1 : 1));
     const freeOn = (date: string, from: number, to: number) => freeMinutesBetween(days.get(date) ?? EMPTY_DAY, from, to);
-    // 置いた時間を数える範囲は両画面とも PLACED_LOOKBACK_DAYS 日前まで（それより前は /plan が読まない）。
-    const countFloor = addDays(today, -PLACED_LOOKBACK_DAYS);
     let cumulative = 0;
     return sorted.map((goal) => {
         const due = dueOf(goal);
         const past = goal.dueOn < today || (goal.dueOn === today && due <= nowMinutes);
         const name = goal.name.trim();
+        // 置いた時間は、現在時刻より後の分だけ（過去の予定と、今日の今までの分は数えない）。
         let placed = 0;
         if (name) {
             for (const date of knownDates) {
-                if (date < goal.countFrom || date < countFloor || date > goal.dueOn) continue;
+                if (date < today || date > goal.dueOn) continue;
+                const floor = date === today ? nowMinutes : 0;
                 const limit = date === goal.dueOn ? due : DAY_MINUTES;
                 for (const e of days.get(date)!.events) {
-                    if (!e.activity.includes(name)) continue;
-                    placed += Math.max(0, Math.min(e.end, limit) - e.start);
+                    if (!activityMatchesName(e.activity, name)) continue;
+                    placed += Math.max(0, Math.min(e.end, limit) - Math.max(e.start, floor));
                 }
             }
         }

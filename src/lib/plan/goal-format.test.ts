@@ -5,7 +5,7 @@ import { formatDue, goalVerdict } from './goal-format';
 function status(partial: Partial<GoalStatus> & { needMinutes?: number }): GoalStatus {
     const { needMinutes = 0, ...rest } = partial;
     return {
-        goal: { id: 'g', name: 'A', dueOn: '2026-10-16', dueMinutes: null, needMinutes, countFrom: '2026-10-01' },
+        goal: { id: 'g', name: 'A', dueOn: '2026-10-16', dueMinutes: null, needMinutes },
         past: false,
         placedMinutes: 0,
         remainingMinutes: needMinutes,

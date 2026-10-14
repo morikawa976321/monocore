@@ -12,18 +12,16 @@ import {
     type PlanGoalRow,
     type PlanGoalUpdate,
 } from '@/src/lib/supabase/queries/plan-goals';
-import { utcToLocalTime } from '@/src/lib/date';
 import { timeToMinutes, type GoalInput } from '@/src/lib/schedules/free-time';
 
-/** DB の行を計算用の形に。「置いた時間」は目標を作った日（ローカル）から数える。 */
-export function planGoalToInput(row: PlanGoalRow, timezone: string): GoalInput {
+/** DB の行を計算用の形に。 */
+export function planGoalToInput(row: PlanGoalRow): GoalInput {
     return {
         id: row.id,
         name: row.name,
         dueOn: row.due_on,
         dueMinutes: timeToMinutes(row.due_time),
         needMinutes: row.need_minutes,
-        countFrom: utcToLocalTime(row.created_at, timezone).date,
     };
 }
 

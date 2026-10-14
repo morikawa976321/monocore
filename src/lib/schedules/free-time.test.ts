@@ -74,27 +74,49 @@ describe('evaluateGoals', () => {
         name: '',
         dueMinutes: null,
         needMinutes: 0,
-        countFrom: '2026-10-07',
         ...g,
     });
 
-    it('counts events that contain the goal name as placed time, from countFrom', () => {
+    it('counts only the part of matching events after now', () => {
         const goals = [goal({ id: 'a', name: '論文の図', dueOn: '2026-10-09', dueMinutes: h(12), needMinutes: h(10) })];
         const [s] = evaluateGoals({ ...base, goals });
-        // 10/6 の2時間は countFrom(10/7) より前なので数えない
+        // 10/6 の2時間は過去なので数えない。10/8 の3時間だけ
         expect(s.placedMinutes).toBe(h(3));
         expect(s.remainingMinutes).toBe(h(7));
         // 10/7: 17:00-22:00 = 5h, 10/8: 09:00-13:00 + 16:00-22:00 = 10h, 10/9: 09:00-12:00 = 3h
         expect(s.supplyMinutes).toBe(h(5) + h(10) + h(3));
         expect(s.ok).toBe(true);
 
-        const [fromEarlier] = evaluateGoals({ ...base, goals: [{ ...goals[0], countFrom: '2026-10-01' }] });
-        expect(fromEarlier.placedMinutes).toBe(h(5));
+        // 今日の 13:00-15:00 は、14:00 の時点では残り 1h
+        const today = new Map(days).set('2026-10-07', analyzeDayContent('1300-1500 論文の図'));
+        const [midway] = evaluateGoals({ ...base, days: today, nowMinutes: h(14), goals });
+        expect(midway.placedMinutes).toBe(h(1) + h(3));
+        const [done] = evaluateGoals({ ...base, days: today, nowMinutes: h(15), goals });
+        expect(done.placedMinutes).toBe(h(3));
+    });
 
-        // 90日より前は、作った日が古くても数えない（/plan はそこまで読まないので両画面で揃える）
-        const withOld = new Map(days).set('2026-06-01', analyzeDayContent('1300-1900 論文の図'));
-        const [old] = evaluateGoals({ ...base, days: withOld, goals: [{ ...goals[0], countFrom: '2026-01-01' }] });
-        expect(old.placedMinutes).toBe(h(5));
+    it('counts only events where the goal name is delimited by whitespace or the line ends', () => {
+        const withNames = new Map(days).set(
+            '2026-10-09',
+            analyzeDayContent(
+                [
+                    '0900-1000 xyz',
+                    '1000-1100 xyz abc',
+                    '1100-1200 abc xyz',
+                    '1200-1300 xyzabc',
+                    '1300-1400 abcxyz',
+                    '1400-1500 abc xyzabc xyz',
+                    '1500-1600 xyz-abc',
+                ].join('\n')
+            )
+        );
+        const [s] = evaluateGoals({
+            ...base,
+            days: withNames,
+            goals: [goal({ id: 'x', name: 'xyz', dueOn: '2026-10-09', needMinutes: h(10) })],
+        });
+        // 09-10, 10-11, 11-12, 14-15（2つ目の xyz が語として当たる）
+        expect(s.placedMinutes).toBe(h(4));
     });
 
     it('compares cumulative remaining time by earliest deadline', () => {
