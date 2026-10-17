@@ -42,6 +42,12 @@ describe('analyzeDayContent', () => {
         expect(a.events.map((e) => e.activity)).toEqual(['消灯']);
     });
 
+    it('treats a zero-length wake range as no morning routine', () => {
+        const a = analyzeDayContent(['0700-0700 起床', '2200-2300 消灯'].join('\n'));
+        expect(a.runs[1]).toEqual({ kind: 'free', start: h(7), end: h(22) });
+        expect(a.freeMinutes).toBe(h(15));
+    });
+
     it('starts sleep at the end of the lights-out event and uses the wake line', () => {
         const a = analyzeDayContent(['1000 起床', '2300-2330 BM 読書 消灯'].join('\n'));
         expect(a.wake).toBe(h(10));

@@ -82,7 +82,8 @@ export function analyzeDayContent(content: string): DayAnalysis {
 
     // 起床の行が範囲（0700-1200 起床 …）なら、その範囲が身支度。時刻だけなら起床から最初の予定まで
     // （最大2時間）を身支度とし、起床の時点で続いている予定があれば0。どちらも非自由。
-    if (wakeBlock && wakeBlock.end !== null && wakeBlock.end > wake) {
+    // 0700-0700 のような同時刻の範囲は身支度0分（時刻だけの行とは区別する）。
+    if (wakeBlock && wakeBlock.end !== null && wakeBlock.end >= wake) {
         busy.push({ start: wake, end: wakeBlock.end });
     } else {
         const firstStart = busy
