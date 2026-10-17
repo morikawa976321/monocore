@@ -6,7 +6,8 @@ import { TIME_LINE_REGEX, isValidHhmm } from './text-format';
  * 予定は起床を除いてすべて開始と終了を持つ前提（終了の無い予定・終了が開始より前の予定は
  * text-format.ts の findDayContentIssues が不正として保存前に弾く）。1日は3つに分かれる:
  * - 睡眠: 起床より前と、消灯の予定が終わった後
- * - 非自由: 予定の時間（消灯の予定を含む）と、起床から最初の予定までの身支度（最大2時間）
+ * - 非自由: 予定の時間（消灯の予定を含む）と、起床から最初の予定までの身支度（最大2時間。
+ *   起床の行が範囲を持てばその範囲）
  * - 自由: それ以外
  * 規則の由来は docs/decisions.md の /plan。
  */
@@ -79,11 +80,16 @@ export function analyzeDayContent(content: string): DayAnalysis {
     const sleep = lightsOut ? lightsOut.end : DEFAULT_LIGHTS_OUT.end;
     const busy: { start: number; end: number }[] = lightsOut ? [...events] : [...events, DEFAULT_LIGHTS_OUT];
 
-    // 起床から最初の予定まで（最大2時間）は身支度として非自由。起床の時点で続いている予定があれば0。
-    const firstStart = busy
-        .filter((e) => e.end > wake)
-        .reduce((min, e) => Math.min(min, Math.max(e.start, wake)), sleep);
-    busy.push({ start: wake, end: Math.min(wake + MORNING_MAX_MINUTES, firstStart) });
+    // 起床の行が範囲（0700-1200 起床 …）なら、その範囲が身支度。時刻だけなら起床から最初の予定まで
+    // （最大2時間）を身支度とし、起床の時点で続いている予定があれば0。どちらも非自由。
+    if (wakeBlock && wakeBlock.end !== null && wakeBlock.end > wake) {
+        busy.push({ start: wake, end: wakeBlock.end });
+    } else {
+        const firstStart = busy
+            .filter((e) => e.end > wake)
+            .reduce((min, e) => Math.min(min, Math.max(e.start, wake)), sleep);
+        busy.push({ start: wake, end: Math.min(wake + MORNING_MAX_MINUTES, firstStart) });
+    }
 
     const slots: SlotKind[] = Array.from({ length: DAY_MINUTES }, (_, m) => (m < wake || m >= sleep ? 'sleep' : 'free'));
     for (const b of busy) {
