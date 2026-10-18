@@ -91,8 +91,6 @@ export default function PlanPage() {
             days.push({
                 date: d,
                 usableMinutes: freeMinutesBetween(a, d === now.today ? now.nowMinutes : 0, 24 * 60),
-                wake: a.wake,
-                sleep: a.sleep,
             });
         }
         return days;

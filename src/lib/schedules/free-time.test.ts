@@ -6,8 +6,6 @@ const h = (hours: number) => hours * 60;
 describe('analyzeDayContent', () => {
     it('treats a day with no lines as 0700 wake and 2200-2300 lights-out', () => {
         const a = analyzeDayContent('');
-        expect(a.wake).toBe(h(7));
-        expect(a.sleep).toBe(h(23));
         // 07:00-09:00 は身支度、22:00-23:00 は消灯の予定、23:00 以降は睡眠
         expect(a.runs.map((r) => [r.kind, r.start, r.end])).toEqual([
             ['sleep', 0, h(7)],
@@ -35,7 +33,6 @@ describe('analyzeDayContent', () => {
 
     it('uses the wake line range as the morning routine instead of two hours', () => {
         const a = analyzeDayContent(['0700-1200 起床 発送 モーニングページ', '2200-2300 消灯'].join('\n'));
-        expect(a.wake).toBe(h(7));
         expect(a.runs[1]).toEqual({ kind: 'busy', start: h(7), end: h(12) });
         expect(a.freeMinutes).toBe(h(10));
         // 起床の行は予定（置いた時間の集計）に入れない
@@ -50,9 +47,14 @@ describe('analyzeDayContent', () => {
 
     it('starts sleep at the end of the lights-out event and uses the wake line', () => {
         const a = analyzeDayContent(['1000 起床', '2300-2330 BM 読書 消灯'].join('\n'));
-        expect(a.wake).toBe(h(10));
-        expect(a.sleep).toBe(h(23.5));
-        // 10:00-12:00 身支度、12:00-23:00 自由
+        // 10:00-12:00 身支度、12:00-23:00 自由、23:00-23:30 消灯の予定、23:30 から睡眠
+        expect(a.runs.map((r) => [r.kind, r.start, r.end])).toEqual([
+            ['sleep', 0, h(10)],
+            ['busy', h(10), h(12)],
+            ['free', h(12), h(23)],
+            ['busy', h(23), h(23.5)],
+            ['sleep', h(23.5), h(24)],
+        ]);
         expect(a.freeMinutes).toBe(h(11));
     });
 

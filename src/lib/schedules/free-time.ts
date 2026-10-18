@@ -30,10 +30,6 @@ export type SlotKind = 'sleep' | 'busy' | 'free';
 export type Run = { kind: SlotKind; start: number; end: number };
 export type DayEvent = { start: number; end: number; activity: string };
 export type DayAnalysis = {
-    /** その日の起床の時刻。起床の行が無ければ 0。/plan の柱の中で期日の位置を決めるのに使う。 */
-    wake: number;
-    /** その日の起床より後の最後の消灯の終わり。無ければ 24時。 */
-    sleep: number;
     /** 時刻範囲を持つ予定（起床を除く）。置いた時間の集計に使う。 */
     events: DayEvent[];
     runs: Run[];
@@ -226,11 +222,7 @@ export function analyzeDays(days: DayInput[]): Map<string, DayAnalysis> {
             if (last && last.kind === kind) last.end = m + 1;
             else runs.push({ kind, start: m, end: m + 1 });
         }
-        const wake = p.wakes.length > 0 ? p.wakes[0].at : 0;
-        const sleep = p.lightsOuts.filter((l) => l.start > wake).reduce((max, l) => Math.max(max, l.end), -1);
         result.set(p.date, {
-            wake,
-            sleep: sleep < 0 ? DAY_MINUTES : sleep,
             events: p.events,
             runs,
             freeMinutes: runs.filter((r) => r.kind === 'free').reduce((sum, r) => sum + r.end - r.start, 0),

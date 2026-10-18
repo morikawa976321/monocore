@@ -5,12 +5,12 @@
  */
 import type { GoalStatus } from '@/src/lib/schedules/free-time';
 
+const DAY_MINUTES = 24 * 60;
+
 export type CapacityDay = {
     date: string;
     /** その日の自由時間（今日は今以降）。 */
     usableMinutes: number;
-    wake: number;
-    sleep: number;
 };
 
 /** 累計の始まり（c0）と終わり（c1）を持つ1日の柱。 */
@@ -74,12 +74,14 @@ export function cumulativeColumns(days: CapacityDay[]): CapacityColumn[] {
 }
 
 /**
- * 期日の時刻を、その日の柱の中の位置（0..1）にする。起床前は 0、消灯後は 1。
- * 時刻の無い期日はその日の終わりなので消灯の位置（1）。起床と消灯が同時刻でも割らない。
+ * 期日の時刻を、その日の柱の中の位置（0..1）にする。時計の時刻のまま置く（0時が左端、24時が右端。時刻の無い
+ * 期日はその日の終わりで 1）。柱は1日分の自由時間をまとめて描くので、位置は締切の時刻を示すだけで、その時点
+ * までの自由時間の量は表さない（間に合うかは evaluateGoals が判定する）。起床〜消灯の間の比で置いていた頃は、
+ * 前日から起きたままの 0900 起床の日に 08:00 の締切が左端に寄った（本人選択 2026-10-18、
+ * docs/free-time-model.md カード6）。
  */
-export function positionWithinDay(day: CapacityDay, dueMinutes: number | null): number {
-    const due = dueMinutes ?? day.sleep;
-    return Math.max(0, Math.min(1, (due - day.wake) / Math.max(1, day.sleep - day.wake)));
+export function positionWithinDay(dueMinutes: number | null): number {
+    return Math.max(0, Math.min(1, (dueMinutes ?? DAY_MINUTES) / DAY_MINUTES));
 }
 
 /** 日が無ければ null（描かない）。 */
@@ -102,7 +104,7 @@ export function layoutCapacityChart(days: CapacityDay[], statuses: GoalStatus[])
     const marks: CapacityMark[] = [];
     upcoming.forEach((status) => {
         const i = days.findIndex((d) => d.date === status.goal.dueOn);
-        const within = positionWithinDay(days[i], status.goal.dueMinutes);
+        const within = positionWithinDay(status.goal.dueMinutes);
         const prev = marks[marks.length - 1];
         marks.push({
             status,

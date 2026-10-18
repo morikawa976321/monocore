@@ -11,11 +11,8 @@ import {
     shortDate,
 } from './capacity-chart';
 
-const WAKE = 7 * 60;
-const SLEEP = 23 * 60;
-
-function day(date: string, usableMinutes: number, extra: Partial<CapacityDay> = {}): CapacityDay {
-    return { date, usableMinutes, wake: WAKE, sleep: SLEEP, ...extra };
+function day(date: string, usableMinutes: number): CapacityDay {
+    return { date, usableMinutes };
 }
 
 function status(
@@ -79,28 +76,15 @@ describe('cumulativeColumns', () => {
 });
 
 describe('positionWithinDay', () => {
-    const d = day('2026-10-10', 0);
-
-    it('puts a due without a time at the end of the day (the sleep edge)', () => {
-        expect(positionWithinDay(d, null)).toBe(1);
+    it('puts a due without a time at the end of the day', () => {
+        expect(positionWithinDay(null)).toBe(1);
     });
 
-    it('clamps times before wake to 0 and after sleep to 1', () => {
-        expect(positionWithinDay(d, 0)).toBe(0);
-        expect(positionWithinDay(d, WAKE)).toBe(0);
-        expect(positionWithinDay(d, SLEEP)).toBe(1);
-        expect(positionWithinDay(d, 24 * 60 - 1)).toBe(1);
-    });
-
-    it('places a time proportionally between wake and sleep', () => {
-        expect(positionWithinDay(d, 15 * 60)).toBe(0.5);
-    });
-
-    it('does not divide by zero when wake and sleep coincide', () => {
-        const flat = day('2026-10-10', 0, { wake: 600, sleep: 600 });
-        expect(positionWithinDay(flat, 600)).toBe(0);
-        expect(positionWithinDay(flat, 601)).toBe(1);
-        expect(positionWithinDay(flat, null)).toBe(0);
+    it('places a time by the clock, from midnight (0) to the end of the day (1)', () => {
+        expect(positionWithinDay(0)).toBe(0);
+        expect(positionWithinDay(6 * 60)).toBe(0.25);
+        expect(positionWithinDay(12 * 60)).toBe(0.5);
+        expect(positionWithinDay(24 * 60)).toBe(1);
     });
 });
 
@@ -178,8 +162,8 @@ describe('layoutCapacityChart', () => {
         const [m1, m2] = layout.marks;
         expect(m1.fromX).toBe(0);
         expect(m1.fromY).toBe(0);
-        // 15:00 is halfway between 07:00 and 23:00 → middle of the first column.
-        expect(m1.mx).toBeCloseTo((0.5 / 3) * 100);
+        // 15:00 is 15/24 of the first column.
+        expect(m1.mx).toBeCloseTo((15 / 24 / 3) * 100);
         expect(m1.my).toBeCloseTo(10);
         expect(m2.fromX).toBe(m1.mx);
         expect(m2.fromY).toBe(m1.my);
@@ -188,11 +172,10 @@ describe('layoutCapacityChart', () => {
         expect(m2.my).toBeCloseTo(30);
     });
 
-    it('positions a deadline inside its own day using that day’s wake and sleep', () => {
-        const late = day('2026-10-11', 60, { wake: 9 * 60, sleep: 21 * 60 });
-        const layout = layoutCapacityChart([day('2026-10-10', 60), late], [status('a', '2026-10-11', 12 * 60, 30)])!;
-        // 12:00 is a quarter of the way from 09:00 to 21:00 → 1.25 days of 2.
-        expect(layout.marks[0].mx).toBeCloseTo((1.25 / 2) * 100);
+    it('positions a deadline inside its own day by the clock', () => {
+        const layout = layoutCapacityChart([day('2026-10-10', 60), day('2026-10-11', 60)], [status('a', '2026-10-11', 12 * 60, 30)])!;
+        // 12:00 is the middle of the second day → 1.5 days of 2.
+        expect(layout.marks[0].mx).toBeCloseTo((1.5 / 2) * 100);
     });
 });
 
