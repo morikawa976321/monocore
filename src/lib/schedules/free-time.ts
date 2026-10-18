@@ -94,7 +94,10 @@ function parseDay(content: string, loaded: boolean): ParsedDay {
         .filter((b): b is Block & { end: number } => !wakeBlocks.includes(b) && b.end !== null && b.end > b.start)
         .map((b) => ({ start: b.start, end: b.end, activity: b.activity }))
         .sort((a, b) => a.start - b.start);
-    const lightsOuts = events.filter((e) => e.activity.includes('消灯')).map((e) => ({ start: e.start, end: e.end }));
+    // 消灯は 2200-2200 のような同時刻の範囲も、その時刻から眠る境目として数える（予定としては0分）。
+    const lightsOuts = blocks
+        .filter((b): b is Block & { end: number } => b.activity.includes('消灯') && b.end !== null && b.end >= b.start)
+        .map((b) => ({ start: b.start, end: b.end }));
     if (!loaded) {
         if (wakeBlocks.length === 0) wakeBlocks.push({ start: DEFAULT_WAKE_MINUTES, end: null, activity: '起床' });
         if (lightsOuts.length === 0) lightsOuts.push({ ...DEFAULT_LIGHTS_OUT });

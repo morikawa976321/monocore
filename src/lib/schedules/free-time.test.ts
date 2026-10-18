@@ -138,6 +138,11 @@ describe('analyzeDays', () => {
         expect(kinds(days.get('2026-10-19')!)[0]).toEqual(['sleep', 0, h(7)]);
     });
 
+    it('treats a zero-length lights-out range as falling asleep at that time', () => {
+        const a = analyzeDayContent('0700 起床\n2200-2200 消灯', true);
+        expect(kinds(a).at(-1)).toEqual(['sleep', h(22), h(24)]);
+    });
+
     it('does not add the default lights-out to an unloaded day that already has a lights-out line', () => {
         const a = analyzeDayContent('0000-0300 消灯\n0900 起床');
         // 03:00-09:00 睡眠、09:00-11:00 身支度、その後は24時まで起きている
