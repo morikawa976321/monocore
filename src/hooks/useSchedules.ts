@@ -42,7 +42,7 @@ import {
  */
 const MAX_CONSECUTIVE_SAVE_FAILURES = 3;
 
-/** 既定予定を書き込んだ記録を読み損ねたときの表示。記録の無い日が読込済みとして描かれうる。再読み込みで直る。 */
+/** 既定予定を書き込んだ記録を読み損ねた日があるときの表示。その日は前の判定のまま描かれる。再読み込みで直る。 */
 const APPLIED_DAYS_ERROR = '既定予定の記録の読み込みに失敗しました（睡眠の帯が正しくない日があります）。';
 
 type UseSchedulesCompanions = {
@@ -68,6 +68,8 @@ type UseSchedulesReturn = {
      * 記録をまだ読んでいない日は含めない。
      */
     unappliedDays: Set<string>;
+    /** 既定予定を書き込んだ記録を最後に読みに行って失敗した日がある間の警告。読み直して成功すれば消える。 */
+    appliedDaysError: string | null;
     scrollContainerRef: RefObject<HTMLDivElement | null>;
     topSentinelRef: RefObject<HTMLDivElement | null>;
     bottomSentinelRef: RefObject<HTMLDivElement | null>;
@@ -105,6 +107,9 @@ export function useSchedules(
     const [isResumeSyncing, setIsResumeSyncing] = useState(false);
     const [syncError, setSyncError] = useState<string | null>(null);
     const [unappliedDays, setUnappliedDays] = useState<Set<string>>(() => new Set());
+    // 記録を最後に読みに行った要求が失敗した日。syncError とは分けて持つ（編集・保存の成功や、別の読み込みの
+    // 完了順で警告が消えたり戻ったりしないよう、日ごとの最新の要求の結果だけで決める）。
+    const [appliedReadFailedDays, setAppliedReadFailedDays] = useState<Set<string>>(() => new Set());
 
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const focusedDateLabelRef = useRef<string | null>(null);
@@ -161,21 +166,22 @@ export function useSchedules(
      * 既定予定を書き込んだ記録を読み、記録の無い日を unappliedDays に入れる。applyDefaults の後に同じ範囲で
      * 呼ぶ（先に読むと、これから書き込む日まで記録が無いと判定する）。読み込みは範囲が重なって並ぶことがある
      * （初回の読み込み中の再読み込みなど）ので、日ごとに最後に読みに行った要求の応答だけを反映し、遅れて
-     * 届いた古い応答で新しい結果を戻さない。読み損ねたら false を返し、呼び出し元が同期エラーとして出す
-     * （その日は今の判定のままなので、記録の無い日が読込済みとして描かれうる）。
+     * 届いた古い応答で新しい結果を戻さない。読み損ねた日は appliedReadFailedDays に入れて警告を出し（その日は
+     * 前の判定のまま）、読み直して成功したら外す。
      */
     const readAppliedDays = useCallback(
-        async (startDay: string, endDay: string): Promise<boolean> => {
+        async (startDay: string, endDay: string) => {
             const seq = ++appliedReadSeqRef.current;
             const days: string[] = [];
             for (let d = parseISO(startDay); d <= parseISO(endDay); d = addDays(d, 1)) days.push(format(d, 'yyyy-MM-dd'));
             for (const day of days) appliedReadOfDayRef.current.set(day, seq);
             const { data, error } = await getDefaultAppliedDays(supabase, startDay, endDay);
             const latest = days.filter((day) => appliedReadOfDayRef.current.get(day) === seq);
-            if (latest.length === 0) return true;
+            if (latest.length === 0) return;
             if (error || !data) {
                 console.error('既定予定の記録の読み込みに失敗しました', error);
-                return false;
+                setAppliedReadFailedDays((prev) => new Set([...prev, ...latest]));
+                return;
             }
             setUnappliedDays((prev) => {
                 const next = new Set(prev);
@@ -185,7 +191,12 @@ export function useSchedules(
                 }
                 return next;
             });
-            return true;
+            setAppliedReadFailedDays((prev) => {
+                if (!latest.some((day) => prev.has(day))) return prev;
+                const next = new Set(prev);
+                for (const day of latest) next.delete(day);
+                return next;
+            });
         },
         [supabase]
     );
@@ -215,7 +226,7 @@ export function useSchedules(
                 ),
                 readAppliedDays(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd')),
             ]))
-            .then(([schedulesResult, revisionsResult, appliedOk]) => {
+            .then(([schedulesResult, revisionsResult]) => {
                 if (schedulesResult.error || revisionsResult.error) {
                     setSyncError('スケジュールの読み込みに失敗しました。');
                     return;
@@ -223,7 +234,6 @@ export function useSchedules(
                 const merged = mergeSchedulesIntoEntries(initial, schedulesResult.data ?? [], tz);
                 setEntries(applyScheduleRevisions(merged, revisionsResult.data ?? []));
                 scrollTodayAfterInitialMergeRef.current = true;
-                if (!appliedOk) setSyncError(APPLIED_DAYS_ERROR);
             })
             .finally(() => {
                 setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
@@ -240,7 +250,7 @@ export function useSchedules(
         const startUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(rangeStart, 'yyyy-MM-dd'), format(rangeEnd, 'yyyy-MM-dd'));
-        const [schedulesResult, revisionsResult, appliedOk] = await Promise.all([
+        const [schedulesResult, revisionsResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(
                 supabase,
@@ -262,8 +272,7 @@ export function useSchedules(
             // サーバの最新revisionを取り込めたので、打ち切っていた日の自動保存を再開してよい。
             autoSaveSuspendedRef.current.clear();
             saveFailureCountRef.current.clear();
-            // 読み込んだ全範囲の記録を読み直したので、記録の読み損ねが解消したかもここで決まる。
-            setSyncError(appliedOk ? null : APPLIED_DAYS_ERROR);
+            setSyncError(null);
         } else {
             setSyncError('スケジュールの同期に失敗しました。');
         }
@@ -527,7 +536,7 @@ export function useSchedules(
         );
         const endUtc = localTimeToUtc(format(addDays(newEnd, 1), 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd'));
-        const [schedulesResult, revisionsResult, appliedOk] = await Promise.all([
+        const [schedulesResult, revisionsResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(
                 supabase,
@@ -542,7 +551,6 @@ export function useSchedules(
         );
         setEntries((prev) => [...prev, ...merged]);
         setRangeEnd(newEnd);
-        if (!appliedOk) setSyncError(APPLIED_DAYS_ERROR);
         setLoadingBottom(false);
     }, [loadingBottom, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays]);
 
@@ -554,7 +562,7 @@ export function useSchedules(
         const startUtc = localTimeToUtc(format(newStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd'));
-        const [noteCount, [schedulesResult, revisionsResult, appliedOk]] = await Promise.all([
+        const [noteCount, [schedulesResult, revisionsResult]] = await Promise.all([
             loadNotes(
                 format(newStart, 'yyyy-MM-dd'),
                 format(addDays(rangeStart, -1), 'yyyy-MM-dd')
@@ -585,7 +593,6 @@ export function useSchedules(
         }
         setEntries((prev) => [...merged, ...prev]);
         setRangeStart(newStart);
-        if (!appliedOk) setSyncError(APPLIED_DAYS_ERROR);
         setLoadingTop(false);
     }, [loadingTop, hasMorePast, rangeStart, supabase, tz, loadNotes, applyDefaults, readAppliedDays]);
 
@@ -637,6 +644,15 @@ export function useSchedules(
         [isEditLocked, clearDebounceTimer, saveDay]
     );
 
+    // 表示している範囲の日だけを数える（過去へ読みに行ってそれ以上の日が無かったときは範囲を広げないので、
+    // その日の読み損ねは再読み込みでも読み直されず、警告が消えなくなる）。
+    const appliedDaysError = useMemo(() => {
+        if (!rangeStart || !rangeEnd) return null;
+        const from = format(rangeStart, 'yyyy-MM-dd');
+        const to = format(rangeEnd, 'yyyy-MM-dd');
+        return [...appliedReadFailedDays].some((day) => day >= from && day <= to) ? APPLIED_DAYS_ERROR : null;
+    }, [appliedReadFailedDays, rangeStart, rangeEnd]);
+
     return {
         todayStr,
         entries,
@@ -647,6 +663,7 @@ export function useSchedules(
         isEditLocked,
         syncError,
         unappliedDays,
+        appliedDaysError,
         scrollContainerRef,
         topSentinelRef,
         bottomSentinelRef,

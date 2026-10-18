@@ -38,6 +38,7 @@ export default function SchedulesPage() {
         isEditLocked,
         syncError,
         unappliedDays,
+        appliedDaysError,
         scrollContainerRef,
         topSentinelRef,
         bottomSentinelRef,
@@ -90,6 +91,9 @@ export default function SchedulesPage() {
                 )}
                 {syncError && (
                     <span className="text-sm text-amber-600 dark:text-amber-400">{syncError}</span>
+                )}
+                {appliedDaysError && (
+                    <span className="text-sm text-amber-600 dark:text-amber-400">{appliedDaysError}</span>
                 )}
                 {noteError && (
                     <span className="text-sm text-amber-600 dark:text-amber-400">{noteError}</span>
