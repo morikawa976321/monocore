@@ -197,8 +197,32 @@ describe('analyzeDays: interpretation of the text', () => {
         expect(kinds(analyzeDayContent('0700\n起床\n2200-2300\n消灯', true))).toEqual(plainDay);
     });
 
-    it('treats 起床 followed by punctuation as a wake (substring match)', () => {
-        expect(kinds(analyzeDayContent('0700 起床。\n2200-2300 消灯', true))).toEqual(plainDay);
+    it('reads 起床 and 消灯 only as words, like 睡眠 and goal names', () => {
+        // 「起床時刻の見直し」は起床ではないので、前夜からの睡眠は 07:00 の起床まで続く
+        const days = analyzeDays([
+            { date: '2026-10-17', content: '0700 起床\n2200-2300 消灯', loaded: true },
+            { date: '2026-10-18', content: '0700 起床\n0300-0330 起床時刻の見直し\n2200-2300 消灯', loaded: true },
+        ]);
+        expect(kinds(days.get('2026-10-18')!)).toEqual(plainDay);
+        // 「消灯前の片付け」は消灯ではないので、20:30 からは眠らない
+        const a = analyzeDayContent('0700 起床\n2000-2030 消灯前の片付け\n2200-2300 消灯', true);
+        expect(kinds(a).slice(2)).toEqual([
+            ['free', h(9), h(20)],
+            ['busy', h(20), h(20.5)],
+            ['free', h(20.5), h(22)],
+            ['busy', h(22), h(23)],
+            ['sleep', h(23), h(24)],
+        ]);
+    });
+
+    it('does not read 起床 followed by punctuation as a wake', () => {
+        // 「起床。」は語として当たらない（保存前の検査でも終了の無い予定として弾かれる）。起床が無いので
+        // 範囲の最初の印は 23:00 の入眠で、それより前は起きている
+        expect(kinds(analyzeDayContent('0700 起床。\n2200-2300 消灯', true))).toEqual([
+            ['free', 0, h(22)],
+            ['busy', h(22), h(23)],
+            ['sleep', h(23), h(24)],
+        ]);
     });
 
     it('does not paint a wake line that also says 睡眠 as sleep', () => {

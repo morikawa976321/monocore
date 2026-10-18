@@ -18,8 +18,8 @@ type GenDay = { loaded: boolean; lines: GenLine[] };
 const MARK_LABELS = ['起床', '消灯', '起床 発送', 'BM 読書 消灯'];
 const SLEEP_LABELS = ['睡眠', '昼 睡眠'];
 const PLAIN_LABELS = ['作業', 'BCL'];
-// 語の一部に起床・消灯・睡眠を含む予定。
-const CONFUSING_LABELS = ['睡眠薬を買う', '消灯前の片付け', '起床時刻の見直し', '起床 消灯'];
+// 語の一部に起床・消灯・睡眠を含む予定と、語の直後に句読点が付いた行（語として当たらない）。
+const CONFUSING_LABELS = ['睡眠薬を買う', '消灯前の片付け', '起床時刻の見直し', '起床。', '起床 消灯'];
 const ALL_LABELS = [...MARK_LABELS, ...SLEEP_LABELS, ...PLAIN_LABELS, ...CONFUSING_LABELS];
 
 // 30分刻みを主に、端の値（0000・2359・既定の 0700・2200・2300）と任意の分を混ぜる。
@@ -81,10 +81,7 @@ function analyzeKinds(days: GenDay[]): SlotKind[] {
 
 // ---------- 参照実装（docs/free-time-model.md §2 を分ごとにそのまま判定する） ----------
 
-/** 「含む」の判定。起床・消灯は部分一致、睡眠は語として（前後が行端か空白）。 */
-function containsMark(label: string, word: string): boolean {
-    return label.includes(word);
-}
+/** 「含む」の判定。起床・消灯・睡眠とも語として（前後が行端か空白）。 */
 function containsWord(label: string, word: string): boolean {
     return new RegExp(`(^|\\s)${word}(\\s|$)`).test(label);
 }
@@ -103,10 +100,10 @@ function classifyDay(day: GenDay, offset = 0): Classified {
         // 終了の 2359 は24時。
         const end = l.end === null ? null : l.end === DAY - 1 ? DAY : l.end;
         const ranged = end !== null && end >= l.start;
-        const isWake = containsMark(l.label, '起床');
+        const isWake = containsWord(l.label, '起床');
         if (isWake) c.wakes.push({ at: offset + l.start, rangeEnd: ranged ? offset + end! : null });
         else if (end !== null && end > l.start) c.events.push({ a: offset + l.start, b: offset + end, label: l.label });
-        if (containsMark(l.label, '消灯') && ranged) c.lightsOuts.push({ a: offset + l.start, b: offset + end! });
+        if (containsWord(l.label, '消灯') && ranged) c.lightsOuts.push({ a: offset + l.start, b: offset + end! });
     }
     if (!day.loaded) {
         if (c.wakes.length === 0) c.wakes.push({ at: offset + 420, rangeEnd: null });

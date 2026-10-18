@@ -47,6 +47,15 @@ describe('text-format', () => {
         expect(findDayContentIssues('')).toEqual([]);
     });
 
+    it('lets only lines with 起床 as a word omit the end time (same rule as the free-time calculation)', () => {
+        const content = ['0700 起床', '0710 朝の 起床', '0720 起床時刻の見直し', '0730 起床。'].join('\n');
+
+        expect(findDayContentIssues(content)).toEqual([
+            { line: '0720 起床時刻の見直し', kind: 'missing-end' },
+            { line: '0730 起床。', kind: 'missing-end' },
+        ]);
+    });
+
     it('formats rows to day content and supports round-trip-like parsing', () => {
         const rows = [
             {

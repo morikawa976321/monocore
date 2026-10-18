@@ -30,6 +30,32 @@ export function isValidHhmm(hhmm: string): boolean {
 }
 
 /**
+ * 予定の内容が名前を「語として」含むか。名前の前後が行頭・行末か空白（スペース・改行）のときだけ
+ * 当たる。"xyz" に対して "xyz" "xyz abc" は当たり、"xyzabc" "abcxyz" "xyz-abc" は当たらない。
+ * /plan の目標の名前と、起床・消灯・睡眠の判定が同じ規則を使う（本人指定 2026-10-14・2026-10-18）。
+ * 複数行の予定は空白か改行でつながれるので、改行も空白として扱われる。
+ */
+export function activityMatchesName(activity: string, name: string): boolean {
+    if (!name) return false;
+    for (let i = activity.indexOf(name); i !== -1; i = activity.indexOf(name, i + 1)) {
+        const before = i === 0 || /\s/.test(activity[i - 1]);
+        const end = i + name.length;
+        const after = end === activity.length || /\s/.test(activity[end]);
+        if (before && after) return true;
+    }
+    return false;
+}
+
+/**
+ * 起床の行か（「起床」を語として含む）。起床の行だけは終了を省ける。保存前の検査と空き時間の計算
+ * （free-time.ts）が同じ判定を使わないと、保存できるのに計算では起床にならない行ができる。
+ * 「起床時刻の見直し」は起床の行ではなく、「起床。」も起床の行にならない（「起床 。」と書く）。
+ */
+export function isWakeActivity(activity: string): boolean {
+    return activityMatchesName(activity, '起床');
+}
+
+/**
  * テキストエリア1日分の文字列を ReplaceScheduleItem[] に変換する。
  * 行頭が HHMM または HHMM-HHMM の行でブロックを区切り、1ブロック＝1レコード。
  */
@@ -129,7 +155,7 @@ export function findDayContentIssues(content: string): DayContentIssue[] {
         }
         const activity = activityLines.join('\n');
         if (endHhmm === null) {
-            if (!activity.includes('起床')) issues.push({ line, kind: 'missing-end' });
+            if (!isWakeActivity(activity)) issues.push({ line, kind: 'missing-end' });
         } else if (endHhmm < startHhmm) {
             issues.push({ line, kind: 'reversed' });
         }

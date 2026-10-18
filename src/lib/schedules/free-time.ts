@@ -1,4 +1,7 @@
-import { TIME_LINE_REGEX, isValidHhmm } from './text-format';
+import { TIME_LINE_REGEX, activityMatchesName, isValidHhmm, isWakeActivity } from './text-format';
+
+// 語として含むかの判定は保存前の検査（text-format.ts）と共有する。free-time から使う箇所のために残す。
+export { activityMatchesName };
 
 /**
  * 予定テキストから「空き時間（自由時間）」を求める。スケジュール画面の日カードと /plan の両方が使う。
@@ -104,11 +107,12 @@ type ClassifiedDay = {
  * その日の行を分類し、読み込んでいない日（既定予定を書き込んだ記録の無い日）に限って、起床の行が無ければ
  * 既定の 0700 起床を、消灯の行が無ければ既定の 2200-2300 消灯を補う。読み込んだ日は既定予定が実データと
  * して入っているので、行が無ければ本人が消したものとして補わない。補った消灯は events に入れない（置いた
- * 時間に数えない）。1つの行が起床と消灯の両方を含めば、両方として働く。
+ * 時間に数えない）。起床・消灯・睡眠はどれも語として含むかで判定し（「起床時刻の見直し」は起床の行ではない）、
+ * 1つの行が起床と消灯の両方を含めば、両方として働く。
  */
 function classifyDay(content: string, loaded: boolean): ClassifiedDay {
     const blocks = parseBlocks(content);
-    const isWake = (b: Block) => b.activity.includes('起床');
+    const isWake = (b: Block) => isWakeActivity(b.activity);
     const wakes = blocks
         .filter(isWake)
         .map((b) => ({ at: b.start, rangeEnd: hasRange(b) ? b.end : null }))
@@ -119,7 +123,7 @@ function classifyDay(content: string, loaded: boolean): ClassifiedDay {
         .map((b) => ({ start: b.start, end: b.end, activity: b.activity }))
         .sort((a, b) => a.start - b.start);
     const lightsOuts: Span[] = blocks
-        .filter((b) => b.activity.includes('消灯'))
+        .filter((b) => activityMatchesName(b.activity, '消灯'))
         .filter(hasRange)
         .map((b) => ({ start: b.start, end: b.end }));
     if (!loaded) {
@@ -264,22 +268,6 @@ export function daysBetween(a: string, b: string): number {
         return Date.UTC(y, m - 1, d);
     };
     return Math.round((toUtc(b) - toUtc(a)) / 86400000);
-}
-
-/**
- * 予定の内容が目標の名前を「語として」含むか。名前の前後が行頭・行末か空白（スペース・改行）のときだけ
- * 当たる。"xyz" に対して "xyz" "xyz abc" は当たり、"xyzabc" "abcxyz" は当たらない。
- * 複数行の予定は parseBlocks が空白でつないでいるので、改行も空白として扱われる。
- */
-export function activityMatchesName(activity: string, name: string): boolean {
-    if (!name) return false;
-    for (let i = activity.indexOf(name); i !== -1; i = activity.indexOf(name, i + 1)) {
-        const before = i === 0 || /\s/.test(activity[i - 1]);
-        const end = i + name.length;
-        const after = end === activity.length || /\s/.test(activity[end]);
-        if (before && after) return true;
-    }
-    return false;
 }
 
 /**
