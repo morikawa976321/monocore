@@ -15,6 +15,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/src/types/database.types';
 import {
     applyDefaultSchedules,
+    getDefaultAppliedDays,
     getScheduleDayRevisions,
     getSchedules,
     replaceSchedulesForDay,
@@ -58,6 +59,12 @@ type UseSchedulesReturn = {
     isResumeSyncing: boolean;
     isEditLocked: boolean;
     syncError: string | null;
+    /**
+     * 読み込んだ範囲のうち、既定予定を書き込んだ記録（default_schedule_applications）の無い日。空き時間の
+     * 計算ではこの日を未読込として既定の起床・消灯で補う（既定予定の effective_from より前の過去の日など）。
+     * 記録をまだ読んでいない日は含めない。
+     */
+    unappliedDays: Set<string>;
     scrollContainerRef: RefObject<HTMLDivElement | null>;
     topSentinelRef: RefObject<HTMLDivElement | null>;
     bottomSentinelRef: RefObject<HTMLDivElement | null>;
@@ -94,6 +101,7 @@ export function useSchedules(
     const [isInitialSyncing, setIsInitialSyncing] = useState(true);
     const [isResumeSyncing, setIsResumeSyncing] = useState(false);
     const [syncError, setSyncError] = useState<string | null>(null);
+    const [unappliedDays, setUnappliedDays] = useState<Set<string>>(() => new Set());
 
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const focusedDateLabelRef = useRef<string | null>(null);
@@ -142,6 +150,30 @@ export function useSchedules(
         [supabase, tz]
     );
 
+    /**
+     * 既定予定を書き込んだ記録を読み、記録の無い日を unappliedDays に入れる。applyDefaults の後に同じ範囲で
+     * 呼ぶ（先に読むと、これから書き込む日まで記録が無いと判定する）。読み損ねたら、その範囲は今の判定のまま。
+     */
+    const readAppliedDays = useCallback(
+        async (startDay: string, endDay: string) => {
+            const { data, error } = await getDefaultAppliedDays(supabase, startDay, endDay);
+            if (error || !data) {
+                console.error('既定予定の記録の読み込みに失敗しました', error);
+                return;
+            }
+            setUnappliedDays((prev) => {
+                const next = new Set(prev);
+                for (let d = parseISO(startDay); d <= parseISO(endDay); d = addDays(d, 1)) {
+                    const day = format(d, 'yyyy-MM-dd');
+                    if (data.has(day)) next.delete(day);
+                    else next.add(day);
+                }
+                return next;
+            });
+        },
+        [supabase]
+    );
+
     // --- 初回（クライアントのみ）: 日付確定 → entries 生成 → DB fetch → 今日へスクロール ---
     useEffect(() => {
         const str = format(toZonedTime(new Date(), tz), 'yyyy-MM-dd');
@@ -158,6 +190,9 @@ export function useSchedules(
         const endUtc = localTimeToUtc(format(addDays(end, 1), 'yyyy-MM-dd'), '0000', tz);
         void loadNotes(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'));
         void applyDefaults(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'))
+            .then(() => {
+                void readAppliedDays(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'));
+            })
             .then(() => Promise.all([
                 getSchedules(supabase, startUtc, endUtc),
                 getScheduleDayRevisions(
@@ -190,6 +225,7 @@ export function useSchedules(
         const startUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(rangeStart, 'yyyy-MM-dd'), format(rangeEnd, 'yyyy-MM-dd'));
+        void readAppliedDays(format(rangeStart, 'yyyy-MM-dd'), format(rangeEnd, 'yyyy-MM-dd'));
         const [schedulesResult, revisionsResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(
@@ -218,7 +254,7 @@ export function useSchedules(
         setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
         setLoadingTop(false);
         setLoadingBottom(false);
-    }, [rangeStart, rangeEnd, tz, supabase, loadNotes, applyDefaults]);
+    }, [rangeStart, rangeEnd, tz, supabase, loadNotes, applyDefaults, readAppliedDays]);
 
     useEffect(() => {
         if (!todayStr || entries.length === 0) return;
@@ -475,6 +511,7 @@ export function useSchedules(
         );
         const endUtc = localTimeToUtc(format(addDays(newEnd, 1), 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd'));
+        void readAppliedDays(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd'));
         const [schedulesResult, revisionsResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(
@@ -490,7 +527,7 @@ export function useSchedules(
         setEntries((prev) => [...prev, ...merged]);
         setRangeEnd(newEnd);
         setLoadingBottom(false);
-    }, [loadingBottom, rangeEnd, supabase, tz, loadNotes, applyDefaults]);
+    }, [loadingBottom, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays]);
 
     const loadMorePast = useCallback(async () => {
         if (loadingTop || !hasMorePast || !rangeStart) return;
@@ -500,6 +537,7 @@ export function useSchedules(
         const startUtc = localTimeToUtc(format(newStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd'));
+        void readAppliedDays(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd'));
         const [noteCount, [schedulesResult, revisionsResult]] = await Promise.all([
             loadNotes(
                 format(newStart, 'yyyy-MM-dd'),
@@ -531,7 +569,7 @@ export function useSchedules(
         setEntries((prev) => [...merged, ...prev]);
         setRangeStart(newStart);
         setLoadingTop(false);
-    }, [loadingTop, hasMorePast, rangeStart, supabase, tz, loadNotes, applyDefaults]);
+    }, [loadingTop, hasMorePast, rangeStart, supabase, tz, loadNotes, applyDefaults, readAppliedDays]);
 
     useEffect(() => {
         const container = scrollContainerRef.current;
@@ -590,6 +628,7 @@ export function useSchedules(
         isResumeSyncing,
         isEditLocked,
         syncError,
+        unappliedDays,
         scrollContainerRef,
         topSentinelRef,
         bottomSentinelRef,
