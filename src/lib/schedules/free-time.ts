@@ -1,20 +1,26 @@
 import { TIME_LINE_REGEX, isValidHhmm } from './text-format';
 
 /**
- * 1日分の予定テキストから「空き時間（自由時間）」を求める。スケジュール画面の日カードと /plan の両方が使う。
+ * 予定テキストから「空き時間（自由時間）」を求める。スケジュール画面の日カードと /plan の両方が使う。
  *
+ * スケジュール画面の予定を正として導出する（本人指定 2026-10-18）。時間は日をまたいで連続しており、
+ * 消灯の予定が終わってから次の起床までが睡眠、起床から消灯までが起きている時間。日の境目では区切らない
+ * （0000-0300 消灯 は前夜の続きで、前日に消灯の行が無ければ前日は24時まで起きている）。起床が続いたり
+ * 消灯が続いたりしたら、2つ目以降は境目として無視する。
  * 予定は起床を除いてすべて開始と終了を持つ前提（終了の無い予定・終了が開始より前の予定は
- * text-format.ts の findDayContentIssues が不正として保存前に弾く）。1日は3つに分かれる:
- * - 睡眠: 起床より前と、消灯の予定が終わった後
- * - 非自由: 予定の時間（消灯の予定を含む）と、起床から最初の予定までの身支度（最大2時間。
+ * text-format.ts の findDayContentIssues が不正として保存前に弾く）。時間は3つに分かれる:
+ * - 睡眠: 消灯の予定の終わりから次の起床まで。「睡眠」を語として含む予定の時間も睡眠として塗る
+ * - 非自由: 起きている間の予定の時間（消灯の予定を含む）と、起床から最初の予定までの身支度（最大2時間。
  *   起床の行が範囲を持てばその範囲）
- * - 自由: それ以外
- * 規則の由来は docs/decisions.md の /plan。
+ * - 自由: それ以外の起きている時間
+ * 既定の起床・消灯は、スケジュール画面でまだ読み込んでいない日（既定予定を書き込んだ記録の無い日）に
+ * だけ、その行が無いときに補う。読み込んだ日は既定予定が実データとして入っているので、行が無ければ
+ * 本人が消したものとして補わない。規則の由来は docs/decisions.md の /plan。
  */
 
-/** 起床の行が無い日の起床時刻。既定予定（default_schedules）の 0700 起床と同じ。 */
+/** 読み込んでいない日に起床の行が無いときの起床時刻。既定予定（default_schedules）の 0700 起床と同じ。 */
 export const DEFAULT_WAKE_MINUTES = 7 * 60;
-/** 消灯の行が無い日の消灯。既定予定の 2200-2300 消灯と同じ。終わった時刻から睡眠。 */
+/** 読み込んでいない日に消灯の行が無いときの消灯。既定予定の 2200-2300 消灯と同じ。終わった時刻から睡眠。 */
 export const DEFAULT_LIGHTS_OUT = { start: 22 * 60, end: 23 * 60 } as const;
 /** 起床から最初の予定までを身支度として非自由にする。それより長く空いていても、この長さまで。 */
 export const MORNING_MAX_MINUTES = 120;
@@ -25,8 +31,9 @@ export type SlotKind = 'sleep' | 'busy' | 'free';
 export type Run = { kind: SlotKind; start: number; end: number };
 export type DayEvent = { start: number; end: number; activity: string };
 export type DayAnalysis = {
+    /** その日の起床の時刻。起床の行が無ければ 0。/plan の柱の中で期日の位置を決めるのに使う。 */
     wake: number;
-    /** 睡眠に入る時刻（消灯の予定の終わり）。 */
+    /** その日の起床より後の最後の消灯の終わり。無ければ 24時。 */
     sleep: number;
     /** 時刻範囲を持つ予定（起床を除く）。置いた時間の集計に使う。 */
     events: DayEvent[];
@@ -38,6 +45,12 @@ type Block = { start: number; end: number | null; activity: string };
 
 function hhmmToMinutes(hhmm: string): number {
     return parseInt(hhmm.slice(0, 2), 10) * 60 + parseInt(hhmm.slice(2, 4), 10);
+}
+
+/** 終了の 2359 は24時として数える（2400 は書けないので、日の終わりまでの予定は 2359 で書かれる）。 */
+function endToMinutes(hhmm: string): number {
+    const m = hhmmToMinutes(hhmm);
+    return m === DAY_MINUTES - 1 ? DAY_MINUTES : m;
 }
 
 /** dayContentToScheduleItems と同じ区切り方で、時刻ブロックを分単位で取り出す。 */
@@ -59,58 +72,145 @@ function parseBlocks(content: string): Block[] {
         }
         const activity = activityLines.join(' ').trim();
         if (activity === '') continue;
-        blocks.push({ start: hhmmToMinutes(m[1]), end: m[3] ? hhmmToMinutes(m[3]) : null, activity });
+        blocks.push({ start: hhmmToMinutes(m[1]), end: m[3] ? endToMinutes(m[3]) : null, activity });
     }
     return blocks;
 }
 
-export function analyzeDayContent(content: string): DayAnalysis {
+type ParsedDay = {
+    /** 起床の行。無ければ null（読み込んでいない日は既定の 0700 起床で補う）。 */
+    wakeBlock: Block | null;
+    events: DayEvent[];
+    /** 消灯の予定。読み込んでいない日で起床より後に無ければ、既定の 2200-2300 消灯を足す。 */
+    lightsOuts: { start: number; end: number }[];
+};
+
+function parseDay(content: string, loaded: boolean): ParsedDay {
     const blocks = parseBlocks(content);
-    const wakeBlock = blocks.find((b) => b.activity.includes('起床'));
-    const wake = wakeBlock ? wakeBlock.start : DEFAULT_WAKE_MINUTES;
+    let wakeBlock = blocks.find((b) => b.activity.includes('起床')) ?? null;
     // 時刻範囲を持つ予定だけを数える。終了の無い行・終了が開始より前の行は保存前に弾かれるが、
     // 規則を入れる前に保存された古い行が残っていても数えない。
     const events: DayEvent[] = blocks
         .filter((b): b is Block & { end: number } => b !== wakeBlock && b.end !== null && b.end > b.start)
         .map((b) => ({ start: b.start, end: b.end, activity: b.activity }))
         .sort((a, b) => a.start - b.start);
+    const lightsOuts = events.filter((e) => e.activity.includes('消灯')).map((e) => ({ start: e.start, end: e.end }));
+    if (!loaded) {
+        if (!wakeBlock) wakeBlock = { start: DEFAULT_WAKE_MINUTES, end: null, activity: '起床' };
+        const wake = wakeBlock.start;
+        if (!lightsOuts.some((l) => l.start > wake)) lightsOuts.push({ ...DEFAULT_LIGHTS_OUT });
+    }
+    return { wakeBlock, events, lightsOuts };
+}
 
-    // 消灯の予定（起床より後の最後のもの）が終わった時刻から睡眠。無ければ既定の 2200-2300。
-    const lightsOut = [...events].reverse().find((e) => e.activity.includes('消灯') && e.start > wake);
-    const sleep = lightsOut ? lightsOut.end : DEFAULT_LIGHTS_OUT.end;
-    const busy: { start: number; end: number }[] = lightsOut ? [...events] : [...events, DEFAULT_LIGHTS_OUT];
+export type DayInput = {
+    /** YYYY-MM-DD */
+    date: string;
+    content: string;
+    /** スケジュール画面で読み込んだ（既定予定を書き込んだ記録がある）日か。 */
+    loaded: boolean;
+};
 
-    // 起床の行が範囲（0700-1200 起床 …）なら、その範囲が身支度。時刻だけなら起床から最初の予定まで
-    // （最大2時間）を身支度とし、起床の時点で続いている予定があれば0。どちらも非自由。
-    // 0700-0700 のような同時刻の範囲は身支度0分（時刻だけの行とは区別する）。
-    if (wakeBlock && wakeBlock.end !== null && wakeBlock.end >= wake) {
-        busy.push({ start: wake, end: wakeBlock.end });
-    } else {
-        const firstStart = busy
-            .filter((e) => e.end > wake)
-            .reduce((min, e) => Math.min(min, Math.max(e.start, wake)), sleep);
-        busy.push({ start: wake, end: Math.min(wake + MORNING_MAX_MINUTES, firstStart) });
+/**
+ * 複数日をひと続きの時間として解析する。睡眠は日をまたぐので、隣の日の起床・消灯も見る。
+ * 渡した範囲の最初の境目より前は、最初が起床なら睡眠、消灯なら起きているとみなす。
+ */
+export function analyzeDays(days: DayInput[]): Map<string, DayAnalysis> {
+    const result = new Map<string, DayAnalysis>();
+    if (days.length === 0) return result;
+    const sorted = [...days].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    const first = sorted[0].date;
+    const parsed = sorted.map((d) => ({
+        date: d.date,
+        offset: daysBetween(first, d.date) * DAY_MINUTES,
+        ...parseDay(d.content, d.loaded),
+    }));
+    const total = parsed[parsed.length - 1].offset + DAY_MINUTES;
+
+    // 起床と消灯を時刻順に並べ、消灯の終わりから次の起床までを睡眠にする。起きている間の起床・眠っている
+    // 間の消灯（2つ目以降）は無視する。同じ時刻なら起床を先に置く。
+    type Edge = { at: number; kind: 'wake' } | { at: number; kind: 'lightsOut'; end: number };
+    const edges: Edge[] = [];
+    for (const p of parsed) {
+        if (p.wakeBlock) edges.push({ at: p.offset + p.wakeBlock.start, kind: 'wake' });
+        for (const l of p.lightsOuts) edges.push({ at: p.offset + l.start, kind: 'lightsOut', end: p.offset + l.end });
+    }
+    edges.sort((a, b) => a.at - b.at || (a.kind === 'wake' ? -1 : 1) - (b.kind === 'wake' ? -1 : 1));
+
+    const slots: SlotKind[] = new Array(total).fill('free');
+    let asleep = edges.length > 0 && edges[0].kind === 'wake';
+    let sleepFrom = 0;
+    for (const e of edges) {
+        if (asleep && e.kind === 'wake') {
+            slots.fill('sleep', sleepFrom, Math.max(sleepFrom, e.at));
+            asleep = false;
+        } else if (!asleep && e.kind === 'lightsOut') {
+            sleepFrom = Math.min(e.end, total);
+            asleep = true;
+        }
+    }
+    if (asleep) slots.fill('sleep', sleepFrom, total);
+
+    // 起きている間の予定（消灯の予定を含む）と身支度を非自由にする。
+    const busy: { start: number; end: number }[] = [];
+    for (const p of parsed) {
+        for (const e of p.events) busy.push({ start: p.offset + e.start, end: p.offset + e.end });
+        // 読み込んでいない日に補った既定の消灯は events に無いので足す（置いた時間には数えない）。
+        for (const l of p.lightsOuts) busy.push({ start: p.offset + l.start, end: p.offset + l.end });
+    }
+    const routines: { start: number; end: number }[] = [];
+    for (const p of parsed) {
+        if (!p.wakeBlock) continue;
+        const wake = p.offset + p.wakeBlock.start;
+        // 起床の行が範囲（0700-1200 起床 …）なら、その範囲が身支度。時刻だけなら起床から最初の予定まで
+        // （最大2時間）を身支度とし、起床の時点で続いている予定があれば0。
+        // 0700-0700 のような同時刻の範囲は身支度0分（時刻だけの行とは区別する）。
+        if (p.wakeBlock.end !== null && p.wakeBlock.end >= p.wakeBlock.start) {
+            routines.push({ start: wake, end: p.offset + p.wakeBlock.end });
+        } else {
+            const firstStart = busy
+                .filter((e) => e.end > wake)
+                .reduce((min, e) => Math.min(min, Math.max(e.start, wake)), wake + MORNING_MAX_MINUTES);
+            routines.push({ start: wake, end: firstStart });
+        }
+    }
+    for (const b of [...busy, ...routines]) {
+        for (let m = Math.max(b.start, 0); m < Math.min(b.end, total); m++) if (slots[m] !== 'sleep') slots[m] = 'busy';
+    }
+    // 「睡眠」と書いた予定（昼寝など）は睡眠として塗る。起床・消灯の境目は動かさない。
+    for (const p of parsed) {
+        for (const e of p.events) {
+            if (activityMatchesName(e.activity, '睡眠')) slots.fill('sleep', p.offset + e.start, p.offset + e.end);
+        }
     }
 
-    const slots: SlotKind[] = Array.from({ length: DAY_MINUTES }, (_, m) => (m < wake || m >= sleep ? 'sleep' : 'free'));
-    for (const b of busy) {
-        for (let m = Math.max(b.start, wake); m < Math.min(b.end, sleep); m++) slots[m] = 'busy';
+    for (const p of parsed) {
+        const runs: Run[] = [];
+        for (let m = 0; m < DAY_MINUTES; m++) {
+            const kind = slots[p.offset + m];
+            const last = runs[runs.length - 1];
+            if (last && last.kind === kind) last.end = m + 1;
+            else runs.push({ kind, start: m, end: m + 1 });
+        }
+        const wake = p.wakeBlock ? p.wakeBlock.start : 0;
+        const sleep = p.lightsOuts.filter((l) => l.start > wake).reduce((max, l) => Math.max(max, l.end), -1);
+        result.set(p.date, {
+            wake,
+            sleep: sleep < 0 ? DAY_MINUTES : sleep,
+            events: p.events,
+            runs,
+            freeMinutes: runs.filter((r) => r.kind === 'free').reduce((sum, r) => sum + r.end - r.start, 0),
+        });
     }
+    return result;
+}
 
-    const runs: Run[] = [];
-    slots.forEach((kind, m) => {
-        const last = runs[runs.length - 1];
-        if (last && last.kind === kind) last.end = m + 1;
-        else runs.push({ kind, start: m, end: m + 1 });
-    });
-
-    return {
-        wake,
-        sleep,
-        events,
-        runs,
-        freeMinutes: runs.filter((r) => r.kind === 'free').reduce((sum, r) => sum + r.end - r.start, 0),
-    };
+/**
+ * 1日だけを解析する。前後の日を見ないので、最初の境目より前は analyzeDays と同じ推定になる。
+ * loaded の既定は false（起床・消灯の行が無ければ既定で補う）。
+ */
+export function analyzeDayContent(content: string, loaded = false): DayAnalysis {
+    return analyzeDays([{ date: '2000-01-01', content, loaded }]).get('2000-01-01')!;
 }
 
 /** [from, to) に含まれる自由時間の分数。 */

@@ -53,6 +53,33 @@ export async function getSchedulesAllPages(
     }
 }
 
+/**
+ * startDay〜endDay（両端含む）のうち、スケジュール画面が既定予定を書き込んだ記録
+ * （default_schedule_applications）のある日。空き時間の計算で、既定の起床・消灯を補うかを決める。
+ * 1日に既定予定の数だけ行があるので、max_rows で切れないようページを分けて読む。
+ */
+export async function getDefaultAppliedDays(
+    supabase: SupabaseClient<Database>,
+    startDay: string,
+    endDay: string,
+): Promise<{ data: Set<string> | null; error: PostgrestError | null }> {
+    const days = new Set<string>()
+    for (let offset = 0; ; ) {
+        const { data, error } = await supabase
+            .from('default_schedule_applications')
+            .select('day_key')
+            .gte('day_key', startDay)
+            .lte('day_key', endDay)
+            .order('day_key', { ascending: true })
+            .order('default_schedule_id', { ascending: true })
+            .range(offset, offset + PAGE_ROWS - 1)
+        if (error) return { data: null, error }
+        if (!data || data.length === 0) return { data: days, error: null }
+        for (const row of data) days.add(row.day_key)
+        offset += data.length
+    }
+}
+
 export async function getScheduleDayRevisions(
     supabase: SupabaseClient<Database>,
     startDay: string,

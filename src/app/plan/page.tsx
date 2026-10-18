@@ -12,10 +12,9 @@ import type { CapacityDay } from '@/src/lib/plan/capacity-chart';
 import {
     EMPTY_DAY,
     addDays,
-    analyzeDayContent,
+    analyzeDays,
     evaluateGoals,
     freeMinutesBetween,
-    type DayAnalysis,
 } from '@/src/lib/schedules/free-time';
 import { createClient } from '@/src/lib/supabase/client';
 
@@ -42,16 +41,20 @@ export default function PlanPage() {
     // 置いた時間は現在時刻より後の予定だけを数えるので、今日から先だけ読む。
     const {
         contents,
+        loadedDays,
         isLoading: contentsLoading,
         error: contentsError,
         reload: reloadContents,
     } = usePlanDayContents(supabase, now?.today ?? null, now ? HORIZON_DAYS : 0);
 
-    const analyses = useMemo(() => {
-        const map = new Map<string, DayAnalysis>();
-        for (const [date, content] of contents) map.set(date, analyzeDayContent(content));
-        return map;
-    }, [contents]);
+    // 睡眠は日をまたぐので、読んだ日をまとめて解析する。
+    const analyses = useMemo(
+        () =>
+            analyzeDays(
+                [...contents].map(([date, content]) => ({ date, content, loaded: loadedDays.has(date) })),
+            ),
+        [contents, loadedDays],
+    );
     const analyze = useCallback((date: string) => analyses.get(date) ?? EMPTY_DAY, [analyses]);
 
     const statuses = useMemo(() => {

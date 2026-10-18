@@ -3,7 +3,7 @@ import { Undo2 } from 'lucide-react';
 import { FreeTimeStrip } from '@/src/components/plan/FreeTimeStrip';
 import { AutoHeightTextarea } from '@/src/components/schedules/AutoHeightTextarea';
 import { Button } from '@/src/components/ui/Button';
-import { analyzeDayContent } from '@/src/lib/schedules/free-time';
+import type { DayAnalysis } from '@/src/lib/schedules/free-time';
 import { findDayContentIssues, type DayContentIssue, type DayEntry } from '@/src/lib/schedules/text-format';
 
 const ISSUE_TEXT: Record<DayContentIssue['kind'], string> = {
@@ -31,6 +31,8 @@ type DaySectionProps = {
     isReadOnly?: boolean;
     // 今日だけ渡す。3色の帯に今の時刻の線を引く。
     nowMinutes?: number;
+    // 3色の帯の解析。睡眠は日をまたぐので、読み込んだ日をまとめて解析した結果を親から受け取る。
+    analysis: DayAnalysis;
 };
 
 export function DaySection({
@@ -44,10 +46,9 @@ export function DaySection({
     onBlur,
     isReadOnly = false,
     nowMinutes,
+    analysis,
 }: DaySectionProps) {
     const [previousContent, setPreviousContent] = useState<string | null>(null);
-    // 打つたびに再計算する（1日分なので軽い）。/plan の目標の判定と同じ計算。
-    const dayAnalysis = useMemo(() => analyzeDayContent(entry.content), [entry.content]);
     // 不正な行がある日は保存されない(useSchedules.saveDay)。何を直せばよいかはバッジのツールチップに出す。
     const issues = useMemo(() => findDayContentIssues(entry.content), [entry.content]);
     const canUndo = previousContent !== null && previousContent !== entry.content;
@@ -90,7 +91,7 @@ export function DaySection({
                     60日分のスクロール長が伸びるのを避ける)。スマホは幅が無いので出さない。
                     空き時間の数値は出さない(本人指定 2026-10-13。計画の機能はこの帯だけ)。 */}
                 <div className="hidden sm:block min-w-0 flex-1 px-4">
-                    <FreeTimeStrip analysis={dayAnalysis} nowMinutes={isToday ? nowMinutes : undefined} />
+                    <FreeTimeStrip analysis={analysis} nowMinutes={isToday ? nowMinutes : undefined} />
                 </div>
                 {/* 元に戻すボタンは幅を固定し、帯の右端をずらさない。 */}
                 <div className="flex items-center">

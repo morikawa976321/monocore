@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, analyzeDayContent, evaluateGoals, freeMinutesBetween, type GoalInput } from './free-time';
+import { addDays, analyzeDayContent, analyzeDays, evaluateGoals, freeMinutesBetween, type GoalInput } from './free-time';
 
 const h = (hours: number) => hours * 60;
 
@@ -60,6 +60,89 @@ describe('analyzeDayContent', () => {
         const a = analyzeDayContent(['0700 起床', '1050 院生ゼミ', '1500-1300 逆', '2200-2300 消灯'].join('\n'));
         expect(a.events.map((e) => e.activity)).toEqual(['消灯']);
         expect(a.freeMinutes).toBe(h(13));
+    });
+});
+
+describe('analyzeDays', () => {
+    const kinds = (a: { runs: { kind: string; start: number; end: number }[] }) =>
+        a.runs.map((r) => [r.kind, r.start, r.end]);
+
+    it('sleeps from the end of lights-out to the next wake across the day boundary', () => {
+        const days = analyzeDays([
+            { date: '2026-10-17', content: '0730 起床\n1400-1600 作業\n2200-2359 休憩', loaded: true },
+            { date: '2026-10-18', content: '0000-0300 消灯\n0900-1200 起床 発送\n2200-2300 消灯', loaded: true },
+        ]);
+        // 10/17 は消灯の行が無いので24時まで起きている（2359 の終わりは24時）
+        expect(kinds(days.get('2026-10-17')!)).toEqual([
+            ['sleep', 0, h(7.5)],
+            ['busy', h(7.5), h(9.5)],
+            ['free', h(9.5), h(14)],
+            ['busy', h(14), h(16)],
+            ['free', h(16), h(22)],
+            ['busy', h(22), h(24)],
+        ]);
+        // 10/18 は 0000-0300 の消灯が起きている時間で、03:00 から起床までが睡眠
+        expect(kinds(days.get('2026-10-18')!)).toEqual([
+            ['busy', 0, h(3)],
+            ['sleep', h(3), h(9)],
+            ['busy', h(9), h(12)],
+            ['free', h(12), h(22)],
+            ['busy', h(22), h(23)],
+            ['sleep', h(23), h(24)],
+        ]);
+        expect(days.get('2026-10-18')!.freeMinutes).toBe(h(10));
+    });
+
+    it('ignores a second lights-out before the next wake', () => {
+        const days = analyzeDays([
+            { date: '2026-10-17', content: '0700 起床\n2200-2300 消灯', loaded: true },
+            { date: '2026-10-18', content: '0000-0300 消灯\n0900 起床', loaded: true },
+        ]);
+        expect(kinds(days.get('2026-10-17')!).at(-1)).toEqual(['sleep', h(23), h(24)]);
+        expect(kinds(days.get('2026-10-18')!)[0]).toEqual(['sleep', 0, h(9)]);
+    });
+
+    it('ignores a second wake while awake', () => {
+        const days = analyzeDays([
+            { date: '2026-10-17', content: '0700 起床', loaded: true },
+            { date: '2026-10-18', content: '0900 起床\n2200-2300 消灯', loaded: true },
+        ]);
+        // 10/17 は消灯が無いので、10/18 の 0900 起床までずっと起きている
+        expect(kinds(days.get('2026-10-18')!).slice(0, 2)).toEqual([
+            ['free', 0, h(9)],
+            ['busy', h(9), h(11)],
+        ]);
+    });
+
+    it('fills the default wake and lights-out only on days the schedule page has not loaded', () => {
+        const days = analyzeDays([
+            { date: '2026-10-20', content: '0700 起床\n1300-1500 作業', loaded: true },
+            { date: '2026-10-21', content: '1300-1500 作業', loaded: false },
+        ]);
+        // 読み込んだ日は行のとおり（消灯が無いので24時まで起きている）
+        expect(kinds(days.get('2026-10-20')!).at(-1)).toEqual(['free', h(15), h(24)]);
+        // 読み込んでいない日は 0700 起床・2200-2300 消灯で補う（前日から起きているので 0700 は境目にならず、
+        // 身支度だけ置く）
+        expect(kinds(days.get('2026-10-21')!)).toEqual([
+            ['free', 0, h(7)],
+            ['busy', h(7), h(9)],
+            ['free', h(9), h(13)],
+            ['busy', h(13), h(15)],
+            ['free', h(15), h(22)],
+            ['busy', h(22), h(23)],
+            ['sleep', h(23), h(24)],
+        ]);
+    });
+
+    it('paints events named 睡眠 as sleep without moving the wake/lights-out boundaries', () => {
+        const a = analyzeDayContent('0730 起床\n0800-1330 睡眠\n1330-1400 睡眠薬を買う\n2200-2300 消灯', true);
+        expect(kinds(a).slice(0, 5)).toEqual([
+            ['sleep', 0, h(7.5)],
+            ['busy', h(7.5), h(8)],
+            ['sleep', h(8), h(13.5)],
+            ['busy', h(13.5), h(14)],
+            ['free', h(14), h(22)],
+        ]);
     });
 });
 

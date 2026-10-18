@@ -9,6 +9,7 @@ import { useInbox } from '@/src/hooks/useInbox';
 import { useDayNotes } from '@/src/hooks/useDayNotes';
 import { useNow } from '@/src/hooks/useNow';
 import { useSchedules } from '@/src/hooks/useSchedules';
+import { analyzeDays } from '@/src/lib/schedules/free-time';
 import { dateLabelToDateStr } from '@/src/lib/schedules/text-format';
 import { Inbox } from 'lucide-react';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
@@ -53,6 +54,12 @@ export default function SchedulesPage() {
     });
 
     const now = useNow();
+    // 3色の帯。睡眠は日をまたぐので、読み込んだ日をまとめて解析する（打つたびに再計算する）。画面に出す日は
+    // 既定予定を書き込んでから読んでいるので、起床・消灯の行が無ければ本人が消したものとして補わない。
+    const analyses = useMemo(
+        () => analyzeDays(entries.map((e) => ({ date: dateLabelToDateStr(e.dateLabel), content: e.content, loaded: true }))),
+        [entries],
+    );
 
     const handleInboxToggle = () => {
         if (inboxOpen) saveInboxNow();
@@ -138,6 +145,7 @@ export default function SchedulesPage() {
                             onFocus={() => focusDay(entry.dateLabel)}
                             onBlur={() => blurDay(entry.dateLabel)}
                             nowMinutes={now?.nowMinutes}
+                            analysis={analyses.get(dateLabelToDateStr(entry.dateLabel))!}
                         />
                     ))}
 
