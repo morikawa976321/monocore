@@ -20,6 +20,11 @@ import { createClient } from '@/src/lib/supabase/client';
 
 /** 今日から先に予定を読む日数。期日がこれより先なら、その先は予定の無い日（EMPTY_DAY）として数える。 */
 const HORIZON_DAYS = 120;
+/**
+ * 今日より前に読む日数。睡眠は日をまたぐ（消灯の終わりから次の起床まで）ので、今日の0時に眠っているかを
+ * 決めるために前の日の起床・消灯を見る。置いた時間と自由時間は今日から先だけを数える（evaluateGoals）。
+ */
+const LOOKBACK_DAYS = 7;
 /** 累積グラフの幅（日）。目標の期日が先なら期日の3日後まで伸ばすが、予定を読んだ範囲で打ち切る。 */
 const CHART_MIN_DAYS = 21;
 /** 期日の入力の上限（年の打ち間違いを入口で止める）。 */
@@ -38,14 +43,18 @@ export default function PlanPage() {
     const { goals, isLoading: goalsLoading, error: goalsError, reload: reloadGoals, addGoal, updateGoal, removeGoal } =
         usePlanGoals(supabase);
     const goalInputs = useMemo(() => goals.map(planGoalToInput), [goals]);
-    // 置いた時間は現在時刻より後の予定だけを数えるので、今日から先だけ読む。
+    // 置いた時間は現在時刻より後の予定だけを数える。前の数日は睡眠の境目を知るためだけに読む。
     const {
         contents,
         loadedDays,
         isLoading: contentsLoading,
         error: contentsError,
         reload: reloadContents,
-    } = usePlanDayContents(supabase, now?.today ?? null, now ? HORIZON_DAYS : 0);
+    } = usePlanDayContents(
+        supabase,
+        now ? addDays(now.today, -LOOKBACK_DAYS) : null,
+        now ? LOOKBACK_DAYS + HORIZON_DAYS : 0,
+    );
 
     // 睡眠は日をまたぐので、読んだ日をまとめて解析する。
     const analyses = useMemo(

@@ -78,29 +78,28 @@ function parseBlocks(content: string): Block[] {
 }
 
 type ParsedDay = {
-    /** 起床の行。無ければ null（読み込んでいない日は既定の 0700 起床で補う）。 */
-    wakeBlock: Block | null;
+    /** 起床の行（時刻順）。読み込んでいない日で1つも無ければ、既定の 0700 起床で補う。 */
+    wakeBlocks: Block[];
     events: DayEvent[];
-    /** 消灯の予定。読み込んでいない日で起床より後に無ければ、既定の 2200-2300 消灯を足す。 */
+    /** 消灯の予定。読み込んでいない日で1つも無ければ、既定の 2200-2300 消灯で補う。 */
     lightsOuts: { start: number; end: number }[];
 };
 
 function parseDay(content: string, loaded: boolean): ParsedDay {
     const blocks = parseBlocks(content);
-    let wakeBlock = blocks.find((b) => b.activity.includes('起床')) ?? null;
+    const wakeBlocks = blocks.filter((b) => b.activity.includes('起床')).sort((a, b) => a.start - b.start);
     // 時刻範囲を持つ予定だけを数える。終了の無い行・終了が開始より前の行は保存前に弾かれるが、
     // 規則を入れる前に保存された古い行が残っていても数えない。
     const events: DayEvent[] = blocks
-        .filter((b): b is Block & { end: number } => b !== wakeBlock && b.end !== null && b.end > b.start)
+        .filter((b): b is Block & { end: number } => !wakeBlocks.includes(b) && b.end !== null && b.end > b.start)
         .map((b) => ({ start: b.start, end: b.end, activity: b.activity }))
         .sort((a, b) => a.start - b.start);
     const lightsOuts = events.filter((e) => e.activity.includes('消灯')).map((e) => ({ start: e.start, end: e.end }));
     if (!loaded) {
-        if (!wakeBlock) wakeBlock = { start: DEFAULT_WAKE_MINUTES, end: null, activity: '起床' };
-        const wake = wakeBlock.start;
-        if (!lightsOuts.some((l) => l.start > wake)) lightsOuts.push({ ...DEFAULT_LIGHTS_OUT });
+        if (wakeBlocks.length === 0) wakeBlocks.push({ start: DEFAULT_WAKE_MINUTES, end: null, activity: '起床' });
+        if (lightsOuts.length === 0) lightsOuts.push({ ...DEFAULT_LIGHTS_OUT });
     }
-    return { wakeBlock, events, lightsOuts };
+    return { wakeBlocks, events, lightsOuts };
 }
 
 export type DayInput = {
@@ -113,7 +112,8 @@ export type DayInput = {
 
 /**
  * 複数日をひと続きの時間として解析する。睡眠は日をまたぐので、隣の日の起床・消灯も見る。
- * 渡した範囲の最初の境目より前は、最初が起床なら睡眠、消灯なら起きているとみなす。
+ * 渡した範囲の最初の境目より前は、最初が起床なら睡眠、消灯なら起きているとみなす。範囲の最初の日を
+ * 正しく数えたいときは、前の日も含めて渡す。
  */
 export function analyzeDays(days: DayInput[]): Map<string, DayAnalysis> {
     const result = new Map<string, DayAnalysis>();
@@ -127,54 +127,57 @@ export function analyzeDays(days: DayInput[]): Map<string, DayAnalysis> {
     }));
     const total = parsed[parsed.length - 1].offset + DAY_MINUTES;
 
-    // 起床と消灯を時刻順に並べ、消灯の終わりから次の起床までを睡眠にする。起きている間の起床・眠っている
-    // 間の消灯（2つ目以降）は無視する。同じ時刻なら起床を先に置く。
-    type Edge = { at: number; kind: 'wake' } | { at: number; kind: 'lightsOut'; end: number };
+    // 起床と、消灯の予定の終わり（眠りに入る時刻）を時刻順に並べ、消灯の終わりから次の起床までを睡眠に
+    // する。起きている間の起床・眠っている間の消灯（続いたときの2つ目以降）は無視する。消灯の時間の途中に
+    // ある起床は、眠りに入る前なので無視される。同じ時刻なら消灯を先に置く（0300 に消灯が終わり 0300 に
+    // 起床なら起きている）。
+    type Edge = { at: number; kind: 'wake' | 'sleep' };
     const edges: Edge[] = [];
     for (const p of parsed) {
-        if (p.wakeBlock) edges.push({ at: p.offset + p.wakeBlock.start, kind: 'wake' });
-        for (const l of p.lightsOuts) edges.push({ at: p.offset + l.start, kind: 'lightsOut', end: p.offset + l.end });
+        for (const w of p.wakeBlocks) edges.push({ at: p.offset + w.start, kind: 'wake' });
+        for (const l of p.lightsOuts) edges.push({ at: p.offset + l.end, kind: 'sleep' });
     }
-    edges.sort((a, b) => a.at - b.at || (a.kind === 'wake' ? -1 : 1) - (b.kind === 'wake' ? -1 : 1));
+    edges.sort((a, b) => a.at - b.at || (a.kind === 'sleep' ? -1 : 1) - (b.kind === 'sleep' ? -1 : 1));
 
     const slots: SlotKind[] = new Array(total).fill('free');
     let asleep = edges.length > 0 && edges[0].kind === 'wake';
     let sleepFrom = 0;
     for (const e of edges) {
         if (asleep && e.kind === 'wake') {
-            slots.fill('sleep', sleepFrom, Math.max(sleepFrom, e.at));
+            slots.fill('sleep', sleepFrom, e.at);
             asleep = false;
-        } else if (!asleep && e.kind === 'lightsOut') {
-            sleepFrom = Math.min(e.end, total);
+        } else if (!asleep && e.kind === 'sleep') {
+            sleepFrom = Math.min(e.at, total);
             asleep = true;
         }
     }
     if (asleep) slots.fill('sleep', sleepFrom, total);
 
     // 起きている間の予定（消灯の予定を含む）と身支度を非自由にする。
-    const busy: { start: number; end: number }[] = [];
-    for (const p of parsed) {
-        for (const e of p.events) busy.push({ start: p.offset + e.start, end: p.offset + e.end });
-        // 読み込んでいない日に補った既定の消灯は events に無いので足す（置いた時間には数えない）。
-        for (const l of p.lightsOuts) busy.push({ start: p.offset + l.start, end: p.offset + l.end });
-    }
+    // 読み込んでいない日に補った既定の消灯は events に無いので足す（置いた時間には数えない）。
+    const busyByDay = parsed.map((p) =>
+        [...p.events, ...p.lightsOuts].map((e) => ({ start: p.offset + e.start, end: p.offset + e.end })),
+    );
     const routines: { start: number; end: number }[] = [];
-    for (const p of parsed) {
-        if (!p.wakeBlock) continue;
-        const wake = p.offset + p.wakeBlock.start;
-        // 起床の行が範囲（0700-1200 起床 …）なら、その範囲が身支度。時刻だけなら起床から最初の予定まで
-        // （最大2時間）を身支度とし、起床の時点で続いている予定があれば0。
-        // 0700-0700 のような同時刻の範囲は身支度0分（時刻だけの行とは区別する）。
-        if (p.wakeBlock.end !== null && p.wakeBlock.end >= p.wakeBlock.start) {
-            routines.push({ start: wake, end: p.offset + p.wakeBlock.end });
-        } else {
-            const firstStart = busy
-                .filter((e) => e.end > wake)
-                .reduce((min, e) => Math.min(min, Math.max(e.start, wake)), wake + MORNING_MAX_MINUTES);
-            routines.push({ start: wake, end: firstStart });
+    parsed.forEach((p, i) => {
+        // 身支度は最大2時間なので、ぶつかる予定はその日か翌日にしか無い。
+        const nearby = [...busyByDay[i], ...(busyByDay[i + 1] ?? [])];
+        for (const w of p.wakeBlocks) {
+            const wake = p.offset + w.start;
+            // 起床の行が範囲（0700-1200 起床 …）なら、その範囲が身支度。時刻だけなら起床から最初の予定まで
+            // （最大2時間）を身支度とし、起床の時点で続いている予定があれば0。
+            // 0700-0700 のような同時刻の範囲は身支度0分（時刻だけの行とは区別する）。
+            if (w.end !== null && w.end >= w.start) {
+                routines.push({ start: wake, end: p.offset + w.end });
+            } else {
+                const firstStart = nearby
+                    .filter((e) => e.end > wake)
+                    .reduce((min, e) => Math.min(min, Math.max(e.start, wake)), wake + MORNING_MAX_MINUTES);
+                routines.push({ start: wake, end: firstStart });
+            }
         }
-    }
-    for (const b of [...busy, ...routines]) {
+    });
+    for (const b of [...busyByDay.flat(), ...routines]) {
         for (let m = Math.max(b.start, 0); m < Math.min(b.end, total); m++) if (slots[m] !== 'sleep') slots[m] = 'busy';
     }
     // 「睡眠」と書いた予定（昼寝など）は睡眠として塗る。起床・消灯の境目は動かさない。
@@ -192,7 +195,7 @@ export function analyzeDays(days: DayInput[]): Map<string, DayAnalysis> {
             if (last && last.kind === kind) last.end = m + 1;
             else runs.push({ kind, start: m, end: m + 1 });
         }
-        const wake = p.wakeBlock ? p.wakeBlock.start : 0;
+        const wake = p.wakeBlocks.length > 0 ? p.wakeBlocks[0].start : 0;
         const sleep = p.lightsOuts.filter((l) => l.start > wake).reduce((max, l) => Math.max(max, l.end), -1);
         result.set(p.date, {
             wake,

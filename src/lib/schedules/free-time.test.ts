@@ -114,6 +114,36 @@ describe('analyzeDays', () => {
         ]);
     });
 
+    it('uses every wake line of a day, so a nap ended by lights-out and a second wake is counted', () => {
+        const a = analyzeDayContent('0700 起床\n1200-1300 消灯\n1800 起床\n2200-2300 消灯', true);
+        expect(kinds(a)).toEqual([
+            ['sleep', 0, h(7)],
+            ['busy', h(7), h(9)],
+            ['free', h(9), h(12)],
+            ['busy', h(12), h(13)],
+            ['sleep', h(13), h(18)],
+            ['busy', h(18), h(20)],
+            ['free', h(20), h(22)],
+            ['busy', h(22), h(23)],
+            ['sleep', h(23), h(24)],
+        ]);
+    });
+
+    it('ignores a wake inside a lights-out event, since sleep starts only at its end', () => {
+        const days = analyzeDays([
+            { date: '2026-10-18', content: '0000-0300 消灯\n0100 起床', loaded: true },
+            { date: '2026-10-19', content: '0700 起床\n2200-2300 消灯', loaded: true },
+        ]);
+        expect(kinds(days.get('2026-10-18')!).at(-1)).toEqual(['sleep', h(3), h(24)]);
+        expect(kinds(days.get('2026-10-19')!)[0]).toEqual(['sleep', 0, h(7)]);
+    });
+
+    it('does not add the default lights-out to an unloaded day that already has a lights-out line', () => {
+        const a = analyzeDayContent('0000-0300 消灯\n0900 起床');
+        // 03:00-09:00 睡眠、09:00-11:00 身支度、その後は24時まで起きている
+        expect(a.freeMinutes).toBe(h(13));
+    });
+
     it('fills the default wake and lights-out only on days the schedule page has not loaded', () => {
         const days = analyzeDays([
             { date: '2026-10-20', content: '0700 起床\n1300-1500 作業', loaded: true },
@@ -266,6 +296,22 @@ describe('evaluateGoals', () => {
         const [far] = evaluateGoals({ ...base, goals: [goal({ id: 'far', dueOn: '9999-12-31' })] });
         expect(performance.now() - started).toBeLessThan(50);
         expect(far.supplyMinutes).toBeGreaterThan(0);
+    });
+
+    it('uses the days before today to know whether today starts awake', () => {
+        // 前日に消灯が無く起きたまま。今日の 0900 起床は境目にならず、0〜9時は自由
+        const awake = analyzeDays([
+            { date: '2026-10-06', content: '0700 起床', loaded: true },
+            { date: '2026-10-07', content: '0900 起床\n2200-2300 消灯', loaded: true },
+        ]);
+        const [s] = evaluateGoals({
+            days: awake,
+            today: '2026-10-07',
+            nowMinutes: 0,
+            goals: [goal({ id: 'a', dueOn: '2026-10-07', dueMinutes: h(8), needMinutes: h(1) })],
+        });
+        expect(s.supplyMinutes).toBe(h(8));
+        expect(s.ok).toBe(true);
     });
 
     it('handles a goal due today on a day that was not loaded', () => {
