@@ -42,6 +42,9 @@ import {
  */
 const MAX_CONSECUTIVE_SAVE_FAILURES = 3;
 
+/** 既定予定を書き込んだ記録を読み損ねたときの表示。記録の無い日が読込済みとして描かれうる。再読み込みで直る。 */
+const APPLIED_DAYS_ERROR = '既定予定の記録の読み込みに失敗しました（睡眠の帯が正しくない日があります）。';
+
 type UseSchedulesCompanions = {
     loadNotes: (startDay: string, endDay: string) => Promise<number>;
     flushPendingNoteSaves: () => void;
@@ -150,26 +153,39 @@ export function useSchedules(
         [supabase, tz]
     );
 
+    /** readAppliedDays の要求の通し番号と、日ごとに最後にその日を読みに行った要求の番号。 */
+    const appliedReadSeqRef = useRef(0);
+    const appliedReadOfDayRef = useRef(new Map<string, number>());
+
     /**
      * 既定予定を書き込んだ記録を読み、記録の無い日を unappliedDays に入れる。applyDefaults の後に同じ範囲で
-     * 呼ぶ（先に読むと、これから書き込む日まで記録が無いと判定する）。読み損ねたら、その範囲は今の判定のまま。
+     * 呼ぶ（先に読むと、これから書き込む日まで記録が無いと判定する）。読み込みは範囲が重なって並ぶことがある
+     * （初回の読み込み中の再読み込みなど）ので、日ごとに最後に読みに行った要求の応答だけを反映し、遅れて
+     * 届いた古い応答で新しい結果を戻さない。読み損ねたら false を返し、呼び出し元が同期エラーとして出す
+     * （その日は今の判定のままなので、記録の無い日が読込済みとして描かれうる）。
      */
     const readAppliedDays = useCallback(
-        async (startDay: string, endDay: string) => {
+        async (startDay: string, endDay: string): Promise<boolean> => {
+            const seq = ++appliedReadSeqRef.current;
+            const days: string[] = [];
+            for (let d = parseISO(startDay); d <= parseISO(endDay); d = addDays(d, 1)) days.push(format(d, 'yyyy-MM-dd'));
+            for (const day of days) appliedReadOfDayRef.current.set(day, seq);
             const { data, error } = await getDefaultAppliedDays(supabase, startDay, endDay);
+            const latest = days.filter((day) => appliedReadOfDayRef.current.get(day) === seq);
+            if (latest.length === 0) return true;
             if (error || !data) {
                 console.error('既定予定の記録の読み込みに失敗しました', error);
-                return;
+                return false;
             }
             setUnappliedDays((prev) => {
                 const next = new Set(prev);
-                for (let d = parseISO(startDay); d <= parseISO(endDay); d = addDays(d, 1)) {
-                    const day = format(d, 'yyyy-MM-dd');
+                for (const day of latest) {
                     if (data.has(day)) next.delete(day);
                     else next.add(day);
                 }
                 return next;
             });
+            return true;
         },
         [supabase]
     );
@@ -190,9 +206,6 @@ export function useSchedules(
         const endUtc = localTimeToUtc(format(addDays(end, 1), 'yyyy-MM-dd'), '0000', tz);
         void loadNotes(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'));
         void applyDefaults(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'))
-            .then(() => {
-                void readAppliedDays(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'));
-            })
             .then(() => Promise.all([
                 getSchedules(supabase, startUtc, endUtc),
                 getScheduleDayRevisions(
@@ -200,8 +213,9 @@ export function useSchedules(
                     format(start, 'yyyy-MM-dd'),
                     format(end, 'yyyy-MM-dd')
                 ),
+                readAppliedDays(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd')),
             ]))
-            .then(([schedulesResult, revisionsResult]) => {
+            .then(([schedulesResult, revisionsResult, appliedOk]) => {
                 if (schedulesResult.error || revisionsResult.error) {
                     setSyncError('スケジュールの読み込みに失敗しました。');
                     return;
@@ -209,6 +223,7 @@ export function useSchedules(
                 const merged = mergeSchedulesIntoEntries(initial, schedulesResult.data ?? [], tz);
                 setEntries(applyScheduleRevisions(merged, revisionsResult.data ?? []));
                 scrollTodayAfterInitialMergeRef.current = true;
+                if (!appliedOk) setSyncError(APPLIED_DAYS_ERROR);
             })
             .finally(() => {
                 setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
@@ -225,14 +240,14 @@ export function useSchedules(
         const startUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(rangeStart, 'yyyy-MM-dd'), format(rangeEnd, 'yyyy-MM-dd'));
-        void readAppliedDays(format(rangeStart, 'yyyy-MM-dd'), format(rangeEnd, 'yyyy-MM-dd'));
-        const [schedulesResult, revisionsResult] = await Promise.all([
+        const [schedulesResult, revisionsResult, appliedOk] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(
                 supabase,
                 format(rangeStart, 'yyyy-MM-dd'),
                 format(rangeEnd, 'yyyy-MM-dd')
             ),
+            readAppliedDays(format(rangeStart, 'yyyy-MM-dd'), format(rangeEnd, 'yyyy-MM-dd')),
         ]);
         if (!schedulesResult.error && !revisionsResult.error) {
             setEntries((prev) => {
@@ -247,7 +262,8 @@ export function useSchedules(
             // サーバの最新revisionを取り込めたので、打ち切っていた日の自動保存を再開してよい。
             autoSaveSuspendedRef.current.clear();
             saveFailureCountRef.current.clear();
-            setSyncError(null);
+            // 読み込んだ全範囲の記録を読み直したので、記録の読み損ねが解消したかもここで決まる。
+            setSyncError(appliedOk ? null : APPLIED_DAYS_ERROR);
         } else {
             setSyncError('スケジュールの同期に失敗しました。');
         }
@@ -511,14 +527,14 @@ export function useSchedules(
         );
         const endUtc = localTimeToUtc(format(addDays(newEnd, 1), 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd'));
-        void readAppliedDays(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd'));
-        const [schedulesResult, revisionsResult] = await Promise.all([
+        const [schedulesResult, revisionsResult, appliedOk] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(
                 supabase,
                 format(addDays(rangeEnd, 1), 'yyyy-MM-dd'),
                 format(newEnd, 'yyyy-MM-dd')
             ),
+            readAppliedDays(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd')),
         ]);
         const merged = applyScheduleRevisions(
             mergeSchedulesIntoEntries(newEntries, schedulesResult.data ?? [], tz),
@@ -526,6 +542,7 @@ export function useSchedules(
         );
         setEntries((prev) => [...prev, ...merged]);
         setRangeEnd(newEnd);
+        if (!appliedOk) setSyncError(APPLIED_DAYS_ERROR);
         setLoadingBottom(false);
     }, [loadingBottom, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays]);
 
@@ -537,8 +554,7 @@ export function useSchedules(
         const startUtc = localTimeToUtc(format(newStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd'));
-        void readAppliedDays(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd'));
-        const [noteCount, [schedulesResult, revisionsResult]] = await Promise.all([
+        const [noteCount, [schedulesResult, revisionsResult, appliedOk]] = await Promise.all([
             loadNotes(
                 format(newStart, 'yyyy-MM-dd'),
                 format(addDays(rangeStart, -1), 'yyyy-MM-dd')
@@ -550,6 +566,7 @@ export function useSchedules(
                     format(newStart, 'yyyy-MM-dd'),
                     format(addDays(rangeStart, -1), 'yyyy-MM-dd')
                 ),
+                readAppliedDays(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd')),
             ]),
         ]);
         const scheduleRows = schedulesResult.data ?? [];
@@ -568,6 +585,7 @@ export function useSchedules(
         }
         setEntries((prev) => [...merged, ...prev]);
         setRangeStart(newStart);
+        if (!appliedOk) setSyncError(APPLIED_DAYS_ERROR);
         setLoadingTop(false);
     }, [loadingTop, hasMorePast, rangeStart, supabase, tz, loadNotes, applyDefaults, readAppliedDays]);
 

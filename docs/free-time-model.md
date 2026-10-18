@@ -311,7 +311,7 @@ F  = U \ (SL ∪ B)                  自由
    `EMPTY_DAY` は「0時に眠っている未読込の空の日」として定義し直した(値は同じ 780分)。
 3. **カードの反映**(1枚1コミット): `decisions.md` の文面とテストの期待値を同じコミットで変えた。
    - カード2(d2343e9): 起床・消灯を語として判定し、`findDayContentIssues` も `isWakeActivity` で揃えた。語の判定 `activityMatchesName` は循環 import を避けるため `text-format.ts` に移し、`free-time.ts` から同じ名前で再 export した。
-   - カード4(c738f8a): `useSchedules` が読み込みの4経路で `applyDefaults` の後に同じ範囲の記録を読み、記録の無い日を `unappliedDays` として返す。スケジュール画面はそれを `loaded` に使う。
+   - カード4(c738f8a): `useSchedules` が読み込みの4経路で `applyDefaults` の後に同じ範囲の記録を読み、記録の無い日を `unappliedDays` として返す。スケジュール画面はそれを `loaded` に使う。範囲の重なった読み込みでは、日ごとに最後に読みに行った要求の応答だけを反映し、記録の読み損ねは見出しの同期エラーとして出す(再読み込みで消える。sol のレビューの指摘)。
    - カード6(2a4b943): `positionWithinDay` を時計の時刻にし、`DayAnalysis` と `CapacityDay` から `wake` / `sleep` を外した。
    - カード1・3・5: コードは変えず、`decisions.md` に決定を書いた。
 4. (任意・未着手)`evaluateGoals` の供給を、日ごとの切り分け(今日・期日の日・読込済み・未読込の場合分け)ではなく、全体の時間軸の自由時間から求める。手順2の後なら小さな変更で済む。
