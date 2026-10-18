@@ -181,6 +181,92 @@ describe('analyzeDays', () => {
     });
 });
 
+// 予定テキストの解釈。性質テスト（free-time.property.test.ts）は行の構造から作るので、テキスト固有の解釈はここで確かめる。
+describe('analyzeDays: interpretation of the text', () => {
+    const kinds = (a: { runs: { kind: string; start: number; end: number }[] }) =>
+        a.runs.map((r) => [r.kind, r.start, r.end]);
+    const plainDay = [
+        ['sleep', 0, h(7)],
+        ['busy', h(7), h(9)],
+        ['free', h(9), h(22)],
+        ['busy', h(22), h(23)],
+        ['sleep', h(23), h(24)],
+    ];
+
+    it('reads a description continued on the next lines as part of the time line', () => {
+        expect(kinds(analyzeDayContent('0700\n起床\n2200-2300\n消灯', true))).toEqual(plainDay);
+    });
+
+    it('treats 起床 followed by punctuation as a wake (substring match)', () => {
+        expect(kinds(analyzeDayContent('0700 起床。\n2200-2300 消灯', true))).toEqual(plainDay);
+    });
+
+    it('does not paint a wake line that also says 睡眠 as sleep', () => {
+        // 起床の行は予定ではないので「睡眠」の塗りにならず、範囲が身支度になる
+        const a = analyzeDayContent('0700 起床\n1300-1400 起床 睡眠\n2200-2300 消灯', true);
+        expect(kinds(a).slice(2, 5)).toEqual([
+            ['free', h(9), h(13)],
+            ['busy', h(13), h(14)],
+            ['free', h(14), h(22)],
+        ]);
+    });
+
+    it('treats a reversed wake range as a wake time without a range', () => {
+        expect(kinds(analyzeDayContent('0900-0700 起床\n2200-2300 消灯', true)).slice(0, 2)).toEqual([
+            ['sleep', 0, h(9)],
+            ['busy', h(9), h(11)],
+        ]);
+    });
+
+    it('reads the end 2359 as 24:00 even for a zero-length range', () => {
+        // 2359-2359 は 23:59〜24:00 の1分になる
+        expect(kinds(analyzeDayContent('0700 起床\n2359-2359 消灯', true)).at(-1)).toEqual(['busy', h(24) - 1, h(24)]);
+        expect(kinds(analyzeDayContent('2359-2359 起床', true))).toEqual([
+            ['sleep', 0, h(24) - 1],
+            ['busy', h(24) - 1, h(24)],
+        ]);
+    });
+});
+
+describe('analyzeDays: boundary cases', () => {
+    const kinds = (a: { runs: { kind: string; start: number; end: number }[] }) =>
+        a.runs.map((r) => [r.kind, r.start, r.end]);
+
+    it('is awake when lights-out ends at the same time as a wake', () => {
+        const days = analyzeDays([
+            { date: '2026-10-17', content: '0700 起床', loaded: true },
+            { date: '2026-10-18', content: '0000-0300 消灯\n0300 起床\n2200-2300 消灯', loaded: true },
+        ]);
+        // 03:00 に消灯が終わり 03:00 に起床するので眠らない。0〜3時は消灯の予定、3〜5時は身支度
+        expect(kinds(days.get('2026-10-18')!)).toEqual([
+            ['busy', 0, h(5)],
+            ['free', h(5), h(22)],
+            ['busy', h(22), h(23)],
+            ['sleep', h(23), h(24)],
+        ]);
+    });
+
+    it('gives no morning routine when an event is still going on at the wake time', () => {
+        // 未読込の日の既定の 07:00 起床。03:31-07:01 の予定が続いているので身支度は0分で、07:01 から自由
+        const a = analyzeDayContent('0331-0701 作業');
+        expect(kinds(a).slice(0, 3)).toEqual([
+            ['sleep', 0, h(7)],
+            ['busy', h(7), h(7) + 1],
+            ['free', h(7) + 1, h(22)],
+        ]);
+    });
+
+    it('infers the state before the range from its first mark, even across days without marks', () => {
+        // 範囲の最初の印が起床なので、それより前の印の無い8日間はすべて睡眠になる（前の日を読まない限り確定できない）
+        const days = analyzeDays([
+            ...Array.from({ length: 8 }, (_, i) => ({ date: addDays('2026-10-10', i), content: '1000-1200 作業', loaded: true })),
+            { date: '2026-10-18', content: '0700 起床\n2200-2300 消灯', loaded: true },
+        ]);
+        expect(kinds(days.get('2026-10-10')!)).toEqual([['sleep', 0, h(24)]]);
+        expect(days.get('2026-10-18')!.freeMinutes).toBe(h(13));
+    });
+});
+
 describe('freeMinutesBetween', () => {
     it('counts only the free minutes inside the range', () => {
         expect(freeMinutesBetween(analyzeDayContent(''), h(8), h(12))).toBe(h(3));
@@ -317,6 +403,24 @@ describe('evaluateGoals', () => {
         });
         expect(s.supplyMinutes).toBe(h(8));
         expect(s.ok).toBe(true);
+    });
+
+    it('counts a day outside the analyzed range as an empty day that starts asleep', () => {
+        // 10/18 は消灯が無く起きたまま終わる。10/19 を解析に含めないと予定の無い日（0〜7時は睡眠）として数え、
+        // 未読込の空の日として含めると前日から起きたままになる。/plan は今日から120日先まで全日を解析するので、
+        // この差はそれより先でしか起きない。
+        const goals = [goal({ id: 'g', dueOn: '2026-10-19', dueMinutes: h(8) })];
+        const awake = { today: '2026-10-18', nowMinutes: 0, goals };
+        const outside = evaluateGoals({ ...awake, days: analyzeDays([{ date: '2026-10-18', content: '0700 起床', loaded: true }]) });
+        const inside = evaluateGoals({
+            ...awake,
+            days: analyzeDays([
+                { date: '2026-10-18', content: '0700 起床', loaded: true },
+                { date: '2026-10-19', content: '', loaded: false },
+            ]),
+        });
+        expect(outside[0].supplyMinutes).toBe(h(15));
+        expect(inside[0].supplyMinutes).toBe(h(22));
     });
 
     it('handles a goal due today on a day that was not loaded', () => {
