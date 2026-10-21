@@ -2,12 +2,14 @@
 
 import { useCallback, useMemo } from 'react';
 import { PageHeader } from '@/src/components/layout/PageHeader';
+import { BlockedProjectCards } from '@/src/components/plan/BlockedProjectCards';
 import { CapacityChart } from '@/src/components/plan/CapacityChart';
 import { GoalEditor } from '@/src/components/plan/GoalEditor';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { useNow } from '@/src/hooks/useNow';
 import { usePlanDayContents } from '@/src/hooks/usePlanDayContents';
 import { planGoalToInput, usePlanGoals } from '@/src/hooks/usePlanGoals';
+import { MOCK_BLOCKED_PROJECTS } from '@/src/lib/plan/blocked-projects';
 import type { CapacityDay } from '@/src/lib/plan/capacity-chart';
 import {
     EMPTY_DAY,
@@ -37,6 +39,9 @@ const CARD = 'rounded overflow-hidden border border-neutral-400 bg-neutral-50 da
 const CARD_HEADER =
     'px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 font-normal text-neutral-700 dark:text-neutral-300';
 const CARD_BODY = 'px-2 sm:px-4 py-2';
+
+/** 保存先を作るまでの仮表示。本番では出さない。 */
+const BLOCKED_PROJECTS = process.env.NODE_ENV === 'development' ? MOCK_BLOCKED_PROJECTS : [];
 
 /** 長期の計画。目標（この日までにこれを終える）と、締切までに使える空きを比べる。 */
 export default function PlanPage() {
@@ -127,6 +132,13 @@ export default function PlanPage() {
 
             <div className="flex-1 overflow-hidden relative">
                 <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4">
+                    <BlockedProjectCards
+                        projects={BLOCKED_PROJECTS}
+                        cardClassName={CARD}
+                        headerClassName={CARD_HEADER}
+                        bodyClassName={CARD_BODY}
+                    />
+
                     {now && (
                         <section className={CARD}>
                             <h2 className={CARD_HEADER}>目標</h2>
