@@ -23,8 +23,9 @@
 - 各日セクションに記法制約なしの自由記述メモ欄（`schedule_day_notes`）。本人が読んで使う（回収してクリアする自動の主体は無い）。
 - inbox パネルを同居。ラップトップ（＝AI 側）が寝ている間に成立する唯一のモバイル書き込み経路なので、独立ルートは持たせていない。
 
-### Plan（`/plan`）
+### Ahead（`/plan`）
 
+- 一番上に、本人の手で止まっているプロジェクトを1つにつき1枚のカードで出す（`blocked_projects`）。見出しがプロジェクト名、本文が止まっているタスク（1行に1つ）で、どちらもその場で書き換える。AI は本人の指示で monocore スキルの `blocked` から書き換える。
 - 目標は名前・期日・必要時間だけ（`plan_goals`）。進捗の列は持たず、「置いた時間」は名前を含む予定の合計を画面側で数える（現在時刻より後の分だけ。名前の前後が空白か行端の予定に限る）。
 - 判定は締切の早い順の累計で「残り必要時間の累計 ≦ 今から締切までの自由時間」。自由時間の数え方（睡眠・非自由・自由の3区分）は `src/lib/schedules/free-time.ts`、形式的な定義とテストの方針は `docs/free-time-model.md`、規則の由来は `docs/decisions.md`。
 - 予定は読むだけで書き込まない。睡眠は日をまたいで「消灯の終わりから次の起床まで」で数える。既定予定を書き込んだ記録の無い日（スケジュール画面でまだ読み込んでいない日と、既定予定を始めた日より前の日）だけ、起床・消灯の行が無ければ既定予定どおり 0700 起床・2200-2300 消灯で補う。
@@ -122,6 +123,7 @@ monocore は AI 活用基盤（context-engine）の**人間向け窓口**であ�
 | `schedule_day_notes` / `schedule_day_revisions` | 画面 | monocore |
 | `inboxes` | 画面（単一 TEXT blob） | monocore |
 | `plan_goals` | 画面（`/plan`） | monocore |
+| `blocked_projects` | 画面（`/plan`） / AI スキル（本人の指示があったときだけ） | monocore |
 | `reports` | `service_role` のみ（`scripts/upsert-reports.mjs` が `mf/reports/*.md` を HTML にして upsert。ops-daily の `sync-reports.ps1` が毎日呼ぶ） | `mf/reports/` |
 | `articles` | `service_role` のみ（`scraper/` が毎時投入） | **このDB自身** |
 

@@ -66,6 +66,33 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_projects: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          tasks: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          tasks?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          tasks?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       default_schedule_applications: {
         Row: {
           applied_at: string
