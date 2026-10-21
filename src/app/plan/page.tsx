@@ -114,7 +114,7 @@ export default function PlanPage() {
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
             <PageHeader
-                title="Plan"
+                title="Ahead"
                 onRefresh={() => {
                     void reloadGoals();
                     void reloadContents();

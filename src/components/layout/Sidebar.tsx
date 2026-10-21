@@ -16,7 +16,7 @@ import { Button } from "@/src/components/ui/Button";
 
 const MENU_ITEMS = [
     { href: "/schedules", icon: Clock, label: "Schedule" },
-    { href: "/plan", icon: Target, label: "Plan" },
+    { href: "/plan", icon: Target, label: "Ahead" },
     { href: "/reports", icon: FileText, label: "Reports" },
     { href: "/news", icon: Newspaper, label: "News" },
 ] as const;
