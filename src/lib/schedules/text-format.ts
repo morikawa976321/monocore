@@ -32,7 +32,7 @@ export function isValidHhmm(hhmm: string): boolean {
 /**
  * 予定の内容が名前を「語として」含むか。名前の前後が行頭・行末か空白（スペース・改行）のときだけ
  * 当たる。"xyz" に対して "xyz" "xyz abc" は当たり、"xyzabc" "abcxyz" "xyz-abc" は当たらない。
- * /plan の目標の名前と、起床・消灯・睡眠の判定が同じ規則を使う（本人指定 2026-10-14・2026-10-18）。
+ * 起床・消灯・睡眠の判定がこの規則を使う（本人指定 2026-10-14・2026-10-18。目標の名前にも使っていたが目標は 2026-10-23 に廃止）。
  * 複数行の予定は空白か改行でつながれるので、改行も空白として扱われる。
  */
 export function activityMatchesName(activity: string, name: string): boolean {

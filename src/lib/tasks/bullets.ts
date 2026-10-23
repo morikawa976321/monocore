@@ -1,5 +1,5 @@
 /**
- * Tasks(/plan)のカードの本文に付ける箇条書きの点。
+ * Tasks(Schedules のモーダル)のカードの本文に付ける箇条書きの点。
  * 保存する blocked_projects.tasks は点の無い1行1タスクのまま(monocore スキルの blocked append / done も
  * 点の無い行を読み書きする)にし、点は入力欄に出すときに付け、保存するときに外す。
  */

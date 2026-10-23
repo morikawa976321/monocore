@@ -10,8 +10,7 @@
 
 | ルート | 役割 |
 | :--- | :--- |
-| `/schedules` | 予定の一覧・編集。日別メモ欄と inbox パネルを同居。日カードの見出しに睡眠・非自由・自由の3色の帯 |
-| `/plan` | Tasks。プロジェクトごとのタスクの一覧（表示名は Tasks、URL は `/plan` のまま） |
+| `/schedules` | 予定の一覧・編集。日別メモ欄と、Tasks・Inbox のモーダルを同居。日カードの見出しに睡眠・非自由・自由の3色の帯 |
 | `/reports` | `mf/reports/` の読み取り専用ミラー |
 | `/news` | RSS で集めた記事の一覧（ソース別。読み取り専用） |
 
@@ -24,8 +23,9 @@
 - inbox パネルを同居。ラップトップ（＝AI 側）が寝ている間に成立する唯一のモバイル書き込み経路なので、独立ルートは持たせていない。
 - 日カードの見出しの3色の帯（睡眠・非自由・自由）は予定から導出する。睡眠は日をまたいで「消灯の終わりから次の起床まで」で数える。数え方は `src/lib/schedules/free-time.ts`、形式的な定義とテストの方針は `docs/free-time-model.md`、規則の由来は `docs/decisions.md`。
 
-### Tasks（`/plan`）
+### Tasks（Schedules のモーダル）
 
+- Schedules のヘッダー（スマホは右下の Inbox ボタンの上）の Tasks ボタンで、Inbox と同じ形のモーダルを開く（`src/components/plan/TasksPanel.tsx`）。2026-10-23 に `/plan` のページから移した。
 - 枠の4枚のカードを 2×2 で出す（`blocked_projects`。1段目が固定枠の就活・研究、2段目が自由枠の funomi・モデリング・3DP受注。`src/lib/tasks/slots.ts`）。見出しは固定、本文がタスク（1行に1つ。行頭に「・」を出すが保存はしない）で、その場で書き換える。AI は本人の指示で monocore スキルの `blocked` から書き換える。枠に無い名前の行は画面に出さない。
 - 目標（`plan_goals`）と締切までの時間の累計グラフは 2026-10-23 に廃止した（経緯は `docs/decisions.md`）。
 
@@ -121,7 +121,7 @@ monocore は AI 活用基盤（context-engine）の**人間向け窓口**であ�
 | `schedules` | 画面 / AI スキル | monocore |
 | `schedule_day_notes` / `schedule_day_revisions` | 画面 | monocore |
 | `inboxes` | 画面（単一 TEXT blob） | monocore |
-| `blocked_projects` | 画面（`/plan`） / AI スキル（本人の指示があったときだけ） | monocore |
+| `blocked_projects` | 画面（Schedules の Tasks モーダル） / AI スキル（本人の指示があったときだけ） | monocore |
 | `finance_events` | 画面（`/finance`。計画イベント） | monocore |
 | `finance_measurements` | 画面（`/finance`。月末の Cash・NISA 実測） | monocore |
 | `reports` | `service_role` のみ（`scripts/upsert-reports.mjs` が `mf/reports/*.md` を HTML にして upsert。ops-daily の `sync-reports.ps1` が毎日呼ぶ） | `mf/reports/` |

@@ -27,33 +27,6 @@ export async function getSchedules(
 const PAGE_ROWS = 1000
 
 /**
- * getSchedules と同じ範囲を、max_rows で黙って切れないようにページを分けて全件取得する。
- * 読む範囲が広い /plan 用（docs/database.md §2）。
- */
-export async function getSchedulesAllPages(
-    supabase: SupabaseClient<Database>,
-    start_at: string,
-    end_at: string,
-): Promise<{ data: ScheduleRow[] | null; error: Error | null }> {
-    const rows: ScheduleRow[] = []
-    // 返ってきた件数ぶん進め、空のページで終える。サーバ側の max_rows が PAGE_ROWS より小さくても
-    // 「足りなかった＝最後のページ」と誤判定しない。
-    for (;;) {
-        const { data, error } = await supabase
-            .from('schedules')
-            .select('*')
-            .gte('start_at', start_at)
-            .lt('start_at', end_at)
-            .order('start_at', { ascending: true })
-            .order('id', { ascending: true })
-            .range(rows.length, rows.length + PAGE_ROWS - 1)
-        if (error) return { data: null, error }
-        if (!data || data.length === 0) return { data: rows, error: null }
-        rows.push(...data)
-    }
-}
-
-/**
  * startDay〜endDay（両端含む）のうち、スケジュール画面が既定予定を書き込んだ記録
  * （default_schedule_applications）のある日。空き時間の計算で、既定の起床・消灯を補うかを決める。
  * 1日に既定予定の数だけ行があるので、max_rows で切れないようページを分けて読む。

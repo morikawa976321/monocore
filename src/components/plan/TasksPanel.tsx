@@ -9,7 +9,7 @@ import { useBlockedProjects } from '@/src/hooks/useBlockedProjects';
 import { createClient } from '@/src/lib/supabase/client';
 
 /**
- * Schedules のヘッダーの Tasks ボタンで開くモーダル。枠の4枚のカードを出す（中身と保存は /plan と同じ部品）。
+ * Schedules のヘッダーの Tasks ボタンで開くモーダル。枠の4枚のカードを出す（2026-10-23 に /plan のページから移した）。
  * 開くたびに読み直すので、閉じている間に AI がスキルで書き換えた内容も開いたときに出る。
  */
 export function TasksPanel({ onClose }: { onClose: () => void }) {
