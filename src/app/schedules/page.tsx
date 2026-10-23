@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { createClient } from '@/src/lib/supabase/client';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
+import { TasksPanel } from '@/src/components/plan/TasksPanel';
 import { DaySection } from '@/src/components/schedules/DaySection';
 import { Button } from '@/src/components/ui/Button';
 import { useInbox } from '@/src/hooks/useInbox';
@@ -11,7 +12,7 @@ import { useNow } from '@/src/hooks/useNow';
 import { useSchedules } from '@/src/hooks/useSchedules';
 import { analyzeDays } from '@/src/lib/schedules/free-time';
 import { dateLabelToDateStr } from '@/src/lib/schedules/text-format';
-import { Inbox } from 'lucide-react';
+import { Inbox, ListTodo } from 'lucide-react';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { PageHeader } from '@/src/components/layout/PageHeader';
 
@@ -71,9 +72,21 @@ export default function SchedulesPage() {
         [entries, unappliedDays],
     );
 
+    // Tasks（枠ごとのタスク）は Inbox と同じ形のモーダルで、同時には開かない。
+    const [tasksOpen, setTasksOpen] = useState(false);
+
     const handleInboxToggle = () => {
         if (inboxOpen) saveInboxNow();
+        setTasksOpen(false);
         setInboxOpen((prev) => !prev);
+    };
+
+    const handleTasksToggle = () => {
+        if (inboxOpen) {
+            saveInboxNow();
+            setInboxOpen(false);
+        }
+        setTasksOpen((prev) => !prev);
     };
 
     return (
@@ -100,12 +113,24 @@ export default function SchedulesPage() {
                 )}
                 <div className="hidden sm:inline-flex">
                     <Button
+                        onClick={handleTasksToggle}
+                        color="secondary"
+                        size="md"
+                        aria-label={tasksOpen ? 'Tasksを閉じる' : 'Tasksを開く'}
+                        className="h-9 w-24"
+                    >
+                        <ListTodo className="w-4 h-4" />
+                        Tasks
+                    </Button>
+                </div>
+                <div className="hidden sm:inline-flex">
+                    <Button
                         onClick={handleInboxToggle}
                         color="secondary"
                         size="md"
                         disabled={isEditLocked}
                         aria-label={inboxOpen ? 'Inboxを閉じる' : 'Inboxを開く'}
-                        className="h-9"
+                        className="h-9 w-24"
                     >
                         <Inbox className="w-4 h-4" />
                         Inbox
@@ -118,12 +143,23 @@ export default function SchedulesPage() {
             <div className="h-1 sm:h-4 shrink-0" aria-hidden="true" />
 
             <div className="flex-1 overflow-hidden relative">
+                {/* Inbox ボタン(bottom-4、高さ 48px)の真上に 8px 空けて置く。ラベルの文字幅が違うので、2つの幅は w-24 で揃える。 */}
+                <Button
+                    onClick={handleTasksToggle}
+                    color="secondary"
+                    size="md"
+                    className="sm:hidden fixed right-4 bottom-18 p-0 rounded h-12 w-24"
+                    aria-label={tasksOpen ? 'Tasksを閉じる' : 'Tasksを開く'}
+                >
+                    <ListTodo className="w-4 h-4" />
+                    <span>Tasks</span>
+                </Button>
                 <Button
                     onClick={handleInboxToggle}
                     color="secondary"
                     size="md"
                     disabled={isEditLocked}
-                    className="sm:hidden fixed right-4 bottom-4 p-0 rounded h-12"
+                    className="sm:hidden fixed right-4 bottom-4 p-0 rounded h-12 w-24"
                     aria-label={inboxOpen ? 'Inboxを閉じる' : 'Inboxを開く'}
                 >
                     <Inbox className="w-4 h-4" />
@@ -179,6 +215,8 @@ export default function SchedulesPage() {
                         </div>
                     </div>
                 )}
+
+                {tasksOpen && <TasksPanel onClose={() => setTasksOpen(false)} />}
 
                 {inboxOpen && (
                     <InboxPanel
