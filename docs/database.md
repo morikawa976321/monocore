@@ -6,7 +6,7 @@
 
 - service_role key の JWT には `sub` クレームが無く、DB 側の `auth.uid()` は **NULL** になる。したがって `auth.uid()` を前提にした `SECURITY DEFINER` RPC(`replace_schedules_for_day`)は service_role から呼ぶと `P0001 Not authenticated` で弾かれる。`GRANT EXECUTE ... TO service_role` を足しても無意味(GRANT は入口の権限で、関数本体のチェックは別)。`user_id UUID NOT NULL DEFAULT auth.uid()` の列は service_role からの INSERT で明示指定が要る(省略すると `23502`)。RLS のバイパスは効く(SELECT 等は通る)。実測 2026-07-17。
 - 対処は **`p_user_id` を明示引数で受ける service_role 専用 RPC を加算的に足す**(`replace_schedules_for_day_as`)。採らなかった案: JWT secret で `sub` 入りトークンを自前発行する(署名鍵の所持=任意ユーザーへのなりすまし能力で、service key より危険)/呼び出し側で DELETE+INSERT を再実装する(日単位置換のアトミック性を二重実装し、2デバイス編集の競合リスクを負う)。
-- `replace_schedules_for_day_as` は 2026-10-23 から日付(`p_day_key`)と期待する版(`p_expected_revision`)を受け、画面用の `replace_schedules_for_day` と同じ日ごとのロックの中で版を確かめて +1 する(monocore#1。migration `20261023220000`)。それまでは版を見も進めもせず、同じ日を開いたままの画面が AI の書き込みを古い内容で黙って上書きしえた。版が違えば書かずに `-1 - 今の版` を返し、monocore スキルは読み直して最大3回やり直す。
+- `replace_schedules_for_day_as` は 2026-10-23 から日付(`p_day_key`)・タイムゾーン(`p_tz`)・期待する版(`p_expected_revision`)を受け、その日の UTC の範囲は日付とタイムゾーンから RPC の中で計算し(範囲を別に受けると、日付と食い違った範囲で版の付かない日を書き換えられた。migration `20261023240000`)、画面用の `replace_schedules_for_day` と同じ日ごとのロックの中で版を確かめて +1 する(monocore#1。migration `20261023220000`)。それまでは版を見も進めもせず、同じ日を開いたままの画面が AI の書き込みを古い内容で黙って上書きしえた。版が違えば書かずに `-1 - 今の版` を返し、monocore スキルは読み直して最大3回やり直す。
 - service_role 専用 RPC は認証チェックを持たないので、Postgres 既定の PUBLIC EXECUTE のままだと **anon が任意ユーザーのデータを壊せる**。`REVOKE ALL ... FROM PUBLIC, anon, authenticated` → `GRANT EXECUTE ... TO service_role` を必ず付ける(baseline migration 末尾。本番で anon/publishable key が 401 になることを確認済み 2026-07-17)。
 - 置換 RPC はその日を削除→再挿入するため、AI が1件足すだけでその日の人間の予定も `updated_by='agent'` になる。この日単位の粗さは許容している(2026-07-17)。表示の未決は `docs/design.md` §2。
 
