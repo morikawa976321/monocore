@@ -82,6 +82,7 @@ Do not duplicate those rules here. Quick pointers for agents:
 ## Agent Behaviour Rules
 
 - **Check `git log` before starting work.** The owner sometimes commits directly to this repo from Cursor while a Claude Code session is running (2026-07-17: 6 unrelated commits in two hours). Migrations and skills that assume an older schema break silently otherwise.
+- **Work directly on local `main` and push it to `origin` without asking** (owner, 2026-10-23: 「以後はローカルのmainで直接作業してそのままリモートにpushしていい」). No feature branch or PR is needed. Still commit by path (`git add <path>` → `git commit -- <path>`), since other sessions share the index.
 - Do **not** put DB calls in `page.tsx`; use `lib/supabase/queries/` only.
 - Do **not** rename existing classes/methods/files without explicit approval.
 - Do **not** guess business logic — ask when unclear.
