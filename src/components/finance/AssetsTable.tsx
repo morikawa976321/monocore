@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import { Pencil, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { MILESTONES } from '@/src/lib/finance/constants';
@@ -14,7 +14,7 @@ const CLICKABLE = 'cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800
 /**
  * 「資産」のカード: 月末残高の表。実測(最新2行、古い分は畳む)→ 計画からの予測。
  * 記録の入力欄は常設しない。次の月の予測行(右端に＋)をクリックしたときだけ、その行が入力欄に変わる。
- * 実測の行はクリック(または鉛筆)で訂正・削除に入る。
+ * 実測の行はクリックで訂正・削除に入る。
  */
 export function AssetsTable({ finance }: { finance: FinanceState }) {
     const [expanded, setExpanded] = useState(false);
@@ -103,11 +103,7 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                                             <td className={`${TD} ${NUM} ${GAP}`}>{formatYen(row.nisa)}</td>
                                             <td className={`${TD} ${NUM} ${GAP}`}>{formatYen(totalOf(row.cash, row.nisa))}</td>
                                             <td className={`${TD} ${LABEL} ${MUTED}`} title={measuredLabel(row.month)}>{measuredLabel(row.month)}</td>
-                                            <td className={`${TD} w-8 py-0 text-right`}>
-                                                <Button color="ghost" size="icon" disabled={!canEdit} onClick={event => { event.stopPropagation(); finance.editMeasurement(row); }} aria-label={`${row.month} の実測を訂正`}>
-                                                    <Pencil className="w-4 h-4" />
-                                                </Button>
-                                            </td>
+                                            <td className={`${TD} w-8`} />
                                         </tr>
                                     )}
                                 </Fragment>

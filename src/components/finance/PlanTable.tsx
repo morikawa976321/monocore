@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { Pencil, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { Textarea } from '@/src/components/ui/Textarea';
@@ -12,7 +12,7 @@ import type { FinanceState } from '@/src/hooks/useFinance';
 /** 行をクリックで編集に入れる行の見た目(Reports の一覧の行と同じ hover)。 */
 const CLICKABLE = 'cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out';
 
-/** 「計画」のカード: イベント表。行をクリック(または鉛筆)で編集、末尾の「計画を追加」で下書き行(Ahead の目標と同じ作法)。 */
+/** 「計画」のカード: イベント表。行をクリックで編集、末尾の「計画を追加」で下書き行(Ahead の目標と同じ作法)。 */
 export function PlanTable({ finance }: { finance: FinanceState }) {
     const { eventDraft: draft } = finance;
     const rows = visibleEvents(finance.events, finance.base?.month);
@@ -27,7 +27,7 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
             <td className={TD}><Input aria-label="終了月（空なら単月）" placeholder="YYYY-MM" value={draft.end} onChange={event => patch('end', event.target.value)} disabled={finance.saving} className="w-28 tabular-nums" /></td>
             <td className={`${TD} ${NUM} ${GAP}`}><Input aria-label="Cash 毎月の増減" value={draft.cash} onChange={event => patch('cash', event.target.value)} disabled={finance.saving} className="w-32 text-right tabular-nums" /></td>
             <td className={`${TD} ${NUM} ${GAP}`}><Input aria-label="NISA 毎月の増減" value={draft.nisa} onChange={event => patch('nisa', event.target.value)} disabled={finance.saving} className="w-32 text-right tabular-nums" /></td>
-            <td className={`${TD} ${GAP}`} colSpan={2}>
+            <td className={`${TD} ${GAP}`}>
                 <Textarea aria-label="メモ" value={draft.memo} onChange={event => patch('memo', event.target.value)} disabled={finance.saving} className="min-w-64 resize-none" rows={2} />
                 <div className="flex flex-wrap gap-2 mt-2">
                     <Button color="primary" onClick={() => void finance.saveEvent()} disabled={finance.saving || !!finance.simulation.error}>保存</Button>
@@ -53,7 +53,6 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                                 <th scope="col" className={`${TH} ${NUM} ${GAP} w-px`}>Cash 増減</th>
                                 <th scope="col" className={`${TH} ${NUM} ${GAP} w-px`}>NISA 増減</th>
                                 <th scope="col" className={`${TH} ${LABEL} w-full`}>メモ</th>
-                                <th scope="col" className={`${TH} w-8`}><span className="sr-only">操作</span></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
@@ -65,11 +64,6 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                                     <td className={`${TD} ${NUM} ${GAP}`}>{signedYen(row.cash)}</td>
                                     <td className={`${TD} ${NUM} ${GAP}`}>{signedYen(row.nisa)}</td>
                                     <td className={`${TD} ${LABEL} ${MUTED}`} title={row.memo || undefined}>{row.memo}</td>
-                                    <td className={`${TD} w-8 py-0 text-right`}>
-                                        <Button color="ghost" size="icon" disabled={!canEdit} onClick={event => { event.stopPropagation(); finance.editEvent(row); }} aria-label={`${row.name || '（名前なし）'} を編集`}>
-                                            <Pencil className="w-4 h-4" />
-                                        </Button>
-                                    </td>
                                 </tr>
                             ))}
                             {/* 新規の下書き、または編集中の行が再取得で一覧から消えた(別所で削除・非表示になった)ときも編集欄を出し、取消できるようにする */}
