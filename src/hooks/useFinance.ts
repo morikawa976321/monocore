@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/src/types/database.types';
 import { addMonths, fromMonthDate, toMonthDate } from '@/src/lib/finance/month';
-import { parseEvent, parseMeasurement, type EventDraft, type MeasurementDraft } from '@/src/lib/finance/input';
+import { isTransfer, parseEvent, parseMeasurement, type EventDraft, type MeasurementDraft } from '@/src/lib/finance/input';
 import { forecastAt, latestMeasurement, project, summarize, type FinanceEvent, type Measurement } from '@/src/lib/finance/projection';
 import {
     getFinanceEvents, getFinanceMeasurements, insertFinanceEvent, updateFinanceEvent,
@@ -100,8 +100,8 @@ export function useFinance(client: SupabaseClient<Database>) {
         if (eventDraft || saving || editingMonth) return;
         setEventError(null);
         draftUpdatedAt.current = event?.updatedAt ?? null;
-        setEventDraft(event ? { ...event, end: event.end ?? '', cash: String(event.cash), nisa: String(event.nisa), memo: event.memo ?? '' }
-            : { id: null, name: '', start: recordDraft.month, end: '', cash: '0', nisa: '0', memo: '' });
+        setEventDraft(event ? { ...event, end: event.end ?? '', cash: String(event.cash), nisa: String(event.nisa), memo: event.memo ?? '', transfer: isTransfer(event) }
+            : { id: null, name: '', start: recordDraft.month, end: '', cash: '0', nisa: '0', memo: '', transfer: false });
     }
 
     async function saveEvent() {
