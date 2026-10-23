@@ -10,8 +10,8 @@ import { ScheduleSaveQueue } from '@/src/lib/schedules/sync';
 
 type UseDayNotesReturn = {
     notes: Map<string, string>;
-    /** 取得した行数を返す（呼び出し側が「その範囲に何もない」ことを判定できるようにする）。 */
-    loadNotes: (startDay: string, endDay: string) => Promise<number>;
+    /** 取得した行数を返す（呼び出し側が「その範囲に何もない」ことを判定できるようにする）。読み込みに失敗したら null。 */
+    loadNotes: (startDay: string, endDay: string) => Promise<number | null>;
     updateNote: (dayKey: string, value: string) => void;
     flushPendingNoteSaves: () => void;
     hasPendingNoteChanges: boolean;
@@ -62,14 +62,14 @@ export function useDayNotes(supabase: SupabaseClient<Database>): UseDayNotesRetu
     );
 
     const loadNotes = useCallback(
-        async (startDay: string, endDay: string): Promise<number> => {
+        async (startDay: string, endDay: string): Promise<number | null> => {
             const seq = ++loadSeqRef.current;
             // 取得中に保存が完了した日を後で見分けるため、開始時点の記録を控えておく。
             const savedBeforeLoad = new Set(savedKeysRef.current);
             const { data, error } = await getScheduleDayNotes(supabase, startDay, endDay);
             if (error) {
                 setNoteError('メモの読み込みに失敗しました。');
-                return 0;
+                return null;
             }
             const rows = data ?? [];
             // より新しい取得が既に反映されているなら、この結果は捨てる。

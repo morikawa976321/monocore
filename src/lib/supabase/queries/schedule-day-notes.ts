@@ -18,6 +18,23 @@ export async function getScheduleDayNotes(
     return { data, error }
 }
 
+/** 範囲内のメモの版の目印(行数といちばん新しい updated_at)。getSchedulesStamp と同じ考え方。 */
+export async function getScheduleDayNotesStamp(
+    supabase: SupabaseClient<Database>,
+    startDay: string,
+    endDay: string,
+): Promise<{ data: string | null; error: PostgrestError | null }> {
+    const { data, count, error } = await supabase
+        .from('schedule_day_notes')
+        .select('updated_at', { count: 'exact' })
+        .gte('day_key', startDay)
+        .lte('day_key', endDay)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+    if (error) return { data: null, error }
+    return { data: `${count ?? 0}|${data?.[0]?.updated_at ?? ''}`, error: null }
+}
+
 /** 指定日のメモ本文を upsert する。user_id は DEFAULT auth.uid() + RLS により自動設定。 */
 export async function upsertScheduleDayNote(
     supabase: SupabaseClient<Database>,

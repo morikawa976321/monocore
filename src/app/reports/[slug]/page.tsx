@@ -7,9 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { Button } from '@/src/components/ui/Button'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
+import { readCachedReport, removeCachedReport, writeCachedReport, type CachedReport } from '@/src/lib/reports/cache'
 import { parseToc, tocForDisplay, type TocEntry } from '@/src/lib/reports/toc'
 import { createClient } from '@/src/lib/supabase/client'
-import { getReportBySlug } from '@/src/lib/supabase/queries/reports'
+import { getReportBySlug, getReportUpdatedAt } from '@/src/lib/supabase/queries/reports'
 
 type ReportDetail = {
     slug: string
@@ -23,6 +24,10 @@ const TOC_INDENT_CLASS: Record<number, string> = {
     1: 'pl-0',
     2: 'pl-2',
     3: 'pl-4',
+}
+
+function toDetail(report: CachedReport): ReportDetail {
+    return { slug: report.slug, title: report.title, bodyHtml: report.bodyHtml, toc: tocForDisplay(parseToc(report.toc)) }
 }
 
 function scrollStorageKey(slug: string) {
@@ -88,25 +93,53 @@ export default function ReportDetailPage() {
         setIsTocOpen(false)
         restoredRef.current = false
 
+        // 手元に本文があればすぐ出し、updated_at だけを問い合わせる。変わっていたときだけ本文を読み直す
+        // (src/lib/reports/cache.ts)。問い合わせに失敗しても(通信が無いなど)手元の本文はそのまま読める。
+        const cached = readCachedReport(slug)
+        if (cached) {
+            setReport(toDetail(cached))
+            setIsLoading(false)
+        } else {
+            setReport(null)
+        }
+
         void (async () => {
+            if (cached) {
+                const stamp = await getReportUpdatedAt(supabase, slug)
+                if (cancelled) return
+                if (stamp.error) return
+                if (stamp.data === null) {
+                    removeCachedReport(slug)
+                    setReport(null)
+                    setNotFound(true)
+                    return
+                }
+                if (stamp.data === cached.updatedAt) return
+            }
             const { data, error } = await getReportBySlug(supabase, slug)
             if (cancelled) return
             if (error) {
-                setErrorMessage('レポートの読み込みに失敗しました。')
+                // 手元の本文を出しているなら、それを読み続けられるので知らせない。
+                if (!cached) setErrorMessage('レポートの読み込みに失敗しました。')
                 setIsLoading(false)
                 return
             }
             if (!data) {
+                removeCachedReport(slug)
+                setReport(null)
                 setNotFound(true)
                 setIsLoading(false)
                 return
             }
-            setReport({
+            const fresh: CachedReport = {
                 slug: data.slug,
                 title: data.title,
                 bodyHtml: data.body_html,
-                toc: tocForDisplay(parseToc(data.toc)),
-            })
+                toc: data.toc,
+                updatedAt: data.updated_at,
+            }
+            writeCachedReport(fresh)
+            setReport(toDetail(fresh))
             setIsLoading(false)
         })()
 

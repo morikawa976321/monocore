@@ -19,6 +19,18 @@ export async function getReportList(
     return { data, error }
 }
 
+/**
+ * レポートの updated_at だけを読む。詳細ページは手元(src/lib/reports/cache.ts)の本文と比べ、変わっていたときだけ
+ * 本文を読む。レポートが無ければ data は null。
+ */
+export async function getReportUpdatedAt(
+    supabase: SupabaseClient<Database>,
+    slug: string
+): Promise<{ data: string | null; error: PostgrestError | null }> {
+    const { data, error } = await supabase.from('reports').select('updated_at').eq('slug', slug).maybeSingle()
+    return { data: data?.updated_at ?? null, error }
+}
+
 export type ReportDetailRow = Pick<ReportRow, 'slug' | 'title' | 'body_html' | 'toc' | 'updated_at'>
 
 export async function getReportBySlug(

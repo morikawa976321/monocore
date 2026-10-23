@@ -2,7 +2,8 @@ import { localTimeToUtc, utcToLocalTime } from '../date';
 import type { ReplaceScheduleItem } from '../supabase/queries/schedules';
 import type { Database } from '../../types/database.types';
 
-export type ScheduleRow = Database['public']['Tables']['schedules']['Row'];
+/** 画面が使う予定の列だけ（getSchedules はこの3列だけを読む。通信量を減らすため 2026-10-23）。 */
+export type ScheduleRow = Pick<Database['public']['Tables']['schedules']['Row'], 'activity' | 'start_at' | 'end_at'>;
 
 const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'] as const;
 

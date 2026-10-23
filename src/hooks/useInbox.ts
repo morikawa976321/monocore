@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/src/types/database.types';
-import { getInbox, upsertInbox } from '@/src/lib/supabase/queries/inboxes';
+import { getInbox, getInboxUpdatedAt, upsertInbox } from '@/src/lib/supabase/queries/inboxes';
 
 type UseInboxReturn = {
     inboxOpen: boolean;
@@ -24,11 +24,17 @@ export function useInbox(supabase: SupabaseClient<Database>): UseInboxReturn {
     const inboxDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // 非同期処理中でも最新本文を参照できるようにするバッファ。
     const inboxContentRef = useRef('');
+    // 画面の本文が DB のどの版か(updated_at)。タブに戻ったときはこれと DB の updated_at だけを比べ、
+    // 違うときだけ本文を読み直す(本文は約 10KB あり、戻るたびに読むと通信がかさむ。2026-10-23)。
+    const loadedUpdatedAtRef = useRef<string | null>(null);
 
     const persistInbox = useCallback(async () => {
         // state更新の遅延に依存しないよう、保存元は常にrefを参照する。
-        const { error } = await upsertInbox(supabase, inboxContentRef.current);
-        if (!error) setHasPendingChanges(false);
+        const { updatedAt, error } = await upsertInbox(supabase, inboxContentRef.current);
+        if (!error) {
+            setHasPendingChanges(false);
+            if (updatedAt) loadedUpdatedAtRef.current = updatedAt;
+        }
     }, [supabase]);
 
     const clearInboxDebounce = useCallback(() => {
@@ -43,6 +49,7 @@ export function useInbox(supabase: SupabaseClient<Database>): UseInboxReturn {
             if (!data) return;
             setInboxContent(data.content);
             inboxContentRef.current = data.content;
+            loadedUpdatedAtRef.current = data.updated_at;
             setHasPendingChanges(false);
         });
     }, [supabase]);
@@ -103,15 +110,20 @@ export function useInbox(supabase: SupabaseClient<Database>): UseInboxReturn {
             } else if (document.visibilityState === 'visible') {
                 if (hasPendingChangesRef.current) return;
                 const fetchSeq = ++resumeFetchSeqRef.current;
-                // フォーカス復帰時に未保存のものがなければ最新のInbox内容を同期
-                void getInbox(supabase).then(({ data }) => {
+                // フォーカス復帰時に未保存のものがなければ、DB の版が変わっていたときだけ本文を読み直す。
+                void (async () => {
+                    const stamp = await getInboxUpdatedAt(supabase);
+                    if (resumeFetchSeqRef.current !== fetchSeq) return;
+                    if (stamp.error || !stamp.data || stamp.data === loadedUpdatedAtRef.current) return;
+                    const { data } = await getInbox(supabase);
                     if (resumeFetchSeqRef.current !== fetchSeq) return;
                     if (hasPendingChangesRef.current) return;
                     if (!data) return;
                     setInboxContent(data.content);
                     inboxContentRef.current = data.content;
+                    loadedUpdatedAtRef.current = data.updated_at;
                     setHasPendingChanges(false);
-                });
+                })();
             }
         };
         const handlePageHide = () => {

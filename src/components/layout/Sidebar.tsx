@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { createClient } from "@/src/lib/supabase/client";
+import { clearReportCache } from "@/src/lib/reports/cache";
 import { Button } from "@/src/components/ui/Button";
 
 const MENU_ITEMS = [
@@ -28,6 +29,8 @@ export function Sidebar() {
     async function handleLogout() {
         setIsLoggingOut(true);
         const supabase = createClient();
+        // ブラウザに置いたレポートの本文は、ログアウトしたら残さない。
+        clearReportCache();
         await supabase.auth.signOut();
         window.location.href = "/login";
     }

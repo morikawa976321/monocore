@@ -1,13 +1,13 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
-type ScheduleRow = Database['public']['Tables']['schedules']['Row']
+type ScheduleRow = Pick<Database['public']['Tables']['schedules']['Row'], 'activity' | 'start_at' | 'end_at'>
 type ScheduleDayRevisionRow = Database['public']['Tables']['schedule_day_revisions']['Row']
 
 /**
  * 指定した時間範囲内のスケジュールを取得する。
  * schedules テーブルから、start_at が options.start_at 以上かつ options.end_at 未満の行を、
- * start_at の昇順で返す。
+ * start_at の昇順で返す。画面が使う activity / start_at / end_at だけを読む（id・user_id・日時の列は使わない）。
  */
 export async function getSchedules(
     supabase: SupabaseClient<Database>,
@@ -16,11 +16,34 @@ export async function getSchedules(
 ): Promise<{ data: ScheduleRow[] | null; error: Error | null }> {
     const { data, error } = await supabase
         .from('schedules')
-        .select('*')
+        .select('activity,start_at,end_at')
         .gte('start_at', start_at)
         .lt('start_at', end_at)
         .order('start_at', { ascending: true })
     return { data, error }
+}
+
+/**
+ * 範囲内の予定の「版の目印」: 行数といちばん新しい updated_at をつないだ文字列。タブに戻ったときに
+ * これだけを問い合わせ、前に読んだときと同じなら予定を読み直さない。予定の保存は画面も AI
+ * (replace_schedules_for_day / _as)も「その日の行を消して入れ直す」なので、書き込めば新しい updated_at の
+ * 行ができて目印が変わる。消しただけの場合は updated_at が変わらないことがあるので行数も見る。
+ * schedule_day_revisions は AI の書き込みで進まない(monocore#1)ので目印に使わない。
+ */
+export async function getSchedulesStamp(
+    supabase: SupabaseClient<Database>,
+    start_at: string,
+    end_at: string,
+): Promise<{ data: string | null; error: Error | null }> {
+    const { data, count, error } = await supabase
+        .from('schedules')
+        .select('updated_at', { count: 'exact' })
+        .gte('start_at', start_at)
+        .lt('start_at', end_at)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+    if (error) return { data: null, error }
+    return { data: `${count ?? 0}|${data?.[0]?.updated_at ?? ''}`, error: null }
 }
 
 /** PostgREST の1レスポンスの上限（supabase/config.toml の max_rows）。 */
