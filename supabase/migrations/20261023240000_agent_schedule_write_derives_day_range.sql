@@ -47,6 +47,12 @@ BEGIN
     -- 日本時間の 0:00 から翌日の 0:00 まで(画面の localTimeToUtc と同じ区切り)。
     v_day_start_utc := p_day_key::TIMESTAMP AT TIME ZONE 'Asia/Tokyo';
     v_day_end_utc := (p_day_key + 1)::TIMESTAMP AT TIME ZONE 'Asia/Tokyo';
+    -- 日本にも夏時間の時期(1948〜1951)があり、切り替わりの日は 24 時間にならない。午前0時が2回ある日は、境目の
+    -- 解釈が呼び出し側(Python は先の時刻)と Postgres(後の時刻)で食い違い、読んでいない予定を消しうる
+    -- (sol のレビューの指摘)。そうした日は書かない。
+    IF v_day_end_utc - v_day_start_utc <> INTERVAL '24 hours' THEN
+        RAISE EXCEPTION 'Day % is not 24 hours long in Asia/Tokyo', p_day_key;
+    END IF;
 
     PERFORM pg_advisory_xact_lock(
         hashtextextended(p_user_id::TEXT || ':' || p_day_key::TEXT, 0)
