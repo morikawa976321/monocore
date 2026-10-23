@@ -35,16 +35,11 @@ import {
 } from '@/src/lib/schedules/text-format';
 import {
     applyScheduleRevisions,
+    decideAfterSave,
     decodeScheduleSaveOutcome,
+    MAX_CONSECUTIVE_SAVE_FAILURES,
     ScheduleSaveQueue,
 } from '@/src/lib/schedules/sync';
-
-/**
- * 同じ日の自動保存が連続でこの回数失敗したら、その日の自動保存を打ち切る。
- * 失敗し続ける保存を無人でリトライすると、1クライアントがDBのエラーログだけで
- * インスタンスのDisk IOを飽和させる(2026-08-25の実障害)。人が編集し直せば解除される。
- */
-const MAX_CONSECUTIVE_SAVE_FAILURES = 3;
 
 /** 既定予定を書き込んだ記録を読み損ねた日があるときの表示。その日は前の判定のまま描かれる。再読み込みで直る。 */
 const APPLIED_DAYS_ERROR = '既定予定の記録の読み込みに失敗しました（睡眠の帯が正しくない日があります）。';
@@ -421,43 +416,33 @@ export function useSchedules(
                 const outcome = error
                     ? ({ kind: 'failed' } as const)
                     : decodeScheduleSaveOutcome(rpcResult);
+                // 続けるか打ち切るかは decideAfterSave が決める(打ち切りの保証はそちらのテストが持つ)。
+                const followUp = decideAfterSave(outcome, saveFailureCountRef.current.get(dateLabel) ?? 0);
 
-                if (outcome.kind === 'conflict') {
-                    // 楽観ロックの競合は待っても解消しない。dirtyを残したまま再試行すると
-                    // 同じ expected_revision のまま永久に失敗し続けるので、この日は打ち切る。
-                    const serverRevision = outcome.currentRevision;
-                    const synced = entriesRef.current.map((current) =>
-                        current.dateLabel === dateLabel
-                            ? { ...current, revision: serverRevision }
-                            : current
-                    );
-                    entriesRef.current = synced;
-                    setEntries(synced);
-                    saveFailureCountRef.current.set(
-                        dateLabel,
-                        (saveFailureCountRef.current.get(dateLabel) ?? 0) + 1
-                    );
+                if (followUp.kind === 'suspend') {
+                    if (followUp.reason === 'conflict') {
+                        // 次に保存するときの expected_revision をサーバの版にそろえておく(再読み込みで内容も取り込む)。
+                        const synced = entriesRef.current.map((current) =>
+                            current.dateLabel === dateLabel
+                                ? { ...current, revision: followUp.serverRevision }
+                                : current
+                        );
+                        entriesRef.current = synced;
+                        setEntries(synced);
+                    }
+                    saveFailureCountRef.current.set(dateLabel, followUp.failures);
                     dirtyDateLabelsRef.current.delete(dateLabel);
                     autoSaveSuspendedRef.current.add(dateLabel);
                     setSyncError(
-                        `${dateStr} は別のデバイスで更新されています。再読み込みしてください。`
+                        followUp.reason === 'conflict'
+                            ? `${dateStr} は別の場所(別のデバイスや AI)で更新されています。再読み込みしてください。`
+                            : `${dateStr} の保存に${MAX_CONSECUTIVE_SAVE_FAILURES}回続けて失敗したため自動保存を止めました。再読み込みしてください。`
                     );
                     return;
                 }
 
-                if (outcome.kind === 'failed') {
-                    const failures = (saveFailureCountRef.current.get(dateLabel) ?? 0) + 1;
-                    saveFailureCountRef.current.set(dateLabel, failures);
-
-                    if (failures >= MAX_CONSECUTIVE_SAVE_FAILURES) {
-                        dirtyDateLabelsRef.current.delete(dateLabel);
-                        autoSaveSuspendedRef.current.add(dateLabel);
-                        setSyncError(
-                            `${dateStr} の保存に${MAX_CONSECUTIVE_SAVE_FAILURES}回続けて失敗したため自動保存を止めました。再読み込みしてください。`
-                        );
-                        return;
-                    }
-
+                if (followUp.kind === 'retry') {
+                    saveFailureCountRef.current.set(dateLabel, followUp.failures);
                     setSyncError(`${dateStr} の保存に失敗しました。`);
                     return;
                 }
@@ -469,7 +454,7 @@ export function useSchedules(
                     if (current.content === savedContent) {
                         dirtyDateLabelsRef.current.delete(dateLabel);
                     }
-                    return { ...current, revision: outcome.revision };
+                    return { ...current, revision: followUp.revision };
                 });
                 entriesRef.current = nextEntries;
                 setEntries(nextEntries);

@@ -41,6 +41,13 @@ export function applyScheduleRevisions(
     }));
 }
 
+/**
+ * 同じ日の自動保存が連続でこの回数失敗したら、その日の自動保存を打ち切る。
+ * 失敗し続ける保存を無人でリトライすると、1クライアントがDBのエラーログだけで
+ * インスタンスのDisk IOを飽和させる(2026-08-25の実障害)。人が編集し直せば解除される。
+ */
+export const MAX_CONSECUTIVE_SAVE_FAILURES = 3;
+
 /** `replace_schedules_for_day` の1回の呼び出しがどう終わったか。 */
 export type ScheduleSaveOutcome =
     | { kind: 'saved'; revision: number }
@@ -63,4 +70,34 @@ export function decodeScheduleSaveOutcome(value: number | null | undefined): Sch
     if (value == null || !Number.isInteger(value) || value === 0) return { kind: 'failed' };
     if (value < 0) return { kind: 'conflict', currentRevision: -1 - value };
     return { kind: 'saved', revision: value };
+}
+
+/**
+ * 1回の保存の結果を受けて、その日の自動保存をどうするか(useSchedules の保存処理はこれに従う)。
+ * - saved: 失敗の回数を消し、新しい版を取り込む
+ * - suspend: dirty を落としてその日の自動保存を打ち切る(人の編集か再読み込みでだけ再開する)
+ * - retry: dirty を残し、次の保存で試す
+ *
+ * 楽観ロックの競合ハンドラには「次の試行が前回と違う入力になる保証」か「試行を止める保証」のどちらかが要る
+ * (docs/database.md、2026-08/09 の 40001 ストーム)。競合は同じ expected_revision のまま何度試しても解消しない
+ * ので、1回目で必ず打ち切る。失敗は通信の一時的な問題でありうるので、maxFailures 回目まで続けてから打ち切る。
+ */
+export type SaveFollowUp =
+    | { kind: 'saved'; revision: number }
+    | { kind: 'suspend'; reason: 'conflict'; failures: number; serverRevision: number }
+    | { kind: 'suspend'; reason: 'failed'; failures: number }
+    | { kind: 'retry'; failures: number };
+
+export function decideAfterSave(
+    outcome: ScheduleSaveOutcome,
+    previousFailures: number,
+    maxFailures: number = MAX_CONSECUTIVE_SAVE_FAILURES,
+): SaveFollowUp {
+    if (outcome.kind === 'saved') return { kind: 'saved', revision: outcome.revision };
+    const failures = previousFailures + 1;
+    if (outcome.kind === 'conflict') {
+        return { kind: 'suspend', reason: 'conflict', failures, serverRevision: outcome.currentRevision };
+    }
+    if (failures >= maxFailures) return { kind: 'suspend', reason: 'failed', failures };
+    return { kind: 'retry', failures };
 }
