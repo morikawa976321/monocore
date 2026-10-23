@@ -6,6 +6,7 @@ import { AutoHeightTextarea } from '@/src/components/schedules/AutoHeightTextare
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import type { BlockedProjectRow, BlockedProjectUpdate } from '@/src/lib/supabase/queries/blocked-projects';
+import { BULLET, fromBulletedText, toBulletedText } from '@/src/lib/tasks/bullets';
 
 type Props = {
     projects: BlockedProjectRow[];
@@ -22,11 +23,12 @@ type CardProps = Omit<Props, 'projects' | 'onAdd'> & { project: BlockedProjectRo
 
 /**
  * 1プロジェクト1枚。見出しがプロジェクト名、本文がタスク（1行に1つ）で、どちらもその場で書き換える。
+ * 本文は行頭に箇条書きの点を付けて出し、改行すると次の行にも点を打つ。保存するときは点を外す（src/lib/tasks/bullets.ts）。
  * 保存は欄を離れたとき。付帯情報（待ち日数・返し方など）は持たない（docs/decisions.md「本人待ちの表示」）。
  */
 function BlockedProjectCard({ project, cardClassName, headerClassName, bodyClassName, onUpdate, onRemove }: CardProps) {
     // 本文は高さを内容に合わせるため制御する。保存済みの値が変わると親の key で作り直される。
-    const [tasks, setTasks] = useState(project.tasks);
+    const [text, setText] = useState(() => toBulletedText(project.tasks));
     return (
         <section className={cardClassName}>
             <div className={`${headerClassName} flex items-center gap-2`}>
@@ -53,9 +55,24 @@ function BlockedProjectCard({ project, cardClassName, headerClassName, bodyClass
             </div>
             <div className={bodyClassName}>
                 <AutoHeightTextarea
-                    value={tasks}
-                    onChange={(e) => setTasks(e.target.value)}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onFocus={() => {
+                        if (text === '') setText(BULLET);
+                    }}
+                    onKeyDown={(e) => {
+                        // 変換の確定の Enter は改行ではないので触らない。
+                        if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                        e.preventDefault();
+                        const ta = e.currentTarget;
+                        const { selectionStart: start, selectionEnd: end } = ta;
+                        const insert = '\n' + BULLET;
+                        setText(text.slice(0, start) + insert + text.slice(end));
+                        requestAnimationFrame(() => ta.setSelectionRange(start + insert.length, start + insert.length));
+                    }}
                     onBlur={() => {
+                        const tasks = fromBulletedText(text);
+                        setText(toBulletedText(tasks));
                         if (tasks !== project.tasks) onUpdate(project.id, { tasks });
                     }}
                     placeholder="タスク（1行に1つ）"
