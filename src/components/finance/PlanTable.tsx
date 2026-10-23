@@ -43,7 +43,8 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                 <td className={`${CELL} whitespace-nowrap tabular-nums`}>{row.start}</td><td className={`${CELL} whitespace-nowrap tabular-nums`}>{row.end}</td>
                 <td className={`${CELL} text-right tabular-nums`}>{signedYen(row.cash)}</td><td className={`${CELL} text-right tabular-nums`}>{signedYen(row.nisa)}</td><td className={`${CELL} text-neutral-700 dark:text-neutral-300`}>{row.memo}</td>
             </tr>)}
-            {draft && !draft.id && editor}
+            {/* 新規の下書き、または編集中の行が再取得で一覧から消えた(別所で削除・非表示になった)ときも編集欄を出し、取消できるようにする */}
+            {draft && (!draft.id || !rows.some(row => row.id === draft.id)) && editor}
         </tbody></table></div>
         {!rows.length && !draft && <p className="text-sm text-neutral-700 dark:text-neutral-300">表示する計画はありません。「+ 追加」でイベントを登録できます。</p>}
         <p className="text-sm text-neutral-700 dark:text-neutral-300">行をタップして編集。下書きは上の表と折れ線へ即時反映されます。記録した月までに終わった行は非表示になります（データは残ります）。</p>

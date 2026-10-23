@@ -90,9 +90,14 @@ export function useFinance(client: SupabaseClient<Database>) {
         }
     }, [events, measurements, eventDraft]);
 
+    // 編集開始時点の updated_at を下書きに固定する。背景の refresh で events が入れ替わっても、
+    // 楽観ロックの条件は「自分が見て編集を始めた版」でなければ他所の変更を黙って上書きしうる。
+    const draftUpdatedAt = useRef<string | null>(null);
+
     function editEvent(event?: Event) {
         if (eventDraft || saving || editingMonth) return;
         setEventError(null);
+        draftUpdatedAt.current = event?.updatedAt ?? null;
         setEventDraft(event ? { ...event, end: event.end ?? '', cash: String(event.cash), nisa: String(event.nisa), memo: event.memo ?? '' }
             : { id: null, name: '', start: recordDraft.month, end: '', cash: '0', nisa: '0', memo: '' });
     }
@@ -107,9 +112,8 @@ export function useFinance(client: SupabaseClient<Database>) {
             const preview = eventDraft.id ? events.map(row => row.id === eventDraft.id ? event : row) : [...events, event];
             project(measurements, preview);
             const input = { name: event.name, start_month: toMonthDate(event.start), end_month: event.end ? toMonthDate(event.end) : null, cash_delta: event.cash, nisa_delta: event.nisa, memo: event.memo ?? '' };
-            const current = eventDraft.id ? events.find(row => row.id === eventDraft.id) : undefined;
             const result = eventDraft.id
-                ? await updateFinanceEvent(client, eventDraft.id, current?.updatedAt ?? '', input)
+                ? await updateFinanceEvent(client, eventDraft.id, draftUpdatedAt.current ?? '', input)
                 : await insertFinanceEvent(client, input);
             if (result.error) throw new Error('計画の保存に失敗しました。下書きを残しています。');
             if (!result.data) {

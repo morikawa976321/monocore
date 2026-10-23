@@ -14,7 +14,8 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
     const [expanded, setExpanded] = useState(false);
     const { measurements, base, recordDraft, editingMonth, simulation, forecast } = finance;
     const older = measurements.slice(0, -2);
-    const displayed = expanded ? measurements : measurements.slice(-2);
+    // 編集中の月は、再取得で最新2行から外れても必ず表示する(編集欄と取消が消えないように)。
+    const displayed = expanded ? measurements : measurements.filter((row, index) => index >= measurements.length - 2 || row.month === editingMonth);
     let total = '—';
     let diff = '差 算出不可';
     let invalid = false;
