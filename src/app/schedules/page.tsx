@@ -123,7 +123,7 @@ export default function SchedulesPage() {
                     color="secondary"
                     size="md"
                     disabled={isEditLocked}
-                    className="sm:hidden fixed right-4 bottom-4 p-0 rounded"
+                    className="sm:hidden fixed right-4 bottom-4 p-0 rounded h-12"
                     aria-label={inboxOpen ? 'Inboxを閉じる' : 'Inboxを開く'}
                 >
                     <Inbox className="w-4 h-4" />
