@@ -45,7 +45,7 @@ monocore
 | `src/hooks/` | **カスタムフック**: Reactの状態管理や副作用（データ取得中など）の共通ロジック。 |
 | `src/lib/` | **外部連携・道具箱**: Supabaseのクライアント設定や、共通のユーティリティ関数。 |
 | `src/app/finance/page.tsx` | 家計の見通しページ。資産表・計画表・前提を配置。 |
-| `src/components/finance/FinanceHeader.tsx` | 最新実測・節目・Cash 最小の要約。 |
+| `src/components/finance/card.ts` | finance のカード・表・補助テキストのクラス(Ahead の CARD と同じ文字列)。 |
 | `src/components/finance/FinanceChart.tsx` | 合計と Cash の SVG 折れ線（実測・予測）。 |
 | `src/components/finance/AssetsTable.tsx` | 月末残高・予測・記録時の差・実測訂正。 |
 | `src/components/finance/PlanTable.tsx` | 計画イベントの行編集・追加・削除。 |
