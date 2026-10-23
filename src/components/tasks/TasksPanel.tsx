@@ -1,20 +1,26 @@
 'use client';
 
-import { useMemo } from 'react';
 import { CARD, CARD_BODY, CARD_HEADER, NOTICE } from '@/src/components/finance/card';
 import { OverlayPanel } from '@/src/components/layout/OverlayPanel';
 import { BlockedProjectCards } from '@/src/components/tasks/BlockedProjectCards';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
-import { useBlockedProjects } from '@/src/hooks/useBlockedProjects';
-import { createClient } from '@/src/lib/supabase/client';
+import type { BlockedProjectRow, BlockedProjectUpdate } from '@/src/lib/supabase/queries/blocked-projects';
+
+type TasksPanelProps = {
+    projects: BlockedProjectRow[];
+    /** 最初の読み込みが終わっていない。読み直しの間は前の内容を出したままにするので、ここでは覆いを出さない。 */
+    isLoading: boolean;
+    error: string | null;
+    onCreate: (name: string, tasks: string) => void;
+    onUpdate: (id: string, loadedUpdatedAt: string, patch: BlockedProjectUpdate) => void;
+    onClose: () => void;
+};
 
 /**
  * Schedules のヘッダーの Tasks ボタンで開くモーダル。枠の4枚のカードを出す（2026-10-23 に /plan のページから移した）。
- * 開くたびに読み直すので、閉じている間に AI がスキルで書き換えた内容も開いたときに出る。
+ * 中身は Schedules のページが持つ（useBlockedProjects）。開いたらすぐ手元の内容を出し、ページ側が裏で読み直す。
  */
-export function TasksPanel({ onClose }: { onClose: () => void }) {
-    const supabase = useMemo(() => createClient(), []);
-    const { projects, isLoading, error, createProject, updateProject } = useBlockedProjects(supabase);
+export function TasksPanel({ projects, isLoading, error, onCreate, onUpdate, onClose }: TasksPanelProps) {
     return (
         <OverlayPanel label="Tasks" onClose={onClose} fitContent>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
@@ -26,8 +32,8 @@ export function TasksPanel({ onClose }: { onClose: () => void }) {
                 ) : (
                     <BlockedProjectCards
                         projects={projects}
-                        onCreate={(name, tasks) => void createProject(name, tasks)}
-                        onUpdate={(id, loadedUpdatedAt, patch) => void updateProject(id, loadedUpdatedAt, patch)}
+                        onCreate={onCreate}
+                        onUpdate={onUpdate}
                         cardClassName={CARD}
                         headerClassName={CARD_HEADER}
                         bodyClassName={CARD_BODY}

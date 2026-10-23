@@ -6,6 +6,7 @@ import { InboxPanel } from '@/src/components/inbox/InboxPanel';
 import { TasksPanel } from '@/src/components/tasks/TasksPanel';
 import { DaySection } from '@/src/components/schedules/DaySection';
 import { Button } from '@/src/components/ui/Button';
+import { useBlockedProjects } from '@/src/hooks/useBlockedProjects';
 import { useInbox } from '@/src/hooks/useInbox';
 import { useDayNotes } from '@/src/hooks/useDayNotes';
 import { useNow } from '@/src/hooks/useNow';
@@ -72,8 +73,10 @@ export default function SchedulesPage() {
         [entries, unappliedDays],
     );
 
-    // Tasks（枠ごとのタスク）は Inbox と同じ形のモーダルで、同時には開かない。
+    // Tasks（枠ごとのタスク）は Inbox と同じ形のモーダルで、同時には開かない。中身はページを開いたときに読んで
+    // 持っておき（モーダルを開いたらすぐ出る）、開くたびに裏で読み直す（閉じている間に AI がスキルで書き換えた分を拾う）。
     const [tasksOpen, setTasksOpen] = useState(false);
+    const tasks = useBlockedProjects(supabase);
 
     const handleInboxToggle = () => {
         if (inboxOpen) saveInboxNow();
@@ -86,6 +89,7 @@ export default function SchedulesPage() {
             saveInboxNow();
             setInboxOpen(false);
         }
+        if (!tasksOpen) void tasks.reload();
         setTasksOpen((prev) => !prev);
     };
 
@@ -216,7 +220,16 @@ export default function SchedulesPage() {
                     </div>
                 )}
 
-                {tasksOpen && <TasksPanel onClose={() => setTasksOpen(false)} />}
+                {tasksOpen && (
+                    <TasksPanel
+                        projects={tasks.projects}
+                        isLoading={tasks.isLoading}
+                        error={tasks.error}
+                        onCreate={(name, content) => void tasks.createProject(name, content)}
+                        onUpdate={(id, loadedUpdatedAt, patch) => void tasks.updateProject(id, loadedUpdatedAt, patch)}
+                        onClose={() => setTasksOpen(false)}
+                    />
+                )}
 
                 {inboxOpen && (
                     <InboxPanel
