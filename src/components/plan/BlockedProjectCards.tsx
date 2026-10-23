@@ -15,7 +15,8 @@ type Props = {
     headerClassName: string;
     bodyClassName: string;
     onAdd: () => void;
-    onUpdate: (id: string, patch: BlockedProjectUpdate) => void;
+    /** loadedUpdatedAt は画面が持っている行の版。保存はこの版のままのときだけ通る（楽観ロック）。 */
+    onUpdate: (id: string, loadedUpdatedAt: string, patch: BlockedProjectUpdate) => void;
     onRemove: (id: string) => void;
 };
 
@@ -27,8 +28,14 @@ type CardProps = Omit<Props, 'projects' | 'onAdd'> & { project: BlockedProjectRo
  * 保存は欄を離れたとき。付帯情報（待ち日数・返し方など）は持たない（docs/decisions.md「本人待ちの表示」）。
  */
 function BlockedProjectCard({ project, cardClassName, headerClassName, bodyClassName, onUpdate, onRemove }: CardProps) {
-    // 本文は高さを内容に合わせるため制御する。保存済みの値が変わると親の key で作り直される。
+    // 本文は高さを内容に合わせるため制御する。保存済みの値（project.tasks）が変わったら入力欄をそれに合わせる。
+    // カードを key で作り直すと、欄を離れた直後のクリックやフォーカス移動の先まで置き換わるので、作り直さない。
     const [text, setText] = useState(() => toBulletedText(project.tasks));
+    const [syncedTasks, setSyncedTasks] = useState(project.tasks);
+    if (project.tasks !== syncedTasks) {
+        setSyncedTasks(project.tasks);
+        setText(toBulletedText(project.tasks));
+    }
     return (
         <section className={cardClassName}>
             <div className={`${headerClassName} flex items-center gap-2`}>
@@ -40,7 +47,7 @@ function BlockedProjectCard({ project, cardClassName, headerClassName, bodyClass
                     aria-label="プロジェクト名"
                     className="min-w-0 flex-1"
                     onBlur={(e) => {
-                        if (e.target.value !== project.name) onUpdate(project.id, { name: e.target.value });
+                        if (e.target.value !== project.name) onUpdate(project.id, project.updated_at, { name: e.target.value });
                     }}
                 />
                 <Button
@@ -61,8 +68,9 @@ function BlockedProjectCard({ project, cardClassName, headerClassName, bodyClass
                         if (text === '') setText(BULLET);
                     }}
                     onKeyDown={(e) => {
-                        // 変換の確定の Enter は改行ではないので触らない。
-                        if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                        // 変換の確定の Enter は改行ではないので触らない。Safari 系は確定の Enter を isComposing=false、
+                        // keyCode=229 で送ることがあるので keyCode も見る。
+                        if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return;
                         e.preventDefault();
                         const ta = e.currentTarget;
                         const { selectionStart: start, selectionEnd: end } = ta;
@@ -73,7 +81,7 @@ function BlockedProjectCard({ project, cardClassName, headerClassName, bodyClass
                     onBlur={() => {
                         const tasks = fromBulletedText(text);
                         setText(toBulletedText(tasks));
-                        if (tasks !== project.tasks) onUpdate(project.id, { tasks });
+                        if (tasks !== project.tasks) onUpdate(project.id, project.updated_at, { tasks });
                     }}
                     placeholder="タスク（1行に1つ）"
                     aria-label={`${project.name || 'プロジェクト'}のタスク`}
@@ -94,7 +102,7 @@ export function BlockedProjectCards({ projects, onAdd, ...cardProps }: Props) {
             {projects.length > 0 && (
                 <div className="grid gap-2 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {projects.map((p) => (
-                        <BlockedProjectCard key={`${p.id}:${p.tasks}`} project={p} {...cardProps} />
+                        <BlockedProjectCard key={p.id} project={p} {...cardProps} />
                     ))}
                 </div>
             )}

@@ -23,13 +23,24 @@ export async function insertBlockedProject(
     return { data, error }
 }
 
+/**
+ * 読み込んだときの updated_at を条件に含める楽観ロック。AI(monocore スキル)や別タブが先に書いていれば
+ * 0 行更新で data が null になり、他所で足されたタスクを古い本文で黙って上書きしない。
+ */
 export async function updateBlockedProject(
     supabase: SupabaseClient<Database>,
     id: string,
+    loadedUpdatedAt: string,
     patch: BlockedProjectUpdate,
-): Promise<{ error: PostgrestError | null }> {
-    const { error } = await supabase.from('blocked_projects').update(patch).eq('id', id)
-    return { error }
+): Promise<{ data: BlockedProjectRow | null; error: PostgrestError | null }> {
+    const { data, error } = await supabase
+        .from('blocked_projects')
+        .update(patch)
+        .eq('id', id)
+        .eq('updated_at', loadedUpdatedAt)
+        .select('*')
+        .maybeSingle()
+    return { data, error }
 }
 
 export async function deleteBlockedProject(

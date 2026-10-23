@@ -37,7 +37,7 @@ export default function PlanPage() {
                     <BlockedProjectCards
                         projects={projects}
                         onAdd={() => void addProject()}
-                        onUpdate={(id, patch) => void updateProject(id, patch)}
+                        onUpdate={(id, loadedUpdatedAt, patch) => void updateProject(id, loadedUpdatedAt, patch)}
                         onRemove={(id) => void removeProject(id)}
                         cardClassName={CARD}
                         headerClassName={CARD_HEADER}

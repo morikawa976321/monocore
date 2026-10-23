@@ -15,4 +15,8 @@ describe('toBulletedText / fromBulletedText', () => {
     it('drops lines with nothing but a bullet and keeps lines whose bullet was deleted', () => {
         expect(fromBulletedText('・a\n・\n・  \nb')).toBe('a\nb');
     });
+
+    it('removes the doubled bullet left by pressing Enter before a bullet', () => {
+        expect(fromBulletedText('・\n・・タスク')).toBe('タスク');
+    });
 });
