@@ -8,8 +8,7 @@ import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { FinanceChart } from '@/src/components/finance/FinanceChart';
 import { AssetsTable } from '@/src/components/finance/AssetsTable';
 import { PlanTable } from '@/src/components/finance/PlanTable';
-import { CARD, CARD_BODY, MUTED, NOTICE } from '@/src/components/finance/card';
-import { ASSUMPTIONS } from '@/src/lib/finance/constants';
+import { CARD, CARD_BODY, NOTICE } from '@/src/components/finance/card';
 
 /** 家計の見通し。外枠・ヘッダー・スクロール域・同期中の覆いは Ahead(/plan)と同じ構成。 */
 export default function FinancePage() {
@@ -42,7 +41,6 @@ export default function FinancePage() {
                             )}
                             <AssetsTable finance={finance} />
                             <PlanTable finance={finance} />
-                            <p className={`text-sm ${MUTED}`}>前提: {ASSUMPTIONS.join(' · ')}</p>
                         </>
                     )}
                 </div>

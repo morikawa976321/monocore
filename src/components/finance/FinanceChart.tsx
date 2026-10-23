@@ -5,8 +5,8 @@ import { monthNumber } from '@/src/lib/finance/month';
 /** グリッドの間隔。月の通し番号は年×12 なので、60 の倍数がちょうど5の倍数の年の1月になる。 */
 const GRID_MONTHS = 60;
 const GRID_YEN = 5_000_000;
-/** 線端ラベルどうしの最小間隔(viewBox の縦 96 に対する単位)。h-32 で約19px、text-sm の行高 20px にほぼ届く。 */
-const LABEL_GAP = 14;
+/** 線端ラベルどうしの最小間隔(viewBox の縦 96 に対する単位)。h-64 で約21px、text-sm の行高 20px を超える。 */
+const LABEL_GAP = 8;
 
 type Key = 'total' | 'cash' | 'nisa';
 type Row = Balance & { total: number };
@@ -45,7 +45,7 @@ export function FinanceChart({ measurements, future }: { measurements: Measureme
     const labelTops = spread(SERIES.map(series => y(last[series.key])), LABEL_GAP, 96);
     return (
         // 線は縦横比を固定せず伸ばすので、文字を SVG に入れると潰れる。ラベルは右の HTML 列に、viewBox の y を % にして置く
-        <div className="flex h-32 sm:h-40">
+        <div className="flex h-64 sm:h-80">
             <svg
                 viewBox="0 0 480 96"
                 preserveAspectRatio="none"
