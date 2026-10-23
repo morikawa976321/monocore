@@ -10,7 +10,7 @@ import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { readCachedReport, removeCachedReport, writeCachedReport, type CachedReport } from '@/src/lib/reports/cache'
 import { parseToc, tocForDisplay, type TocEntry } from '@/src/lib/reports/toc'
 import { createClient } from '@/src/lib/supabase/client'
-import { getReportBySlug, getReportUpdatedAt } from '@/src/lib/supabase/queries/reports'
+import { getReportBySlug, getReportVersion, reportVersion } from '@/src/lib/supabase/queries/reports'
 
 type ReportDetail = {
     slug: string
@@ -93,7 +93,7 @@ export default function ReportDetailPage() {
         setIsTocOpen(false)
         restoredRef.current = false
 
-        // 手元に本文があればすぐ出し、updated_at だけを問い合わせる。変わっていたときだけ本文を読み直す
+        // 手元に本文があればすぐ出し、版の目印だけを問い合わせる。変わっていたときだけ本文を読み直す
         // (src/lib/reports/cache.ts)。問い合わせに失敗しても(通信が無いなど)手元の本文はそのまま読める。
         const cached = readCachedReport(slug)
         if (cached) {
@@ -105,7 +105,7 @@ export default function ReportDetailPage() {
 
         void (async () => {
             if (cached) {
-                const stamp = await getReportUpdatedAt(supabase, slug)
+                const stamp = await getReportVersion(supabase, slug)
                 if (cancelled) return
                 if (stamp.error) return
                 if (stamp.data === null) {
@@ -114,7 +114,7 @@ export default function ReportDetailPage() {
                     setNotFound(true)
                     return
                 }
-                if (stamp.data === cached.updatedAt) return
+                if (stamp.data === cached.version) return
             }
             const { data, error } = await getReportBySlug(supabase, slug)
             if (cancelled) return
@@ -136,11 +136,15 @@ export default function ReportDetailPage() {
                 title: data.title,
                 bodyHtml: data.body_html,
                 toc: data.toc,
-                updatedAt: data.updated_at,
+                version: reportVersion(data),
             }
-            writeCachedReport(fresh)
             setReport(toDetail(fresh))
             setIsLoading(false)
+            // 別タブでログアウトした後に取得が終わることがある。ログインしていなければ手元に置かない
+            // (getSession は Cookie を読むだけで通信しない)。
+            const { data: auth } = await supabase.auth.getSession()
+            if (cancelled || !auth.session) return
+            writeCachedReport(fresh)
         })()
 
         return () => {
@@ -175,10 +179,15 @@ export default function ReportDetailPage() {
         tickingRef.current = true
         requestAnimationFrame(() => {
             const container = scrollContainerRef.current
-            if (container) {
-                window.localStorage.setItem(scrollStorageKey(report.slug), String(container.scrollTop))
+            try {
+                if (container) {
+                    window.localStorage.setItem(scrollStorageKey(report.slug), String(container.scrollTop))
+                }
+            } catch {
+                // 容量の上限(手元に置いたレポートの本文で埋まりうる)。位置を残せないだけで読むのは続けられる。
+            } finally {
+                tickingRef.current = false
             }
-            tickingRef.current = false
         })
     }, [report])
 

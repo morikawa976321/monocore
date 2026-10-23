@@ -8,10 +8,15 @@ import {
 import { mergeNoteRows } from '@/src/lib/schedules/day-notes';
 import { ScheduleSaveQueue } from '@/src/lib/schedules/sync';
 
+export type NotesLoadResult = { count: number; applied: boolean };
+
 type UseDayNotesReturn = {
     notes: Map<string, string>;
-    /** 取得した行数を返す（呼び出し側が「その範囲に何もない」ことを判定できるようにする）。読み込みに失敗したら null。 */
-    loadNotes: (startDay: string, endDay: string) => Promise<number | null>;
+    /**
+     * 取得した行数（呼び出し側が「その範囲に何もない」ことを判定できるようにする）と、画面に反映したか（より新しい
+     * 取得に追い越されたら反映しない）を返す。読み込みに失敗したら null。
+     */
+    loadNotes: (startDay: string, endDay: string) => Promise<NotesLoadResult | null>;
     updateNote: (dayKey: string, value: string) => void;
     flushPendingNoteSaves: () => void;
     hasPendingNoteChanges: boolean;
@@ -62,7 +67,7 @@ export function useDayNotes(supabase: SupabaseClient<Database>): UseDayNotesRetu
     );
 
     const loadNotes = useCallback(
-        async (startDay: string, endDay: string): Promise<number | null> => {
+        async (startDay: string, endDay: string): Promise<NotesLoadResult | null> => {
             const seq = ++loadSeqRef.current;
             // 取得中に保存が完了した日を後で見分けるため、開始時点の記録を控えておく。
             const savedBeforeLoad = new Set(savedKeysRef.current);
@@ -73,7 +78,7 @@ export function useDayNotes(supabase: SupabaseClient<Database>): UseDayNotesRetu
             }
             const rows = data ?? [];
             // より新しい取得が既に反映されているなら、この結果は捨てる。
-            if (seq !== loadSeqRef.current) return rows.length;
+            if (seq !== loadSeqRef.current) return { count: rows.length, applied: false };
 
             // 未保存の日に加え、この取得の最中に保存が終わった日も上書きしない
             // （取得結果のほうが保存前の古い内容を持っているため）。
@@ -86,7 +91,7 @@ export function useDayNotes(supabase: SupabaseClient<Database>): UseDayNotesRetu
             notesRef.current = merged;
             setNotes(merged);
             if (dirtyKeysRef.current.size === 0) setNoteError(null);
-            return rows.length;
+            return { count: rows.length, applied: true };
         },
         [supabase]
     );

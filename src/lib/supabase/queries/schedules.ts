@@ -24,11 +24,12 @@ export async function getSchedules(
 }
 
 /**
- * 範囲内の予定の「版の目印」: 行数といちばん新しい updated_at をつないだ文字列。タブに戻ったときに
- * これだけを問い合わせ、前に読んだときと同じなら予定を読み直さない。予定の保存は画面も AI
- * (replace_schedules_for_day / _as)も「その日の行を消して入れ直す」なので、書き込めば新しい updated_at の
- * 行ができて目印が変わる。消しただけの場合は updated_at が変わらないことがあるので行数も見る。
- * schedule_day_revisions は AI の書き込みで進まない(monocore#1)ので目印に使わない。
+ * 範囲内の予定の「目印」の片方: 行数といちばん新しい updated_at をつないだ文字列。タブに戻ったときに
+ * 目印だけを問い合わせ、前に読んだときと同じなら予定を読み直さない(useSchedules の readStamp)。
+ * 予定の保存は画面も AI(replace_schedules_for_day / _as)も「その日の行を消して入れ直す」なので、書き込めば
+ * 新しい updated_at の行ができる。消しただけの場合は updated_at が変わらないことがあるので行数も見る。
+ * ただし updated_at は now() = 取引の開始時刻なので、先に始まって後から確定した書き込みは最大値を超えず、
+ * 行数も同じなら見落とす。もう片方の目印 getScheduleDayRevisionsStamp(確定順に増える版)がそれを拾う。
  */
 export async function getSchedulesStamp(
     supabase: SupabaseClient<Database>,
@@ -74,6 +75,26 @@ export async function getDefaultAppliedDays(
         for (const row of data) days.add(row.day_key)
         offset += data.length
     }
+}
+
+/**
+ * 範囲内の日ごとの版(day_key と revision)をつないだ文字列。版はその日の書き込みのたびに日ごとのロックの中で
+ * +1 されるので、取引の開始時刻に左右されず確定した順に増える。予定の行を変えずに版だけ進む書き込み(空の日を
+ * 空で保存する等)も拾える。約 70 日で数 KB。
+ */
+export async function getScheduleDayRevisionsStamp(
+    supabase: SupabaseClient<Database>,
+    startDay: string,
+    endDay: string,
+): Promise<{ data: string | null; error: PostgrestError | null }> {
+    const { data, error } = await supabase
+        .from('schedule_day_revisions')
+        .select('day_key,revision')
+        .gte('day_key', startDay)
+        .lte('day_key', endDay)
+        .order('day_key', { ascending: true })
+    if (error) return { data: null, error }
+    return { data: (data ?? []).map((r) => `${r.day_key}:${r.revision}`).join(','), error: null }
 }
 
 export async function getScheduleDayRevisions(

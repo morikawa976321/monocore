@@ -245,6 +245,7 @@ export type Database = {
       reports: {
         Row: {
           body_html: string
+          body_md5: string | null
           slug: string
           title: string
           toc: Json
@@ -252,6 +253,7 @@ export type Database = {
         }
         Insert: {
           body_html: string
+          body_md5?: never
           slug: string
           title: string
           toc?: Json
@@ -259,6 +261,7 @@ export type Database = {
         }
         Update: {
           body_html?: string
+          body_md5?: never
           slug?: string
           title?: string
           toc?: Json

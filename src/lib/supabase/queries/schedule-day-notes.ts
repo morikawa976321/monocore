@@ -18,7 +18,10 @@ export async function getScheduleDayNotes(
     return { data, error }
 }
 
-/** 範囲内のメモの版の目印(行数といちばん新しい updated_at)。getSchedulesStamp と同じ考え方。 */
+/**
+ * 範囲内のメモの目印(行数といちばん新しい updated_at)。getSchedulesStamp と同じ考え方。メモは版を持たないので、
+ * 先に始まって後から確定した upsert を見落とす隙間が残る(1文の upsert の取引の長さ、数ミリ秒程度)。
+ */
 export async function getScheduleDayNotesStamp(
     supabase: SupabaseClient<Database>,
     startDay: string,

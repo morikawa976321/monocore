@@ -18,9 +18,11 @@ import {
     getDefaultAppliedDays,
     getScheduleDayRevisions,
     getSchedules,
+    getScheduleDayRevisionsStamp,
     getSchedulesStamp,
     replaceSchedulesForDay,
 } from '@/src/lib/supabase/queries/schedules';
+import type { NotesLoadResult } from '@/src/hooks/useDayNotes';
 import { getScheduleDayNotesStamp } from '@/src/lib/supabase/queries/schedule-day-notes';
 import { getDefaultTimezone, localTimeToUtc } from '@/src/lib/date';
 import {
@@ -48,7 +50,7 @@ const MAX_CONSECUTIVE_SAVE_FAILURES = 3;
 const APPLIED_DAYS_ERROR = '既定予定の記録の読み込みに失敗しました（睡眠の帯が正しくない日があります）。';
 
 type UseSchedulesCompanions = {
-    loadNotes: (startDay: string, endDay: string) => Promise<number | null>;
+    loadNotes: (startDay: string, endDay: string) => Promise<NotesLoadResult | null>;
     flushPendingNoteSaves: () => void;
     hasPendingNoteChanges: boolean;
     hasPendingInboxChanges: boolean;
@@ -108,6 +110,11 @@ export function useSchedules(
     const [isInitialSyncing, setIsInitialSyncing] = useState(true);
     const [isResumeSyncing, setIsResumeSyncing] = useState(false);
     const [syncError, setSyncError] = useState<string | null>(null);
+    // 戻ったときの判定（syncIfChanged）で、最新の警告の有無を読むため。
+    const syncErrorRef = useRef<string | null>(null);
+    useLayoutEffect(() => {
+        syncErrorRef.current = syncError;
+    });
     const [unappliedDays, setUnappliedDays] = useState<Set<string>>(() => new Set());
     // 記録を最後に読みに行った要求が失敗した日。syncError とは分けて持つ（編集・保存の成功や、別の読み込みの
     // 完了順で警告が消えたり戻ったりしないよう、日ごとの最新の要求の結果だけで決める）。
@@ -124,6 +131,8 @@ export function useSchedules(
     // 目印だけを問い合わせ、同じなら読み直さない（2026-10-23。戻るたびに予定・版・既定予定の記録・メモを
     // 読み直していた）。目印は読む前に取る。読んだ後に取ると、その間の書き込みを読まずに目印だけ進めてしまう。
     const loadedStampRef = useRef<{ range: string; stamp: string } | null>(null);
+    // 既定予定の書き込みが失敗したまま残っているか。残っていれば、戻ったときに目印によらず書き込みからやり直す。
+    const defaultsFailedRef = useRef(false);
     /** 日ごとの連続保存失敗回数。保存成功・編集・再読み込みでリセットする。 */
     const saveFailureCountRef = useRef(new Map<string, number>());
     /** 自動保存を打ち切った日。ユーザーの編集か再読み込みでのみ解除する。 */
@@ -157,24 +166,33 @@ export function useSchedules(
      * 失敗しても予定の表示は止めない。既定予定が入らないだけで、次の読み込みで入る。
      */
     const applyDefaults = useCallback(
-        async (startDay: string, endDay: string) => {
+        async (startDay: string, endDay: string): Promise<boolean> => {
             const { error } = await applyDefaultSchedules(supabase, startDay, endDay, tz);
-            if (error) console.error('既定予定の書き込みに失敗しました', error);
+            if (error) {
+                console.error('既定予定の書き込みに失敗しました', error);
+                defaultsFailedRef.current = true;
+                return false;
+            }
+            return true;
         },
         [supabase, tz]
     );
 
-    /** 範囲の予定とメモの目印（getSchedulesStamp / getScheduleDayNotesStamp）。どちらかが失敗したら null。 */
+    /**
+     * 範囲の予定・版・メモの目印（getSchedulesStamp / getScheduleDayRevisionsStamp / getScheduleDayNotesStamp）。
+     * どれかが失敗したら null。
+     */
     const readStamp = useCallback(
         async (startDay: string, endDay: string): Promise<string | null> => {
             const startUtc = localTimeToUtc(startDay, '0000', tz);
             const endUtc = localTimeToUtc(format(addDays(parseISO(endDay), 1), 'yyyy-MM-dd'), '0000', tz);
-            const [schedules, notes] = await Promise.all([
+            const [schedules, revisions, notes] = await Promise.all([
                 getSchedulesStamp(supabase, startUtc, endUtc),
+                getScheduleDayRevisionsStamp(supabase, startDay, endDay),
                 getScheduleDayNotesStamp(supabase, startDay, endDay),
             ]);
-            if (schedules.error || notes.error || schedules.data == null || notes.data == null) return null;
-            return `${schedules.data}#${notes.data}`;
+            if (schedules.data == null || revisions.data == null || notes.data == null) return null;
+            return `${schedules.data}#${revisions.data}#${notes.data}`;
         },
         [supabase, tz]
     );
@@ -240,7 +258,10 @@ export function useSchedules(
         const endDay = format(end, 'yyyy-MM-dd');
         // 既定予定を書き込む → 目印を取る → 予定・版・既定予定の記録・メモを読む、の順（目印は読む前に取る）。
         void applyDefaults(startDay, endDay)
-            .then(() => readStamp(startDay, endDay))
+            .then((applied) => {
+                if (applied) defaultsFailedRef.current = false;
+                return readStamp(startDay, endDay);
+            })
             .then((stamp) => Promise.all([
                 getSchedules(supabase, startUtc, endUtc),
                 getScheduleDayRevisions(supabase, startDay, endDay),
@@ -248,12 +269,12 @@ export function useSchedules(
                 loadNotes(startDay, endDay),
                 stamp,
             ]))
-            .then(([schedulesResult, revisionsResult, , noteCount, stamp]) => {
+            .then(([schedulesResult, revisionsResult, , notesResult, stamp]) => {
                 if (schedulesResult.error || revisionsResult.error) {
                     setSyncError('スケジュールの読み込みに失敗しました。');
                     return;
                 }
-                if (stamp && noteCount !== null) loadedStampRef.current = { range: `${startDay}..${endDay}`, stamp };
+                if (stamp && notesResult?.applied) loadedStampRef.current = { range: `${startDay}..${endDay}`, stamp };
                 const merged = mergeSchedulesIntoEntries(initial, schedulesResult.data ?? [], tz);
                 setEntries(applyScheduleRevisions(merged, revisionsResult.data ?? []));
                 scrollTodayAfterInitialMergeRef.current = true;
@@ -280,17 +301,17 @@ export function useSchedules(
         const endUtc = localTimeToUtc(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), '0000', tz);
         let stamp: string | null | undefined = resumeStamp;
         if (stamp === undefined) {
-            await applyDefaults(startDay, endDay);
+            if (await applyDefaults(startDay, endDay)) defaultsFailedRef.current = false;
             stamp = await readStamp(startDay, endDay);
         }
-        const [schedulesResult, revisionsResult, , noteCount] = await Promise.all([
+        const [schedulesResult, revisionsResult, , notesResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(supabase, startDay, endDay),
             readAppliedDays(startDay, endDay),
             loadNotes(startDay, endDay),
         ]);
         loadedStampRef.current =
-            stamp && noteCount !== null && !schedulesResult.error && !revisionsResult.error
+            stamp && notesResult?.applied && !schedulesResult.error && !revisionsResult.error
                 ? { range: `${startDay}..${endDay}`, stamp }
                 : null;
         if (!schedulesResult.error && !revisionsResult.error) {
@@ -315,9 +336,24 @@ export function useSchedules(
         setLoadingBottom(false);
     }, [rangeStart, rangeEnd, tz, supabase, loadNotes, applyDefaults, readAppliedDays, readStamp]);
 
-    /** タブに戻ったとき: 目印だけを問い合わせ、読み込んだ範囲のまま変わっていなければ何も読まない。 */
+    /**
+     * タブに戻ったとき: 目印だけを問い合わせ、読み込んだ範囲のまま変わっていなければ何も読まない。
+     * ただし次のときは目印によらず、既定予定の書き込みも含めて全部読み直す（読み直しが立て直しを兼ねるため）:
+     * 既定予定の書き込みが失敗したまま、自動保存を止めた日や保存の失敗が残っている、同期の警告が出ている。
+     */
     const syncIfChanged = useCallback(async () => {
         if (!rangeStart || !rangeEnd) return;
+        // 予定が変わっていなくても日付はまたぎうる（今日の強調と今日へのスクロールのため）。
+        setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
+        if (
+            defaultsFailedRef.current
+            || autoSaveSuspendedRef.current.size > 0
+            || saveFailureCountRef.current.size > 0
+            || syncErrorRef.current !== null
+        ) {
+            await reloadSchedules();
+            return;
+        }
         const startDay = format(rangeStart, 'yyyy-MM-dd');
         const endDay = format(rangeEnd, 'yyyy-MM-dd');
         const stamp = await readStamp(startDay, endDay);
@@ -325,7 +361,7 @@ export function useSchedules(
         if (stamp !== null && loaded?.range === `${startDay}..${endDay}` && loaded.stamp === stamp) return;
         // 目印が取れなかったときは、既定予定の書き込みも含めて今までどおり読み直す。
         await reloadSchedules(stamp ?? undefined);
-    }, [rangeStart, rangeEnd, readStamp, reloadSchedules]);
+    }, [rangeStart, rangeEnd, tz, readStamp, reloadSchedules]);
 
     useEffect(() => {
         if (!todayStr || entries.length === 0) return;
@@ -608,7 +644,7 @@ export function useSchedules(
         const startUtc = localTimeToUtc(format(newStart, 'yyyy-MM-dd'), '0000', tz);
         const endUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
         await applyDefaults(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd'));
-        const [noteCount, [schedulesResult, revisionsResult]] = await Promise.all([
+        const [notesResult, [schedulesResult, revisionsResult]] = await Promise.all([
             loadNotes(
                 format(newStart, 'yyyy-MM-dd'),
                 format(addDays(rangeStart, -1), 'yyyy-MM-dd')
@@ -624,7 +660,7 @@ export function useSchedules(
             ]),
         ]);
         const scheduleRows = schedulesResult.data ?? [];
-        if (scheduleRows.length === 0 && (noteCount ?? 0) === 0) {
+        if (scheduleRows.length === 0 && (notesResult?.count ?? 0) === 0) {
             setHasMorePast(false);
             setLoadingTop(false);
             return;

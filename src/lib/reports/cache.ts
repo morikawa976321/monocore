@@ -1,7 +1,8 @@
 /**
  * 開いたレポートの本文をブラウザ(localStorage)に置いておく(2026-10-23。本文は中央値で約 40KB、最大で約 600KB あり、
- * 開くたびに全部読み直していた)。詳細ページは手元の本文をすぐ出し、updated_at だけを問い合わせて、変わっていたときだけ
- * 本文を読み直す。通信が切れていても一度開いたレポートは読める。
+ * 開くたびに全部読み直していた)。詳細ページは手元の本文をすぐ出し、版の目印(本文の指紋と updated_at。
+ * queries/reports.ts の getReportVersion)だけを問い合わせて、変わっていたときだけ本文を読み直す。通信が切れていても
+ * 一度開いたレポートは読める。
  * 保存に失敗したら(容量の上限)ほかのレポートの分を消してもう一度だけ試し、それでも駄目なら置かない(読むのは毎回の
  * 取得に戻るだけで、表示は壊れない)。ログアウトで全部消す(clearReportCache)。
  */
@@ -15,13 +16,14 @@ export type CachedReport = {
     bodyHtml: string;
     /** reports.toc をそのまま(表示用への変換は読む側で行う)。 */
     toc: Json;
-    updatedAt: string;
+    /** getReportVersion の目印。 */
+    version: string;
 };
 
 function isCachedReport(value: unknown): value is CachedReport {
     if (!value || typeof value !== 'object') return false;
     const v = value as Record<string, unknown>;
-    return typeof v.slug === 'string' && typeof v.title === 'string' && typeof v.bodyHtml === 'string' && typeof v.updatedAt === 'string';
+    return typeof v.slug === 'string' && typeof v.title === 'string' && typeof v.bodyHtml === 'string' && typeof v.version === 'string';
 }
 
 export function readCachedReport(slug: string): CachedReport | null {
