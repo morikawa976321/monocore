@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { createClient } from '@/src/lib/supabase/client';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
-import { TasksPanel } from '@/src/components/plan/TasksPanel';
+import { TasksPanel } from '@/src/components/tasks/TasksPanel';
 import { DaySection } from '@/src/components/schedules/DaySection';
 import { Button } from '@/src/components/ui/Button';
 import { useInbox } from '@/src/hooks/useInbox';

@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { CARD, CARD_BODY, CARD_HEADER, NOTICE } from '@/src/components/finance/card';
 import { OverlayPanel } from '@/src/components/layout/OverlayPanel';
-import { BlockedProjectCards } from '@/src/components/plan/BlockedProjectCards';
+import { BlockedProjectCards } from '@/src/components/tasks/BlockedProjectCards';
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator';
 import { useBlockedProjects } from '@/src/hooks/useBlockedProjects';
 import { createClient } from '@/src/lib/supabase/client';

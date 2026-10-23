@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Undo2 } from 'lucide-react';
-import { FreeTimeStrip } from '@/src/components/plan/FreeTimeStrip';
+import { FreeTimeStrip } from '@/src/components/schedules/FreeTimeStrip';
 import { AutoHeightTextarea } from '@/src/components/schedules/AutoHeightTextarea';
 import { Button } from '@/src/components/ui/Button';
 import type { DayAnalysis } from '@/src/lib/schedules/free-time';

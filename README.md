@@ -25,7 +25,7 @@
 
 ### Tasks（Schedules のモーダル）
 
-- Schedules のヘッダー（スマホは右下の Inbox ボタンの上）の Tasks ボタンで、Inbox と同じ形のモーダルを開く（`src/components/plan/TasksPanel.tsx`）。2026-10-23 に `/plan` のページから移した。
+- Schedules のヘッダー（スマホは右下の Inbox ボタンの上）の Tasks ボタンで、Inbox と同じ形のモーダルを開く（`src/components/tasks/TasksPanel.tsx`）。2026-10-23 に `/plan` のページから移した。
 - 枠の4枚のカードを 2×2 で出す（`blocked_projects`。1段目が固定枠の就活・研究、2段目が自由枠の funomi・モデリング・3DP受注。`src/lib/tasks/slots.ts`）。見出しは固定、本文がタスク（1行に1つ。行頭に「・」を出すが保存はしない）で、その場で書き換える。AI は本人の指示で monocore スキルの `blocked` から書き換える。枠に無い名前の行は画面に出さない。
 - 目標（`plan_goals`）と締切までの時間の累計グラフは 2026-10-23 に廃止した（経緯は `docs/decisions.md`）。
 
