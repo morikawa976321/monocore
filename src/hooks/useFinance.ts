@@ -202,7 +202,7 @@ export function useFinance(client: SupabaseClient<Database>) {
     catch (error) { forecastError = message(error); }
 
     return {
-        events, measurements, base, isLoading, loadError, reload, saving,
+        events, measurements, base, isLoading, loadError, reload, refresh, saving,
         eventDraft, setEventDraft, eventError, editEvent, saveEvent, removeEvent,
         cancelEvent: () => { if (!saving) { setEventDraft(null); setEventError(null); } },
         recordDraft, setMeasurementDraft, measurementError, editMeasurement, record,
