@@ -1,6 +1,6 @@
 import type { Balance, Measurement } from '@/src/lib/finance/projection';
-import { totalOf } from '@/src/lib/finance/projection';
-import { monthNumber } from '@/src/lib/finance/month';
+import { displayedRows, totalOf } from '@/src/lib/finance/projection';
+import { currentMonth, monthNumber } from '@/src/lib/finance/month';
 
 /** グリッドの間隔。月の通し番号は年×12 なので、60 の倍数がちょうど5の倍数の年の1月になる。 */
 const GRID_MONTHS = 60;
@@ -26,13 +26,17 @@ const SERIES: { key: Key; name: string; line: string; label: string }[] = [
  * 凡例は持たず、線の右端に系列名と終点の額を置く(本人の指示 2026-10-23: 3本を見分けるため)。
  */
 export function FinanceChart({ measurements, future }: { measurements: Measurement[]; future: Balance[] }) {
-    const actual: Row[] = [...measurements].sort((a, b) => a.month.localeCompare(b.month)).map(row => ({ ...row, total: totalOf(row.cash, row.nisa) }));
-    const base = actual.at(-1);
-    const projected: Row[] = base ? [base, ...future] : [];
-    const all: Row[] = [...actual, ...future];
+    // 描くのは当月から DISPLAY_MONTHS ヶ月先まで(本人の指示 2026-10-23)。当月より前の実測は描かず、左端を当月に固定する。
+    const from = currentMonth();
+    const inWindow = (rows: Row[]) => displayedRows(rows, from).filter(row => row.month >= from);
+    const measured: Row[] = [...measurements].sort((a, b) => a.month.localeCompare(b.month)).map(row => ({ ...row, total: totalOf(row.cash, row.nisa) }));
+    const base = measured.at(-1);
+    const actual = inWindow(measured);
+    const projected = inWindow(base ? [base, ...future] : []);
+    const all: Row[] = [...actual, ...inWindow(future)];
     if (!base || !all.length) return null;
     const last = all.at(-1)!;
-    const first = monthNumber(all[0].month);
+    const first = monthNumber(from);
     const span = Math.max(1, monthNumber(last.month) - first);
     const values = all.flatMap(row => [row.cash, row.nisa, row.total]);
     const min = values.reduce((bound, value) => Math.min(bound, value), 0);
@@ -72,7 +76,7 @@ export function FinanceChart({ measurements, future }: { measurements: Measureme
                         </g>
                         <line x1="8" x2="472" y1={y(0)} y2={y(0)} className="stroke-current text-neutral-400 dark:text-neutral-600" strokeWidth="1" vectorEffect="non-scaling-stroke" />
                         {/* 最新実測月の縦線は中立色。アンバーは Cash の線が使うので、同色にすると線と紛れる */}
-                        <line x1={x(base.month)} x2={x(base.month)} y1="8" y2="88" strokeDasharray="2 3" className="stroke-current text-neutral-500" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        {base.month >= from && <line x1={x(base.month)} x2={x(base.month)} y1="8" y2="88" strokeDasharray="2 3" className="stroke-current text-neutral-500" strokeWidth="1" vectorEffect="non-scaling-stroke" />}
                         {SERIES.map(series => (
                             <g key={series.key} className={series.line}>
                                 <polyline points={points(actual, series.key)} fill="none" className="stroke-current" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />

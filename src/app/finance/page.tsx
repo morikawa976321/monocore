@@ -9,7 +9,6 @@ import { FinanceChart } from '@/src/components/finance/FinanceChart';
 import { AssetsTable } from '@/src/components/finance/AssetsTable';
 import { PlanTable } from '@/src/components/finance/PlanTable';
 import { CARD, CARD_BODY, NOTICE } from '@/src/components/finance/card';
-import { displayedRows } from '@/src/lib/finance/projection';
 
 /** 家計の見通し。外枠・ヘッダー・スクロール域・同期中の覆いは Schedules などの他ページと同じ構成。 */
 export default function FinancePage() {
@@ -36,7 +35,7 @@ export default function FinancePage() {
                             {finance.base && (
                                 <section className={CARD} aria-label="見通しの折れ線">
                                     <div className={CARD_BODY}>
-                                        <FinanceChart measurements={finance.measurements} future={displayedRows(finance.simulation.rows)} />
+                                        <FinanceChart measurements={finance.measurements} future={finance.simulation.rows} />
                                     </div>
                                 </section>
                             )}
