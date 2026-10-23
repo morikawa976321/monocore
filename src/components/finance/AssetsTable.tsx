@@ -133,7 +133,6 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                         </tbody>
                     </table>
                 </div>
-                <p className={`mt-2 text-sm ${MUTED}`}>灰色の行は計画からの予測。次の月の行(＋)をクリックすると記録、実測の行をクリックすると訂正・削除。</p>
             </div>
         </section>
     );

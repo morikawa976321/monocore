@@ -80,7 +80,6 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                 {/* 行の削除ボタンの失敗は編集欄が無いのでここに出す */}
                 {!draft && finance.eventError && <p role="alert" className={NOTICE}>{finance.eventError}</p>}
                 {!rows.length && !draft && <p className={MUTED}>表示する計画はありません。</p>}
-                <p className={`text-sm ${MUTED}`}>行をクリックすると編集、ゴミ箱で削除。下書きは上の表と折れ線へ即時反映され、保存で確定します。記録した月までに終わった行は非表示になります（データは残ります）。</p>
                 <Button color="secondary" onClick={() => finance.editEvent()} disabled={!canEdit}>
                     <Plus className="w-4 h-4" />
                     計画を追加
