@@ -5,7 +5,8 @@ import { Input } from '@/src/components/ui/Input';
 import { Textarea } from '@/src/components/ui/Textarea';
 import { isTransfer, signedYen } from '@/src/lib/finance/input';
 import { visibleEvents } from '@/src/lib/finance/projection';
-import { CARD, CARD_BODY, CARD_HEADER, GAP, LABEL, MUTED, NOTICE, NUM, TD, TH } from './card';
+import { CARD, CARD_BODY, CARD_HEADER, GAP, MUTED, NOTICE, NUM, TD, TH } from './card';
+import { useRowNote } from './RowNote';
 import type { EventDraft } from '@/src/lib/finance/input';
 import type { FinanceEvent } from '@/src/lib/finance/projection';
 import type { FinanceState } from '@/src/hooks/useFinance';
@@ -25,12 +26,15 @@ function nisaNote(event: Pick<FinanceEvent, 'cash' | 'nisa'>): string {
 /** 「計画」のカード: イベント表。行をクリックで編集、末尾の「計画を追加」で下書き行(Ahead の目標と同じ作法)。 */
 export function PlanTable({ finance }: { finance: FinanceState }) {
     const { eventDraft: draft } = finance;
+    const note = useRowNote();
     const rows = visibleEvents(finance.events, finance.base?.month);
     const canEdit = !draft && !finance.saving && !finance.editingMonth;
     const patch = (key: Exclude<keyof EventDraft, 'id' | 'transfer'>, value: string) => { if (draft) finance.setEventDraft({ ...draft, [key]: value }); };
     const error = finance.eventError || finance.simulation.error;
 
+    // メモ列を持たないので、メモとボタンは2行目に全幅で置く。
     const editor = draft && (
+        <>
         <tr className="bg-neutral-100 dark:bg-neutral-800/50">
             <td className={TD}><Input aria-label="イベント名" value={draft.name} onChange={event => patch('name', event.target.value)} disabled={finance.saving} className="min-w-40" /></td>
             <td className={TD}><Input aria-label="開始月" placeholder="YYYY-MM" value={draft.start} onChange={event => patch('start', event.target.value)} disabled={finance.saving} className="w-28 tabular-nums" /></td>
@@ -46,8 +50,11 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                     <Input aria-label="NISA 毎月の増減" value={draft.nisa} onChange={event => patch('nisa', event.target.value)} disabled={finance.saving} className="mt-1 w-32 text-right tabular-nums" />
                 )}
             </td>
-            <td className={`${TD} ${GAP}`} colSpan={2}>
-                <Textarea aria-label="メモ" value={draft.memo} onChange={event => patch('memo', event.target.value)} disabled={finance.saving} className="min-w-64 resize-none" rows={2} />
+            <td className={`${TD} w-8 hidden sm:table-cell`} />
+        </tr>
+        <tr className="bg-neutral-100 dark:bg-neutral-800/50">
+            <td className="px-2 pt-1 pb-2" colSpan={5}>
+                <Textarea aria-label="メモ" placeholder="メモ" value={draft.memo} onChange={event => patch('memo', event.target.value)} disabled={finance.saving} className="w-full resize-none" rows={2} />
                 <div className="flex flex-wrap gap-2 mt-2">
                     <Button color="primary" onClick={() => void finance.saveEvent()} disabled={finance.saving || !!finance.simulation.error}>保存</Button>
                     <Button color="secondary" onClick={finance.cancelEvent} disabled={finance.saving}>取消</Button>
@@ -56,6 +63,7 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                 {error && <p role="alert" className={`mt-1 ${NOTICE}`}>{error}</p>}
             </td>
         </tr>
+        </>
     );
 
     return (
@@ -66,26 +74,26 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                     <table className="w-full border-collapse text-sm leading-6 sm:text-base sm:leading-7">
                         <thead className={MUTED}>
                             <tr>
-                                <th scope="col" className={`${TH} w-px`}>イベント</th>
+                                <th scope="col" className={`${TH} w-full`}>イベント</th>
                                 <th scope="col" className={`${TH} w-px`}>開始</th>
                                 <th scope="col" className={`${TH} w-px`}>終了</th>
-                                <th scope="col" className={`${TH} ${NUM} ${GAP} w-px`}>Cash 増減</th>
-                                <th scope="col" className={`${TH} ${LABEL} w-full`}>メモ</th>
-                                <th scope="col" className={`${TH} w-8`}><span className="sr-only">操作</span></th>
+                                <th scope="col" className={`${TH} ${NUM} ${GAP} w-px pr-0 sm:pr-2`}>Cash 増減</th>
+                                {/* 狭い画面ではゴミ箱の列を出さず、最後の Cash 列の右余白も詰める(表が横にはみ出す)。削除は行をタップした編集欄の「削除」でできる */}
+                                <th scope="col" className={`${TH} w-8 pr-0 hidden sm:table-cell`}><span className="sr-only">操作</span></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
                             {rows.map(row => draft?.id === row.id ? <Fragment key={row.id}>{editor}</Fragment> : (
-                                <tr key={row.id} className={canEdit ? CLICKABLE : ''} onClick={() => { if (canEdit) finance.editEvent(row); }}>
+                                <tr key={row.id} className={canEdit ? CLICKABLE : ''} onClick={() => { if (canEdit) finance.editEvent(row); }} {...note.rowProps(row.id, row.memo ?? '')}>
                                     <td className={TD}>
                                         {row.name || '（名前なし）'}
                                         {nisaNote(row) && <span className={`ml-2 text-sm ${MUTED}`}>{nisaNote(row)}</span>}
+                                        {note.hint(row.memo ?? '')}
                                     </td>
                                     <td className={`${TD} tabular-nums`}>{row.start}</td>
                                     <td className={`${TD} tabular-nums`}>{row.end}</td>
-                                    <td className={`${TD} ${NUM} ${GAP}`}>{signedYen(row.cash)}</td>
-                                    <td className={`${TD} ${LABEL} ${MUTED}`} title={row.memo || undefined}>{row.memo}</td>
-                                    <td className={`${TD} w-8 py-0 text-right`}>
+                                    <td className={`${TD} ${NUM} ${GAP} pr-0 sm:pr-2`}>{signedYen(row.cash)}</td>
+                                    <td className={`${TD} w-8 py-0 pr-0 text-right hidden sm:table-cell`}>
                                         <Button color="ghost" size="icon" disabled={!canEdit} onClick={event => { event.stopPropagation(); void finance.removeEvent(row.id); }} aria-label={`${row.name || '（名前なし）'} を削除`} title="削除">
                                             <Trash2 className="w-4 h-4" />
                                         </Button>
@@ -105,6 +113,7 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                     計画を追加
                 </Button>
             </div>
+            {note.tooltip}
         </section>
     );
 }
