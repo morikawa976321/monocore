@@ -4,7 +4,7 @@ import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { MILESTONES } from '@/src/lib/finance/constants';
 import { formatYen, parseMeasurement, signedYen } from '@/src/lib/finance/input';
-import { difference, totalOf } from '@/src/lib/finance/projection';
+import { difference, displayedRows, totalOf } from '@/src/lib/finance/projection';
 import { CARD, CARD_BODY, CARD_HEADER, EVEN, GAP, MUTED, NOTICE, NUM, TD, TH } from './card';
 import { useRowNote } from './RowNote';
 import type { FinanceState } from '@/src/hooks/useFinance';
@@ -122,7 +122,7 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                             ))}
                             {/* 実測が1行も無い、次の月の予測行が無い、編集中の実測が別所で削除されて一覧から消えた: 入力行をここに出す */}
                             {(!base || (recording && !nextRowExists) || (editingMonth && !displayed.some(row => row.month === editingMonth))) && editor}
-                            {simulation.rows.map(row => {
+                            {displayedRows(simulation.rows).map(row => {
                                 if (recording && row.month === nextMonth) return <Fragment key={row.month}>{editor}</Fragment>;
                                 const isNext = row.month === nextMonth;
                                 return (

@@ -1,5 +1,5 @@
-import { ASSUMPTIONS, MILESTONES, MIN_HORIZON } from './constants';
-import { monthFromNumber, monthNumber } from './month';
+import { ASSUMPTIONS, DISPLAY_MONTHS, MILESTONES, MIN_HORIZON } from './constants';
+import { addMonths, currentMonth, monthFromNumber, monthNumber } from './month';
 
 export interface FinanceEvent {
     name: string;
@@ -59,6 +59,12 @@ export function horizonFor(events: readonly FinanceEvent[]): string {
 export function visibleEvents<T extends FinanceEvent>(events: readonly T[], latestMonth?: string | null): T[] {
     return events.filter(event => !latestMonth || (event.end ?? event.start) > latestMonth)
         .sort((a, b) => a.start.localeCompare(b.start));
+}
+
+/** 予測のうち、表と折れ線に出す分(当月から DISPLAY_MONTHS ヶ月先まで)。 */
+export function displayedRows<T extends { month: string }>(rows: readonly T[], from = currentMonth()): T[] {
+    const end = addMonths(from, DISPLAY_MONTHS);
+    return rows.filter(row => row.month <= end);
 }
 
 /** Only future balances are derived; measurements are never filled in or rewritten. */

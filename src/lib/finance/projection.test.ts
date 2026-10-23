@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { addMonths, fromMonthDate, monthFromNumber, monthNumber, toMonthDate } from './month';
 import { parseMeasurement, parseYen } from './input';
 import { ASSUMPTIONS } from './constants';
-import { forecastAt, horizonFor, project, summarize, totalOf, visibleEvents, type FinanceEvent } from './projection';
+import { displayedRows, forecastAt, horizonFor, project, summarize, totalOf, visibleEvents, type FinanceEvent } from './projection';
 
 const base = { month: '2026-01', cash: 100, nisa: 50 };
 const end = '2027-12';
@@ -42,6 +42,11 @@ describe('finance projection: hand calculations', () => {
         expect(horizonFor([event('2043-01', '2045-03', 1)])).toBe('2045-03');
         expect(horizonFor([event('2046-01', null, 1)])).toBe('2046-01');
         expect(project([base], []).at(-1)?.month).toBe('2042-03');
+    });
+    it('shows projections only up to 60 months after the current month', () => {
+        const rows = project([base], [], '2032-01');
+        expect(displayedRows(rows, '2026-10').at(-1)?.month).toBe('2031-10');
+        expect(displayedRows(rows, '2026-10')[0].month).toBe('2026-02');
     });
     it('hides ended events only when measurements exist and sorts by start', () => {
         const events = [event('2026-03', null, 1), event('2025-12', '2026-01', 1), event('2026-01', '2026-02', 1)];

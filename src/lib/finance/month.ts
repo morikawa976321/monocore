@@ -29,3 +29,8 @@ export function formatMonth(month: string): string {
     monthNumber(month);
     return month;
 }
+
+/** 日本時間での今月(YYYY-MM)。 */
+export function currentMonth(): string {
+    return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
+}
