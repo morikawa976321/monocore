@@ -373,11 +373,13 @@ export type Database = {
       replace_schedules_for_day_as: {
         Args: {
           p_day_end_utc: string
+          p_day_key: string
           p_day_start_utc: string
+          p_expected_revision?: number
           p_items: Json
           p_user_id: string
         }
-        Returns: undefined
+        Returns: number
       }
     }
     Enums: {
