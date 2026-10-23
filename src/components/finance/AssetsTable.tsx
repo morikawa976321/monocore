@@ -5,9 +5,15 @@ import { Input } from '@/src/components/ui/Input';
 import { MILESTONES } from '@/src/lib/finance/constants';
 import { formatYen, parseMeasurement, signedYen } from '@/src/lib/finance/input';
 import { difference, totalOf } from '@/src/lib/finance/projection';
-import { CARD, CARD_BODY, CARD_HEADER, GAP, MUTED, NOTICE, NUM, TD, TH } from './card';
+import { CARD, CARD_BODY, CARD_HEADER, EVEN, GAP, MUTED, NOTICE, NUM, TD, TH } from './card';
 import { useRowNote } from './RowNote';
 import type { FinanceState } from '@/src/hooks/useFinance';
+
+/**
+ * 年月と操作の列の左余白を、狭い画面だけ外す。数値列が8桁(1,000万円台)になると、375px 幅で表が横にはみ出すため。
+ * 年月はカードの内側余白があるので詰めても端に付かない。
+ */
+const EDGE = 'pl-0 sm:pl-2';
 
 /** 行をクリックで編集に入れる行の見た目(Reports の一覧の行と同じ hover)。 */
 const CLICKABLE = 'cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out';
@@ -93,11 +99,11 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                     <table className="w-full border-collapse text-sm leading-6 sm:text-base sm:leading-7">
                         <thead className={MUTED}>
                             <tr>
-                                <th scope="col" className={`${TH} w-px`}>年月</th>
-                                <th scope="col" className={`${TH} ${NUM} ${GAP} w-px`}>Cash</th>
-                                <th scope="col" className={`${TH} ${NUM} ${GAP} w-px`}>NISA</th>
-                                <th scope="col" className={`${TH} ${NUM} ${GAP} w-px`}>合計</th>
-                                <th scope="col" className={`${TH} w-8 pr-0`}><span className="sr-only">操作</span></th>
+                                <th scope="col" className={`${TH} ${EVEN} ${EDGE}`}>年月</th>
+                                <th scope="col" className={`${TH} ${NUM} ${GAP} ${EVEN}`}>Cash</th>
+                                <th scope="col" className={`${TH} ${NUM} ${GAP} ${EVEN}`}>NISA</th>
+                                <th scope="col" className={`${TH} ${NUM} ${GAP} ${EVEN}`}>合計</th>
+                                <th scope="col" className={`${TH} w-8 pr-0 ${EDGE}`}><span className="sr-only">操作</span></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
@@ -105,11 +111,11 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                                 <Fragment key={row.month}>
                                     {editingMonth === row.month ? editor : (
                                         <tr className={canEdit ? CLICKABLE : ''} onClick={() => { if (canEdit) finance.editMeasurement(row); }} {...note.rowProps(row.month, measuredLabel(row.month))}>
-                                            <td className={`${TD} tabular-nums`}>{row.month}</td>
+                                            <td className={`${TD} tabular-nums ${EDGE}`}>{row.month}</td>
                                             <td className={`${TD} ${NUM} ${GAP}`}>{formatYen(row.cash)}</td>
                                             <td className={`${TD} ${NUM} ${GAP}`}>{formatYen(row.nisa)}</td>
                                             <td className={`${TD} ${NUM} ${GAP}`}>{formatYen(totalOf(row.cash, row.nisa))}</td>
-                                            <td className={`${TD} w-8 py-0 pr-0 text-right`}>{note.mark(row.month, measuredLabel(row.month), `${row.month} のイベント`)}</td>
+                                            <td className={`${TD} w-8 py-0 pr-0 text-right ${EDGE}`}>{note.mark(row.month, measuredLabel(row.month), `${row.month} のイベント`)}</td>
                                         </tr>
                                     )}
                                 </Fragment>
@@ -121,11 +127,11 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                                 const isNext = row.month === nextMonth;
                                 return (
                                     <tr key={row.month} className={`${MUTED} ${isNext && canEdit ? CLICKABLE : ''}`} onClick={() => { if (isNext && canEdit) finance.beginRecord(); }} {...note.rowProps(row.month, labels(row.month, true))}>
-                                        <td className={`${TD} tabular-nums`}>{row.month}</td>
+                                        <td className={`${TD} tabular-nums ${EDGE}`}>{row.month}</td>
                                         <td className={`${TD} ${NUM} ${GAP}`}>{formatYen(row.cash)}</td>
                                         <td className={`${TD} ${NUM} ${GAP}`}>{formatYen(row.nisa)}</td>
                                         <td className={`${TD} ${NUM} ${GAP}`}>{formatYen(row.total)}</td>
-                                        <td className={`${TD} w-8 py-0 pr-0 text-right`}>
+                                        <td className={`${TD} w-8 py-0 pr-0 text-right ${EDGE}`}>
                                             {note.mark(row.month, labels(row.month, true), `${row.month} のイベント`)}
                                             {isNext && (
                                                 <Button color="ghost" size="icon" disabled={!canEdit} onClick={event => { event.stopPropagation(); finance.beginRecord(); }} aria-label={`${row.month} の実測を記録`}>

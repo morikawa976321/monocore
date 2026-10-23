@@ -5,7 +5,7 @@ import { Input } from '@/src/components/ui/Input';
 import { Textarea } from '@/src/components/ui/Textarea';
 import { isTransfer, signedYen } from '@/src/lib/finance/input';
 import { visibleEvents } from '@/src/lib/finance/projection';
-import { CARD, CARD_BODY, CARD_HEADER, GAP, MUTED, NOTICE, NUM, TD, TH } from './card';
+import { CARD, CARD_BODY, CARD_HEADER, EVEN, GAP, MUTED, NOTICE, NUM, TD, TH } from './card';
 import { useRowNote } from './RowNote';
 import type { EventDraft } from '@/src/lib/finance/input';
 import type { FinanceEvent } from '@/src/lib/finance/projection';
@@ -74,10 +74,10 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                     <table className="w-full border-collapse text-sm leading-6 sm:text-base sm:leading-7">
                         <thead className={MUTED}>
                             <tr>
-                                <th scope="col" className={`${TH} w-full`}>イベント</th>
-                                <th scope="col" className={`${TH} w-px`}>開始</th>
-                                <th scope="col" className={`${TH} w-px`}>終了</th>
-                                <th scope="col" className={`${TH} ${NUM} ${GAP} w-px pr-0 sm:pr-2`}>Cash 増減</th>
+                                <th scope="col" className={`${TH} ${EVEN}`}>イベント</th>
+                                <th scope="col" className={`${TH} ${EVEN}`}>開始</th>
+                                <th scope="col" className={`${TH} ${EVEN}`}>終了</th>
+                                <th scope="col" className={`${TH} ${NUM} ${GAP} ${EVEN} pr-0 sm:pr-2`}>Cash 増減</th>
                                 {/* 狭い画面ではゴミ箱の列を出さず、最後の Cash 列の右余白も詰める(表が横にはみ出す)。削除は行をタップした編集欄の「削除」でできる */}
                                 <th scope="col" className={`${TH} w-8 pr-0 hidden sm:table-cell`}><span className="sr-only">操作</span></th>
                             </tr>
