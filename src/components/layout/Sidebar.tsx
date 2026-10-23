@@ -8,6 +8,7 @@ import {
     FileText,
     Menu,
     Newspaper,
+    Wallet,
     LogOut,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
@@ -19,6 +20,7 @@ const MENU_ITEMS = [
     { href: "/plan", icon: Target, label: "Ahead" },
     { href: "/reports", icon: FileText, label: "Reports" },
     { href: "/news", icon: Newspaper, label: "News" },
+    { href: "/finance", icon: Wallet, label: "Finance" },
 ] as const;
 
 export function Sidebar() {

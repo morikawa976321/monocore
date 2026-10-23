@@ -38,7 +38,7 @@ Reference: `docs/directory_structure.md`
 
 ## Development Philosophy
 
-1. **Schedules-centered Personal OS** — Schedules is the primary surface; Inbox is a companion panel on that page (not a peer route). Projects and Reports are separate resources with their own routes.
+1. **Schedules-centered Personal OS** — Schedules is the primary surface; Inbox is a companion panel on that page (not a peer route). Projects, Reports, and Finance are separate resources with their own routes.
 2. **Form follows function / Cognitive load minimization** — No decorative animation; maximize information density and speed; minimize clicks.
 3. **Focus on app logic** — Use `@supabase/ssr` fully; keep boilerplate minimal.
 4. **Prioritize development speed above all** — In this solo, small-scale project, default decisions should favor faster implementation and iteration unless they introduce major product risk.

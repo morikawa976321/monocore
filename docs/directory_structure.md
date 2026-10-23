@@ -44,6 +44,19 @@ monocore
 | `src/components/` | **UIコンポーネント**: 再利用可能な部品（ボタン、リスト、フォームなど）。 |
 | `src/hooks/` | **カスタムフック**: Reactの状態管理や副作用（データ取得中など）の共通ロジック。 |
 | `src/lib/` | **外部連携・道具箱**: Supabaseのクライアント設定や、共通のユーティリティ関数。 |
+| `src/app/finance/page.tsx` | 家計の見通しページ。資産表・計画表・前提を配置。 |
+| `src/components/finance/FinanceHeader.tsx` | 最新実測・節目・Cash 最小の要約。 |
+| `src/components/finance/FinanceChart.tsx` | 合計と Cash の SVG 折れ線（実測・予測）。 |
+| `src/components/finance/AssetsTable.tsx` | 月末残高・予測・記録時の差・実測訂正。 |
+| `src/components/finance/PlanTable.tsx` | 計画イベントの行編集・追加・削除。 |
+| `src/hooks/useFinance.ts` | 家計の読み込み・下書き・保存・記録。 |
+| `src/lib/finance/month.ts` | 月表記・月初 DATE・通し番号の変換と加算。 |
+| `src/lib/finance/constants.ts` | 節目・終点下限・前提文。 |
+| `src/lib/finance/projection.ts` | DB に依存しない予測・比較・要約の純関数。 |
+| `src/lib/finance/input.ts` | 整数円と下書きの検査・金額表示。 |
+| `src/lib/finance/projection.test.ts` | 手計算例と7つの性質テスト。 |
+| `src/lib/finance/projection.realdata.test.ts` | FINANCE_FIXTURE 指定時だけ実データを照合。 |
+| `src/lib/supabase/queries/finance.ts` | finance 2表の DB 操作。 |
 | `src/types/` | **型定義**: TypeScriptのインターフェースやSupabaseの自動生成型の保管場所。 |
 | `supabase/` | **DB設定**: マイグレーションファイルやローカル開発用の設定。 |
 

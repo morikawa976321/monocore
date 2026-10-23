@@ -155,6 +155,72 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_events: {
+        Row: {
+          cash_delta: number
+          created_at: string
+          end_month: string | null
+          id: string
+          memo: string
+          name: string
+          nisa_delta: number
+          start_month: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cash_delta?: number
+          created_at?: string
+          end_month?: string | null
+          id?: string
+          memo?: string
+          name?: string
+          nisa_delta?: number
+          start_month: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          cash_delta?: number
+          created_at?: string
+          end_month?: string | null
+          id?: string
+          memo?: string
+          name?: string
+          nisa_delta?: number
+          start_month?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      finance_measurements: {
+        Row: {
+          cash: number
+          created_at: string
+          month: string
+          nisa: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cash: number
+          created_at?: string
+          month: string
+          nisa: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          cash?: number
+          created_at?: string
+          month?: string
+          nisa?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inboxes: {
         Row: {
           content: string
