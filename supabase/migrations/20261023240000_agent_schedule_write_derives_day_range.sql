@@ -47,11 +47,18 @@ BEGIN
     -- 日本時間の 0:00 から翌日の 0:00 まで(画面の localTimeToUtc と同じ区切り)。
     v_day_start_utc := p_day_key::TIMESTAMP AT TIME ZONE 'Asia/Tokyo';
     v_day_end_utc := (p_day_key + 1)::TIMESTAMP AT TIME ZONE 'Asia/Tokyo';
-    -- 日本にも夏時間の時期(1948〜1951)があり、切り替わりの日は 24 時間にならない。午前0時が2回ある日は、境目の
-    -- 解釈が呼び出し側(Python は先の時刻)と Postgres(後の時刻)で食い違い、読んでいない予定を消しうる
-    -- (sol のレビューの指摘)。そうした日は書かない。
-    IF v_day_end_utc - v_day_start_utc <> INTERVAL '24 hours' THEN
-        RAISE EXCEPTION 'Day % is not 24 hours long in Asia/Tokyo', p_day_key;
+    -- 日本にも夏時間の時期(1948〜1951)があった。境目の0時が無い(夏時間の始まりで飛ばされる)日や2回ある(終わりで
+    -- 繰り返す)日は、解釈が呼び出し側(Python は先の時刻)と Postgres(後の時刻)で食い違い、読んでいない予定を
+    -- 消したり、消したつもりの予定を残したりする(sol のレビューの指摘)。日の長さだけでは、繰り返す0時から始まる
+    -- 日(24 時間ある)を見落とす。始まりと終わりの0時がそれぞれちょうど1回だけあることを確かめ、そうでない日は
+    -- 書かない: UTC から日本時間に戻すと元の0時になる(無い時刻を弾く)、その1時間前が前日の 23:00 になる
+    -- (2回ある時刻を弾く。日本の夏時間のずれは1時間)。
+    IF (v_day_start_utc AT TIME ZONE 'Asia/Tokyo') <> p_day_key::TIMESTAMP
+        OR ((v_day_start_utc - INTERVAL '1 hour') AT TIME ZONE 'Asia/Tokyo') <> p_day_key::TIMESTAMP - INTERVAL '1 hour'
+        OR (v_day_end_utc AT TIME ZONE 'Asia/Tokyo') <> (p_day_key + 1)::TIMESTAMP
+        OR ((v_day_end_utc - INTERVAL '1 hour') AT TIME ZONE 'Asia/Tokyo') <> (p_day_key + 1)::TIMESTAMP - INTERVAL '1 hour'
+    THEN
+        RAISE EXCEPTION 'The boundaries of % are ambiguous in Asia/Tokyo (daylight saving time)', p_day_key;
     END IF;
 
     PERFORM pg_advisory_xact_lock(
