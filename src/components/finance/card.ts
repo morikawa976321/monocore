@@ -14,3 +14,10 @@ export const NOTICE = 'text-sm text-amber-600 dark:text-amber-400';
 export const TH = 'px-2 py-1 text-left font-normal whitespace-nowrap border-b border-neutral-200 dark:border-neutral-800';
 export const TD = 'px-2 py-1 whitespace-nowrap';
 export const NUM = 'text-right tabular-nums';
+/** 表の数値列などの左の間隔。狭い画面では TD の px-2 のまま。 */
+export const GAP = 'sm:pl-6';
+/**
+ * 余った幅を持つ最後の文字列の列(資産のイベント・計画のメモ)。見出しに w-full、他の列の見出しに w-px を付けて組む。
+ * max-w-0 で表の最小幅に数えさせず、幅が足りなければ … に畳む(表に横スクロールを出さないため)。全文は title で読む。
+ */
+export const LABEL = `${GAP} max-w-0 truncate`;

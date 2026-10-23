@@ -5,7 +5,7 @@ import { Input } from '@/src/components/ui/Input';
 import { Textarea } from '@/src/components/ui/Textarea';
 import { signedYen } from '@/src/lib/finance/input';
 import { visibleEvents } from '@/src/lib/finance/projection';
-import { CARD, CARD_BODY, CARD_HEADER, MUTED, NOTICE, NUM, TD, TH } from './card';
+import { CARD, CARD_BODY, CARD_HEADER, GAP, LABEL, MUTED, NOTICE, NUM, TD, TH } from './card';
 import type { EventDraft } from '@/src/lib/finance/input';
 import type { FinanceState } from '@/src/hooks/useFinance';
 
@@ -25,9 +25,9 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
             <td className={TD}><Input aria-label="イベント名" value={draft.name} onChange={event => patch('name', event.target.value)} disabled={finance.saving} className="min-w-40" /></td>
             <td className={TD}><Input aria-label="開始月" placeholder="YYYY-MM" value={draft.start} onChange={event => patch('start', event.target.value)} disabled={finance.saving} className="w-28 tabular-nums" /></td>
             <td className={TD}><Input aria-label="終了月（空なら単月）" placeholder="YYYY-MM" value={draft.end} onChange={event => patch('end', event.target.value)} disabled={finance.saving} className="w-28 tabular-nums" /></td>
-            <td className={`${TD} ${NUM}`}><Input aria-label="Cash 毎月の増減" value={draft.cash} onChange={event => patch('cash', event.target.value)} disabled={finance.saving} className="w-32 text-right tabular-nums" /></td>
-            <td className={`${TD} ${NUM}`}><Input aria-label="NISA 毎月の増減" value={draft.nisa} onChange={event => patch('nisa', event.target.value)} disabled={finance.saving} className="w-32 text-right tabular-nums" /></td>
-            <td className={TD} colSpan={2}>
+            <td className={`${TD} ${NUM} ${GAP}`}><Input aria-label="Cash 毎月の増減" value={draft.cash} onChange={event => patch('cash', event.target.value)} disabled={finance.saving} className="w-32 text-right tabular-nums" /></td>
+            <td className={`${TD} ${NUM} ${GAP}`}><Input aria-label="NISA 毎月の増減" value={draft.nisa} onChange={event => patch('nisa', event.target.value)} disabled={finance.saving} className="w-32 text-right tabular-nums" /></td>
+            <td className={`${TD} ${GAP}`} colSpan={2}>
                 <Textarea aria-label="メモ" value={draft.memo} onChange={event => patch('memo', event.target.value)} disabled={finance.saving} className="min-w-64 resize-none" rows={2} />
                 <div className="flex flex-wrap gap-2 mt-2">
                     <Button color="primary" onClick={() => void finance.saveEvent()} disabled={finance.saving || !!finance.simulation.error}>保存</Button>
@@ -47,12 +47,12 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                     <table className="w-full border-collapse text-sm leading-6 sm:text-base sm:leading-7">
                         <thead className={MUTED}>
                             <tr>
-                                <th scope="col" className={TH}>イベント</th>
-                                <th scope="col" className={TH}>開始</th>
-                                <th scope="col" className={TH}>終了</th>
-                                <th scope="col" className={`${TH} ${NUM}`}>Cash 増減</th>
-                                <th scope="col" className={`${TH} ${NUM}`}>NISA 増減</th>
-                                <th scope="col" className={TH}>メモ</th>
+                                <th scope="col" className={`${TH} w-px`}>イベント</th>
+                                <th scope="col" className={`${TH} w-px`}>開始</th>
+                                <th scope="col" className={`${TH} w-px`}>終了</th>
+                                <th scope="col" className={`${TH} ${NUM} ${GAP} w-px`}>Cash 増減</th>
+                                <th scope="col" className={`${TH} ${NUM} ${GAP} w-px`}>NISA 増減</th>
+                                <th scope="col" className={`${TH} ${LABEL} w-full`}>メモ</th>
                                 <th scope="col" className={`${TH} w-8`}><span className="sr-only">操作</span></th>
                             </tr>
                         </thead>
@@ -62,9 +62,9 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                                     <td className={TD}>{row.name || '（名前なし）'}</td>
                                     <td className={`${TD} tabular-nums`}>{row.start}</td>
                                     <td className={`${TD} tabular-nums`}>{row.end}</td>
-                                    <td className={`${TD} ${NUM}`}>{signedYen(row.cash)}</td>
-                                    <td className={`${TD} ${NUM}`}>{signedYen(row.nisa)}</td>
-                                    <td className={`${TD} ${MUTED}`}>{row.memo}</td>
+                                    <td className={`${TD} ${NUM} ${GAP}`}>{signedYen(row.cash)}</td>
+                                    <td className={`${TD} ${NUM} ${GAP}`}>{signedYen(row.nisa)}</td>
+                                    <td className={`${TD} ${LABEL} ${MUTED}`} title={row.memo || undefined}>{row.memo}</td>
                                     <td className={`${TD} w-8 py-0 text-right`}>
                                         <Button color="ghost" size="icon" disabled={!canEdit} onClick={event => { event.stopPropagation(); finance.editEvent(row); }} aria-label={`${row.name || '（名前なし）'} を編集`}>
                                             <Pencil className="w-4 h-4" />

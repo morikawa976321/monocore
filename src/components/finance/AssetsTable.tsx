@@ -5,15 +5,11 @@ import { Input } from '@/src/components/ui/Input';
 import { MILESTONES } from '@/src/lib/finance/constants';
 import { formatYen, parseMeasurement, signedYen } from '@/src/lib/finance/input';
 import { difference, totalOf } from '@/src/lib/finance/projection';
-import { CARD, CARD_BODY, CARD_HEADER, MUTED, NOTICE, NUM, TD, TH } from './card';
+import { CARD, CARD_BODY, CARD_HEADER, GAP, LABEL, MUTED, NOTICE, NUM, TD, TH } from './card';
 import type { FinanceState } from '@/src/hooks/useFinance';
 
 /** 行をクリックで編集に入れる行の見た目(Reports の一覧の行と同じ hover)。 */
 const CLICKABLE = 'cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out';
-/** 年月〜合計の列は中身の幅に詰め(見出しに w-px)、余った幅はイベント列(w-full)が持つ。数値の間は GAP で空ける(狭い画面では TD の px-2 のまま)。 */
-const GAP = 'sm:pl-6';
-/** イベント列のセル。max-w-0 で表の最小幅に数えさせず、幅が足りなければ … に畳む(表に横スクロールを出さないため)。全文は title で読む。 */
-const LABEL = `${GAP} max-w-0 truncate`;
 
 /**
  * 「資産」のカード: 月末残高の表。実測(最新2行、古い分は畳む)→ 計画からの予測。
