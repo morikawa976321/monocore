@@ -113,6 +113,14 @@ export function useFinance(client: SupabaseClient<Database>) {
             const preview = eventDraft.id ? events.map(row => row.id === eventDraft.id ? event : row) : [...events, event];
             project(measurements, preview);
             const input = { name: event.name, start_month: toMonthDate(event.start), end_month: event.end ? toMonthDate(event.end) : null, cash_delta: event.cash, nisa_delta: event.nisa, memo: event.memo ?? '' };
+            if (eventDraft.id && !draftUpdatedAt.current) {
+                // 条件を持たないまま更新に進まない(空文字の日時条件は形式エラーで永久に失敗する)。取り直してから。
+                const loaded = await refresh();
+                const latest = loaded?.find(row => row.id === eventDraft.id);
+                if (!loaded) throw new Error('表を取り直せませんでした。通信が戻ったらもう一度保存してください。');
+                if (!latest) throw new Error('この行は別の場所で削除されています。取消してから、必要なら「+ 追加」で入れ直してください。');
+                draftUpdatedAt.current = latest.updatedAt;
+            }
             const result = eventDraft.id
                 ? await updateFinanceEvent(client, eventDraft.id, draftUpdatedAt.current ?? '', input)
                 : await insertFinanceEvent(client, input);
@@ -120,10 +128,12 @@ export function useFinance(client: SupabaseClient<Database>) {
             if (!result.data) {
                 // 楽観ロックに外れた(0 行更新)。下書きは残し、表だけ最新にする。
                 // 次の保存は新しい版を条件にできるよう、取り直した行の updated_at に付け替える。
+                // 取り直し自体に失敗したら条件は今のまま残す(次の保存でまた競合→取り直しを試みる)。
                 const loaded = await refresh();
-                const latest = loaded?.find(row => row.id === eventDraft.id);
-                draftUpdatedAt.current = latest?.updatedAt ?? null;
-                if (loaded && !latest) throw new Error('この行は別の場所で削除されています。取消してから、必要なら「+ 追加」で入れ直してください。');
+                if (!loaded) throw new Error('保存が競合しましたが、表を取り直せませんでした。通信が戻ったらもう一度保存してください。');
+                const latest = loaded.find(row => row.id === eventDraft.id);
+                if (!latest) throw new Error('この行は別の場所で削除されています。取消してから、必要なら「+ 追加」で入れ直してください。');
+                draftUpdatedAt.current = latest.updatedAt;
                 throw new Error(CONFLICT_MESSAGE);
             }
             const saved = eventFromRow(result.data);
