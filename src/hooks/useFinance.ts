@@ -145,16 +145,17 @@ export function useFinance(client: SupabaseClient<Database>) {
         finally { busy.current = false; setSaving(false); }
     }
 
-    async function removeEvent() {
-        if (!eventDraft?.id || busy.current) return;
+    /** id を渡せば表の行から直接消す(下書きが無いときだけ)。省略時は編集中の下書きの行を消す。 */
+    async function removeEvent(id: string | null = eventDraft?.id ?? null) {
+        if (!id || busy.current || (eventDraft && eventDraft.id !== id)) return;
         busy.current = true;
         setSaving(true);
         setEventError(null);
         try {
-            project(measurements, events.filter(row => row.id !== eventDraft.id));
-            const { error } = await deleteFinanceEvent(client, eventDraft.id);
-            if (error) throw new Error('計画の削除に失敗しました。下書きを残しています。');
-            setEvents(rows => rows.filter(row => row.id !== eventDraft.id));
+            project(measurements, events.filter(row => row.id !== id));
+            const { error } = await deleteFinanceEvent(client, id);
+            if (error) throw new Error(eventDraft ? '計画の削除に失敗しました。下書きを残しています。' : '計画の削除に失敗しました。');
+            setEvents(rows => rows.filter(row => row.id !== id));
             setEventDraft(null);
             await refresh();
         } catch (error) { setEventError(message(error)); }
