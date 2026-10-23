@@ -39,13 +39,14 @@ export default function FinancePage() {
                                     </div>
                                 </section>
                             )}
-                            {/* 広い画面は資産と計画を、どちらも中身の幅で横に並べる(計画を残りの幅に伸ばすとイベント列だけが広がる)。
+                            {/* 広い画面は資産と計画を同じ幅で横に並べる。どちらもデータ4列+操作列なので、余裕があるときは両方の表の列が
+                                同じ幅に揃う(本人の指示 2026-10-23)。min-w-0 を付けないので、中身が半分に収まらない側は中身の幅が勝つ。
                                 資産は約190行、計画は十数行なので、計画は sticky にして資産をスクロールしても見え続けるようにする(本人の指示 2026-10-23) */}
                             <div className="flex flex-col lg:flex-row lg:items-start gap-2 sm:gap-4">
-                                <div className="lg:shrink-0">
+                                <div className="lg:flex-1">
                                     <AssetsTable finance={finance} />
                                 </div>
-                                <div className="lg:flex-1 lg:min-w-0 lg:sticky lg:top-0">
+                                <div className="lg:flex-1 lg:sticky lg:top-0">
                                     <PlanTable finance={finance} />
                                 </div>
                             </div>
