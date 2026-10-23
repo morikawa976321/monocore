@@ -20,10 +20,17 @@ export function parseYen(text: string): number {
     return safeInteger(Number(value.replaceAll(',', '')));
 }
 
-export function parseEvent({ transfer, ...draft }: EventDraft): FinanceEvent {
+/**
+ * latestMonth は最新の実測月。単月の行がそれ以前だと、見通しは翌月から計算するので効かず、表からも外れて
+ * (visibleEvents)保存したのに消えたように見える。保存させずに止める(本人の指示 2026-10-23)。
+ */
+export function parseEvent({ transfer, ...draft }: EventDraft, latestMonth?: string | null): FinanceEvent {
     const cash = parseYen(draft.cash);
     const event = { ...draft, name: draft.name.trim(), end: draft.end || null, cash, nisa: transfer ? opposite(cash) : parseYen(draft.nisa) };
     validateEvent(event);
+    if (latestMonth && !event.end && event.start <= latestMonth) {
+        throw new Error(`単月の行は、開始月を最新の実測月(${latestMonth})より後にしてください。それ以前の月は見通しに効かず、表にも出ません。`);
+    }
     return event;
 }
 

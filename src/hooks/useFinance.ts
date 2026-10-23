@@ -70,6 +70,7 @@ export function useFinance(client: SupabaseClient<Database>) {
     useEffect(() => { void reload(); }, [reload]);
 
     const base = latestMeasurement(measurements);
+    const latestMonth = base?.month ?? null;
     // 記録する月は一意に決まる(最新の実測の翌月。実測が無ければ今月)。画面で変えられない。
     const nextMonth = base ? addMonths(base.month, 1) : new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
     const recordDraft = measurementDraft ?? { month: nextMonth, cash: '', nisa: '' };
@@ -78,7 +79,7 @@ export function useFinance(client: SupabaseClient<Database>) {
         let previewEvents: FinanceEvent[] = events;
         try {
             if (eventDraft) {
-                const draft = parseEvent(eventDraft);
+                const draft = parseEvent(eventDraft, latestMonth);
                 previewEvents = eventDraft.id ? events.map(event => event.id === eventDraft.id ? draft : event) : [...events, draft];
             }
             return { events: previewEvents, rows: project(measurements, previewEvents), summary: summarize(measurements, previewEvents), error: null };
@@ -90,7 +91,7 @@ export function useFinance(client: SupabaseClient<Database>) {
                 return { events, rows: [], summary: null, error: message(storedError) };
             }
         }
-    }, [events, measurements, eventDraft]);
+    }, [events, measurements, eventDraft, latestMonth]);
 
     // 編集開始時点の updated_at を下書きに固定する。背景の refresh で events が入れ替わっても、
     // 楽観ロックの条件は「自分が見て編集を始めた版」でなければ他所の変更を黙って上書きしうる。
@@ -110,7 +111,7 @@ export function useFinance(client: SupabaseClient<Database>) {
         setSaving(true);
         setEventError(null);
         try {
-            const event = parseEvent(eventDraft);
+            const event = parseEvent(eventDraft, latestMonth);
             const preview = eventDraft.id ? events.map(row => row.id === eventDraft.id ? event : row) : [...events, event];
             project(measurements, preview);
             const input = { name: event.name, start_month: toMonthDate(event.start), end_month: event.end ? toMonthDate(event.end) : null, cash_delta: event.cash, nisa_delta: event.nisa, memo: event.memo ?? '' };

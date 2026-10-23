@@ -24,6 +24,19 @@ describe('NISA との振替', () => {
     });
 });
 
+describe('最新の実測月以前の単月の行', () => {
+    it('開始月が最新の実測月以前なら止める', () => {
+        expect(() => parseEvent(draft({ start: '2026-10' }), '2026-10')).toThrow('最新の実測月(2026-10)');
+        expect(() => parseEvent(draft({ start: '2026-09' }), '2026-10')).toThrow();
+    });
+
+    it('翌月以降の単月、終了月のある行、実測が無いときは通す', () => {
+        expect(parseEvent(draft({ start: '2026-11' }), '2026-10').start).toBe('2026-11');
+        expect(parseEvent(draft({ start: '2026-09', end: '2026-12' }), '2026-10').end).toBe('2026-12');
+        expect(parseEvent(draft({ start: '2026-09' }), null).start).toBe('2026-09');
+    });
+});
+
 describe('signedYen', () => {
     it('正の値だけ + を付ける', () => {
         expect(signedYen(1000)).toBe('+1,000');
