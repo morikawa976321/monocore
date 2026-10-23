@@ -168,6 +168,13 @@ export function useFinance(client: SupabaseClient<Database>) {
         setMeasurementDraft({ month: row.month, cash: String(row.cash), nisa: String(row.nisa) });
     }
 
+    /** 次の月(nextMonth)の記録を始める。入力欄はこのときだけ出す(表を眺めるだけのときは予測行のまま)。 */
+    function beginRecord() {
+        if (eventDraft || saving || editingMonth || measurementDraft) return;
+        setMeasurementError(null);
+        setMeasurementDraft({ month: nextMonth, cash: '', nisa: '' });
+    }
+
     async function record() {
         if (eventDraft || busy.current) return;
         busy.current = true;
@@ -225,7 +232,7 @@ export function useFinance(client: SupabaseClient<Database>) {
         events, measurements, base, isLoading, loadError, reload, refresh, saving,
         eventDraft, setEventDraft, eventError, editEvent, saveEvent, removeEvent,
         cancelEvent: () => { if (!saving) { setEventDraft(null); setEventError(null); } },
-        recordDraft, setMeasurementDraft, measurementError, editMeasurement, record, removeMeasurement,
+        nextMonth, recordDraft, setMeasurementDraft, measurementError, editMeasurement, beginRecord, record, removeMeasurement,
         cancelMeasurement: () => { if (!saving) { setMeasurementDraft(null); setEditingMonth(null); setMeasurementError(null); } },
         editingMonth, hasMeasurementDraft: !!measurementDraft,
         forecast, forecastError, simulation,

@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { MILESTONES } from '@/src/lib/finance/constants';
@@ -12,17 +12,19 @@ import type { FinanceState } from '@/src/hooks/useFinance';
 const CLICKABLE = 'cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out';
 
 /**
- * 「資産」のカード: 月末残高の表。実測(最新2行、古い分は畳む)→ 記録の入力行 → 計画からの予測。
- * 記録する月は一意に決まる(最新実測の翌月)ので表示だけ。実測の行はクリック(または鉛筆)で訂正・削除に入る。
+ * 「資産」のカード: 月末残高の表。実測(最新2行、古い分は畳む)→ 計画からの予測。
+ * 記録の入力欄は常設しない。次の月の予測行(右端に＋)をクリックしたときだけ、その行が入力欄に変わる。
+ * 実測の行はクリック(または鉛筆)で訂正・削除に入る。
  */
 export function AssetsTable({ finance }: { finance: FinanceState }) {
     const [expanded, setExpanded] = useState(false);
-    const { measurements, base, recordDraft, editingMonth, simulation, forecast } = finance;
+    const { measurements, base, nextMonth, recordDraft, editingMonth, simulation, forecast } = finance;
     const older = measurements.slice(0, -2);
     // 編集中の月は、再取得で最新2行から外れても必ず表示する(編集欄と取消が消えないように)。
     const displayed = expanded ? measurements : measurements.filter((row, index) => index >= measurements.length - 2 || row.month === editingMonth);
     const busy = finance.saving || !!finance.eventDraft;
-    const canEdit = !busy && !editingMonth;
+    const canEdit = !busy && !editingMonth && !finance.hasMeasurementDraft;
+    const recording = finance.hasMeasurementDraft && !editingMonth;
 
     let total = '—';
     let diff = '差 算出不可';
@@ -49,14 +51,14 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
     const editor = (
         <tr className="bg-neutral-100 dark:bg-neutral-800/50">
             <td className={`${TD} tabular-nums`}>{recordDraft.month}</td>
-            <td className={`${TD} ${NUM}`}><Input aria-label="Cash 実測" inputMode="text" placeholder={forecast ? formatYen(forecast.cash) : ''} value={recordDraft.cash} onChange={event => patch('cash', event.target.value)} disabled={busy} className="w-36 text-right tabular-nums" /></td>
+            <td className={`${TD} ${NUM}`}><Input aria-label="Cash 実測" inputMode="text" autoFocus placeholder={forecast ? formatYen(forecast.cash) : ''} value={recordDraft.cash} onChange={event => patch('cash', event.target.value)} disabled={busy} className="w-36 text-right tabular-nums" /></td>
             <td className={`${TD} ${NUM}`}><Input aria-label="NISA 実測" inputMode="text" placeholder={forecast ? formatYen(forecast.nisa) : ''} value={recordDraft.nisa} onChange={event => patch('nisa', event.target.value)} disabled={busy} className="w-36 text-right tabular-nums" /></td>
             <td className={`${TD} ${NUM}`}>{total}</td>
             <td className={TD} colSpan={2}>
                 <div className="flex flex-wrap items-center gap-2">
                     <span className={`text-sm tabular-nums ${MUTED}`}>予測 {forecast ? `${formatYen(forecast.cash)} / ${formatYen(forecast.nisa)}` : '算出不可'} → {diff}</span>
                     <Button color="primary" onClick={() => void finance.record()} disabled={invalid || busy || !!finance.forecastError}>{old ? '保存' : '記録'}</Button>
-                    {(editingMonth || finance.hasMeasurementDraft) && <Button color="secondary" onClick={finance.cancelMeasurement} disabled={finance.saving}>取消</Button>}
+                    <Button color="secondary" onClick={finance.cancelMeasurement} disabled={finance.saving}>取消</Button>
                     {editingMonth && <Button color="danger" onClick={() => void finance.removeMeasurement()} disabled={finance.saving}>削除</Button>}
                 </div>
                 {old && <p className={`text-sm tabular-nums ${MUTED}`}>旧値 Cash {formatYen(old.cash)} / NISA {formatYen(old.nisa)}{editingMonth && ' · 削除するとこの月は予測に戻る'}</p>}
@@ -64,6 +66,8 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
             </td>
         </tr>
     );
+
+    const nextRowExists = simulation.rows.some(row => row.month === nextMonth);
 
     return (
         <section className={CARD} aria-labelledby="finance-assets">
@@ -107,22 +111,32 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                                     )}
                                 </Fragment>
                             ))}
-                            {/* 記録の入力行。編集中の実測が別所で削除されて一覧から消えたときも、ここに編集欄を出して取消できるようにする */}
-                            {(!editingMonth || !displayed.some(row => row.month === editingMonth)) && editor}
-                            {simulation.rows.map(row => (
-                                <tr key={row.month} className={MUTED}>
-                                    <td className={`${TD} tabular-nums`}>{row.month}</td>
-                                    <td className={`${TD} ${NUM}`}>{formatYen(row.cash)}</td>
-                                    <td className={`${TD} ${NUM}`}>{formatYen(row.nisa)}</td>
-                                    <td className={`${TD} ${NUM}`}>{formatYen(row.total)}</td>
-                                    <td className={TD}>{labels(row.month, true)}</td>
-                                    <td className={`${TD} w-8`}></td>
-                                </tr>
-                            ))}
+                            {/* 実測が1行も無い、次の月の予測行が無い、編集中の実測が別所で削除されて一覧から消えた: 入力行をここに出す */}
+                            {(!base || (recording && !nextRowExists) || (editingMonth && !displayed.some(row => row.month === editingMonth))) && editor}
+                            {simulation.rows.map(row => {
+                                if (recording && row.month === nextMonth) return <Fragment key={row.month}>{editor}</Fragment>;
+                                const isNext = row.month === nextMonth;
+                                return (
+                                    <tr key={row.month} className={`${MUTED} ${isNext && canEdit ? CLICKABLE : ''}`} onClick={() => { if (isNext && canEdit) finance.beginRecord(); }}>
+                                        <td className={`${TD} tabular-nums`}>{row.month}</td>
+                                        <td className={`${TD} ${NUM}`}>{formatYen(row.cash)}</td>
+                                        <td className={`${TD} ${NUM}`}>{formatYen(row.nisa)}</td>
+                                        <td className={`${TD} ${NUM}`}>{formatYen(row.total)}</td>
+                                        <td className={TD}>{labels(row.month, true)}</td>
+                                        <td className={`${TD} w-8 py-0 text-right`}>
+                                            {isNext && (
+                                                <Button color="ghost" size="icon" disabled={!canEdit} onClick={event => { event.stopPropagation(); finance.beginRecord(); }} aria-label={`${row.month} の実測を記録`}>
+                                                    <Plus className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
-                <p className={`mt-2 text-sm ${MUTED}`}>灰色の行は計画からの予測。実測の行をクリックすると訂正・削除できます。</p>
+                <p className={`mt-2 text-sm ${MUTED}`}>灰色の行は計画からの予測。次の月の行(＋)をクリックすると記録、実測の行をクリックすると訂正・削除。</p>
             </div>
         </section>
     );
