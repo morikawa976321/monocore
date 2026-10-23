@@ -8,7 +8,13 @@ import { difference, totalOf } from '@/src/lib/finance/projection';
 import { CARD, CARD_BODY, CARD_HEADER, MUTED, NOTICE, NUM, TD, TH } from './card';
 import type { FinanceState } from '@/src/hooks/useFinance';
 
-/** 「資産」のカード: 月末残高の表。実測(最新2行、古い分は畳む)→ 記録の入力行 → 計画からの予測。 */
+/** 行をクリックで編集に入れる行の見た目(Reports の一覧の行と同じ hover)。 */
+const CLICKABLE = 'cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out';
+
+/**
+ * 「資産」のカード: 月末残高の表。実測(最新2行、古い分は畳む)→ 記録の入力行 → 計画からの予測。
+ * 記録する月は一意に決まる(最新実測の翌月)ので表示だけ。実測の行はクリック(または鉛筆)で訂正・削除に入る。
+ */
 export function AssetsTable({ finance }: { finance: FinanceState }) {
     const [expanded, setExpanded] = useState(false);
     const { measurements, base, recordDraft, editingMonth, simulation, forecast } = finance;
@@ -16,6 +22,7 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
     // 編集中の月は、再取得で最新2行から外れても必ず表示する(編集欄と取消が消えないように)。
     const displayed = expanded ? measurements : measurements.filter((row, index) => index >= measurements.length - 2 || row.month === editingMonth);
     const busy = finance.saving || !!finance.eventDraft;
+    const canEdit = !busy && !editingMonth;
 
     let total = '—';
     let diff = '差 算出不可';
@@ -35,27 +42,24 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
         ...MILESTONES.filter(item => item.month === month).map(item => item.label),
         ...(simulation.summary?.firstNegative?.month === month ? ['Cash が負になる'] : []),
     ].filter(Boolean).join(' ／ ');
-    const patch = (key: 'month' | 'cash' | 'nisa', value: string) => finance.setMeasurementDraft({ ...recordDraft, [key]: value });
+    const patch = (key: 'cash' | 'nisa', value: string) => finance.setMeasurementDraft({ ...recordDraft, [key]: value });
     const error = finance.measurementError || finance.forecastError || inputError;
 
-    // 記録(または実測の訂正)の入力行。Ahead の目標の行と同じく、枠付きの Input を並べる。
+    // 記録(または実測の訂正)の入力行。Ahead の目標の行と同じく、枠付きの Input を並べる。予測値は placeholder に出す。
     const editor = (
         <tr className="bg-neutral-100 dark:bg-neutral-800/50">
-            <td className={TD}>
-                {editingMonth
-                    ? <span className="tabular-nums">{recordDraft.month}</span>
-                    : <Input aria-label="記録する年月" placeholder="YYYY-MM" value={recordDraft.month} onChange={event => patch('month', event.target.value)} disabled={busy} className="w-28 tabular-nums" />}
-            </td>
-            <td className={`${TD} ${NUM}`}><Input aria-label="Cash 実測" inputMode="text" value={recordDraft.cash} onChange={event => patch('cash', event.target.value)} disabled={busy} className="w-36 text-right tabular-nums" /></td>
-            <td className={`${TD} ${NUM}`}><Input aria-label="NISA 実測" inputMode="text" value={recordDraft.nisa} onChange={event => patch('nisa', event.target.value)} disabled={busy} className="w-36 text-right tabular-nums" /></td>
+            <td className={`${TD} tabular-nums`}>{recordDraft.month}</td>
+            <td className={`${TD} ${NUM}`}><Input aria-label="Cash 実測" inputMode="text" placeholder={forecast ? formatYen(forecast.cash) : ''} value={recordDraft.cash} onChange={event => patch('cash', event.target.value)} disabled={busy} className="w-36 text-right tabular-nums" /></td>
+            <td className={`${TD} ${NUM}`}><Input aria-label="NISA 実測" inputMode="text" placeholder={forecast ? formatYen(forecast.nisa) : ''} value={recordDraft.nisa} onChange={event => patch('nisa', event.target.value)} disabled={busy} className="w-36 text-right tabular-nums" /></td>
             <td className={`${TD} ${NUM}`}>{total}</td>
-            <td className={TD}>
+            <td className={TD} colSpan={2}>
                 <div className="flex flex-wrap items-center gap-2">
                     <span className={`text-sm tabular-nums ${MUTED}`}>予測 {forecast ? `${formatYen(forecast.cash)} / ${formatYen(forecast.nisa)}` : '算出不可'} → {diff}</span>
                     <Button color="primary" onClick={() => void finance.record()} disabled={invalid || busy || !!finance.forecastError}>{old ? '保存' : '記録'}</Button>
-                    {(old || finance.hasMeasurementDraft) && <Button color="secondary" onClick={finance.cancelMeasurement} disabled={finance.saving}>取消</Button>}
+                    {(editingMonth || finance.hasMeasurementDraft) && <Button color="secondary" onClick={finance.cancelMeasurement} disabled={finance.saving}>取消</Button>}
+                    {editingMonth && <Button color="danger" onClick={() => void finance.removeMeasurement()} disabled={finance.saving}>削除</Button>}
                 </div>
-                {old && <p className={`text-sm tabular-nums ${MUTED}`}>旧値 Cash {formatYen(old.cash)} / NISA {formatYen(old.nisa)}</p>}
+                {old && <p className={`text-sm tabular-nums ${MUTED}`}>旧値 Cash {formatYen(old.cash)} / NISA {formatYen(old.nisa)}{editingMonth && ' · 削除するとこの月は予測に戻る'}</p>}
                 {error && <p role="alert" className={NOTICE}>{error}</p>}
             </td>
         </tr>
@@ -81,32 +85,24 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                                 <th scope="col" className={`${TH} ${NUM}`}>NISA</th>
                                 <th scope="col" className={`${TH} ${NUM}`}>合計</th>
                                 <th scope="col" className={TH}>イベント</th>
+                                <th scope="col" className={`${TH} w-8`}><span className="sr-only">操作</span></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
                             {displayed.map(row => (
                                 <Fragment key={row.month}>
                                     {editingMonth === row.month ? editor : (
-                                        <tr className="group">
-                                            <td className={`${TD} tabular-nums`}>
-                                                <span className="inline-flex items-center gap-1">
-                                                    {row.month}
-                                                    <Button
-                                                        color="ghost"
-                                                        size="icon"
-                                                        disabled={busy || !!editingMonth}
-                                                        onClick={() => finance.editMeasurement(row)}
-                                                        aria-label={`${row.month} の実測を訂正`}
-                                                        className="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity duration-150"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </Button>
-                                                </span>
-                                            </td>
+                                        <tr className={canEdit ? CLICKABLE : ''} onClick={() => { if (canEdit) finance.editMeasurement(row); }}>
+                                            <td className={`${TD} tabular-nums`}>{row.month}</td>
                                             <td className={`${TD} ${NUM}`}>{formatYen(row.cash)}</td>
                                             <td className={`${TD} ${NUM}`}>{formatYen(row.nisa)}</td>
                                             <td className={`${TD} ${NUM}`}>{formatYen(totalOf(row.cash, row.nisa))}</td>
                                             <td className={`${TD} ${MUTED}`}>実測{row.month === base?.month ? ' · 起点' : ''}{labels(row.month, false) && ` ／ ${labels(row.month, false)}`}</td>
+                                            <td className={`${TD} w-8 py-0 text-right`}>
+                                                <Button color="ghost" size="icon" disabled={!canEdit} onClick={event => { event.stopPropagation(); finance.editMeasurement(row); }} aria-label={`${row.month} の実測を訂正`}>
+                                                    <Pencil className="w-4 h-4" />
+                                                </Button>
+                                            </td>
                                         </tr>
                                     )}
                                 </Fragment>
@@ -120,12 +116,13 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                                     <td className={`${TD} ${NUM}`}>{formatYen(row.nisa)}</td>
                                     <td className={`${TD} ${NUM}`}>{formatYen(row.total)}</td>
                                     <td className={TD}>{labels(row.month, true)}</td>
+                                    <td className={`${TD} w-8`}></td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-                <p className={`mt-2 text-sm ${MUTED}`}>灰色の行は計画からの予測。実測は年月の横の鉛筆で訂正できます。月を飛ばして記録できます。</p>
+                <p className={`mt-2 text-sm ${MUTED}`}>灰色の行は計画からの予測。実測の行をクリックすると訂正・削除できます。</p>
             </div>
         </section>
     );

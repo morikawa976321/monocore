@@ -9,11 +9,14 @@ import { CARD, CARD_BODY, CARD_HEADER, MUTED, NOTICE, NUM, TD, TH } from './card
 import type { EventDraft } from '@/src/lib/finance/input';
 import type { FinanceState } from '@/src/hooks/useFinance';
 
-/** 「計画」のカード: イベント表。行の鉛筆で編集、末尾の「計画を追加」で下書き行(Ahead の目標と同じ作法)。 */
+/** 行をクリックで編集に入れる行の見た目(Reports の一覧の行と同じ hover)。 */
+const CLICKABLE = 'cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out';
+
+/** 「計画」のカード: イベント表。行をクリック(または鉛筆)で編集、末尾の「計画を追加」で下書き行(Ahead の目標と同じ作法)。 */
 export function PlanTable({ finance }: { finance: FinanceState }) {
     const { eventDraft: draft } = finance;
     const rows = visibleEvents(finance.events, finance.base?.month);
-    const busy = finance.saving || !!finance.editingMonth;
+    const canEdit = !draft && !finance.saving && !finance.editingMonth;
     const patch = (key: keyof EventDraft, value: string) => { if (draft) finance.setEventDraft({ ...draft, [key]: value }); };
     const error = finance.eventError || finance.simulation.error;
 
@@ -24,7 +27,7 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
             <td className={TD}><Input aria-label="終了月（空なら単月）" placeholder="YYYY-MM" value={draft.end} onChange={event => patch('end', event.target.value)} disabled={finance.saving} className="w-28 tabular-nums" /></td>
             <td className={`${TD} ${NUM}`}><Input aria-label="Cash 毎月の増減" value={draft.cash} onChange={event => patch('cash', event.target.value)} disabled={finance.saving} className="w-32 text-right tabular-nums" /></td>
             <td className={`${TD} ${NUM}`}><Input aria-label="NISA 毎月の増減" value={draft.nisa} onChange={event => patch('nisa', event.target.value)} disabled={finance.saving} className="w-32 text-right tabular-nums" /></td>
-            <td className={TD}>
+            <td className={TD} colSpan={2}>
                 <Textarea aria-label="メモ" value={draft.memo} onChange={event => patch('memo', event.target.value)} disabled={finance.saving} className="min-w-64 resize-none" rows={2} />
                 <div className="flex flex-wrap gap-2 mt-2">
                     <Button color="primary" onClick={() => void finance.saveEvent()} disabled={finance.saving || !!finance.simulation.error}>保存</Button>
@@ -50,31 +53,23 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                                 <th scope="col" className={`${TH} ${NUM}`}>Cash 増減</th>
                                 <th scope="col" className={`${TH} ${NUM}`}>NISA 増減</th>
                                 <th scope="col" className={TH}>メモ</th>
+                                <th scope="col" className={`${TH} w-8`}><span className="sr-only">操作</span></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
                             {rows.map(row => draft?.id === row.id ? <Fragment key={row.id}>{editor}</Fragment> : (
-                                <tr key={row.id} className="group">
-                                    <td className={TD}>
-                                        <span className="inline-flex items-center gap-1">
-                                            {row.name || '（名前なし）'}
-                                            <Button
-                                                color="ghost"
-                                                size="icon"
-                                                disabled={!!draft || busy}
-                                                onClick={() => finance.editEvent(row)}
-                                                aria-label={`${row.name || '（名前なし）'} を編集`}
-                                                className="sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity duration-150"
-                                            >
-                                                <Pencil className="w-4 h-4" />
-                                            </Button>
-                                        </span>
-                                    </td>
+                                <tr key={row.id} className={canEdit ? CLICKABLE : ''} onClick={() => { if (canEdit) finance.editEvent(row); }}>
+                                    <td className={TD}>{row.name || '（名前なし）'}</td>
                                     <td className={`${TD} tabular-nums`}>{row.start}</td>
                                     <td className={`${TD} tabular-nums`}>{row.end}</td>
                                     <td className={`${TD} ${NUM}`}>{signedYen(row.cash)}</td>
                                     <td className={`${TD} ${NUM}`}>{signedYen(row.nisa)}</td>
                                     <td className={`${TD} ${MUTED}`}>{row.memo}</td>
+                                    <td className={`${TD} w-8 py-0 text-right`}>
+                                        <Button color="ghost" size="icon" disabled={!canEdit} onClick={event => { event.stopPropagation(); finance.editEvent(row); }} aria-label={`${row.name || '（名前なし）'} を編集`}>
+                                            <Pencil className="w-4 h-4" />
+                                        </Button>
+                                    </td>
                                 </tr>
                             ))}
                             {/* 新規の下書き、または編集中の行が再取得で一覧から消えた(別所で削除・非表示になった)ときも編集欄を出し、取消できるようにする */}
@@ -83,8 +78,8 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                     </table>
                 </div>
                 {!rows.length && !draft && <p className={MUTED}>表示する計画はありません。</p>}
-                <p className={`text-sm ${MUTED}`}>鉛筆で行を編集。下書きは上の表と折れ線へ即時反映され、保存で確定します。記録した月までに終わった行は非表示になります（データは残ります）。</p>
-                <Button color="secondary" onClick={() => finance.editEvent()} disabled={!!draft || busy}>
+                <p className={`text-sm ${MUTED}`}>行をクリックすると編集・削除。下書きは上の表と折れ線へ即時反映され、保存で確定します。記録した月までに終わった行は非表示になります（データは残ります）。</p>
+                <Button color="secondary" onClick={() => finance.editEvent()} disabled={!canEdit}>
                     <Plus className="w-4 h-4" />
                     計画を追加
                 </Button>

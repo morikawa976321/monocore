@@ -8,7 +8,7 @@ import { parseEvent, parseMeasurement, type EventDraft, type MeasurementDraft } 
 import { forecastAt, latestMeasurement, project, summarize, type FinanceEvent, type Measurement } from '@/src/lib/finance/projection';
 import {
     getFinanceEvents, getFinanceMeasurements, insertFinanceEvent, updateFinanceEvent,
-    deleteFinanceEvent, upsertFinanceMeasurement, type FinanceEventRow,
+    deleteFinanceEvent, upsertFinanceMeasurement, deleteFinanceMeasurement, type FinanceEventRow,
 } from '@/src/lib/supabase/queries/finance';
 
 type Event = FinanceEvent & { id: string; updatedAt: string };
@@ -70,6 +70,7 @@ export function useFinance(client: SupabaseClient<Database>) {
     useEffect(() => { void reload(); }, [reload]);
 
     const base = latestMeasurement(measurements);
+    // 記録する月は一意に決まる(最新の実測の翌月。実測が無ければ今月)。画面で変えられない。
     const nextMonth = base ? addMonths(base.month, 1) : new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
     const recordDraft = measurementDraft ?? { month: nextMonth, cash: '', nisa: '' };
 
@@ -187,6 +188,25 @@ export function useFinance(client: SupabaseClient<Database>) {
         finally { busy.current = false; setSaving(false); }
     }
 
+    /** 編集中の実測を消す(早まって記録した月を予測に戻す)。 */
+    async function removeMeasurement() {
+        if (!editingMonth || eventDraft || busy.current) return;
+        busy.current = true;
+        setSaving(true);
+        setMeasurementError(null);
+        try {
+            const next = measurements.filter(old => old.month !== editingMonth);
+            project(next, events);
+            const { error } = await deleteFinanceMeasurement(client, toMonthDate(editingMonth));
+            if (error) throw new Error('実測の削除に失敗しました。入力を残しています。');
+            setMeasurements(next);
+            setMeasurementDraft(null);
+            setEditingMonth(null);
+            await refresh();
+        } catch (error) { setMeasurementError(message(error)); }
+        finally { busy.current = false; setSaving(false); }
+    }
+
     // タブに戻ってきたとき、下書き中でなければ両表を取り直す。
     const idle = !eventDraft && !measurementDraft && !saving;
     useEffect(() => {
@@ -205,7 +225,7 @@ export function useFinance(client: SupabaseClient<Database>) {
         events, measurements, base, isLoading, loadError, reload, refresh, saving,
         eventDraft, setEventDraft, eventError, editEvent, saveEvent, removeEvent,
         cancelEvent: () => { if (!saving) { setEventDraft(null); setEventError(null); } },
-        recordDraft, setMeasurementDraft, measurementError, editMeasurement, record,
+        recordDraft, setMeasurementDraft, measurementError, editMeasurement, record, removeMeasurement,
         cancelMeasurement: () => { if (!saving) { setMeasurementDraft(null); setEditingMonth(null); setMeasurementError(null); } },
         editingMonth, hasMeasurementDraft: !!measurementDraft,
         forecast, forecastError, simulation,

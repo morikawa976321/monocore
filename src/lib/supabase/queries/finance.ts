@@ -32,6 +32,11 @@ export async function getFinanceMeasurements(client: Client) {
     return client.from('finance_measurements').select('*').order('month');
 }
 
+/** 実測を1か月ぶん消す(早まって記録した月を予測に戻す)。month は YYYY-MM-01。 */
+export async function deleteFinanceMeasurement(client: Client, month: string) {
+    return client.from('finance_measurements').delete().eq('month', month).select('month').maybeSingle();
+}
+
 /** user_id is supplied by DEFAULT auth.uid(), including on the insert side of upsert. */
 export async function upsertFinanceMeasurement(client: Client, input: FinanceMeasurementInput) {
     return client.from('finance_measurements').upsert(input, { onConflict: 'user_id,month' }).select('*').single();
