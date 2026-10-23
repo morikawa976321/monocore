@@ -1,5 +1,5 @@
 /**
- * 囲みの外枠と見出しの帯は、予定の板の日付セクション(DaySection)と Ahead のカード(plan/page.tsx の
+ * 囲みの外枠と見出しの帯は、予定の板の日付セクション(DaySection)と Tasks のカード(plan/page.tsx の
  * CARD / CARD_HEADER / CARD_BODY)に揃える。文字列は plan/page.tsx と同じものを置く(そちらは export していない)。
  */
 export const CARD = 'rounded overflow-hidden border border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900';

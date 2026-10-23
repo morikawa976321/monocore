@@ -13,7 +13,7 @@ const CARD_HEADER =
     'px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 font-normal text-neutral-700 dark:text-neutral-300';
 const CARD_BODY = 'px-2 sm:px-4 py-2';
 
-/** 止まっているプロジェクトと、その中で本人を待っているタスクの一覧。 */
+/** Tasks。プロジェクトごとのタスクの一覧（表示名だけ変え、URL とファイル名は /plan のまま）。 */
 export default function PlanPage() {
     const supabase = useMemo(() => createClient(), []);
     const { projects, isLoading, error, reload, addProject, updateProject, removeProject } = useBlockedProjects(supabase);
@@ -22,7 +22,7 @@ export default function PlanPage() {
 
     return (
         <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
-            <PageHeader title="Ahead" onRefresh={() => void reload()}>
+            <PageHeader title="Tasks" onRefresh={() => void reload()}>
                 {isInitialLoading && (
                     <div className="inline-flex items-center gap-2">
                         <LoadingIndicator />

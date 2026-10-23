@@ -12,7 +12,7 @@ import {
     type BlockedProjectUpdate,
 } from '@/src/lib/supabase/queries/blocked-projects';
 
-/** 止まっているプロジェクトの取得と編集。編集は画面へ先に反映し、保存に失敗したら読み直す。 */
+/** プロジェクトごとのタスクのカードの取得と編集。編集は画面へ先に反映し、保存に失敗したら読み直す。 */
 export function useBlockedProjects(supabase: SupabaseClient<Database>) {
     const [projects, setProjects] = useState<BlockedProjectRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -21,7 +21,7 @@ export function useBlockedProjects(supabase: SupabaseClient<Database>) {
     const reload = useCallback(async () => {
         const { data, error: e } = await getBlockedProjects(supabase);
         if (e) {
-            setError('止まっているプロジェクトの読み込みに失敗しました。');
+            setError('プロジェクトの読み込みに失敗しました。');
         } else {
             setProjects(data ?? []);
             setError(null);

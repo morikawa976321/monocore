@@ -21,7 +21,7 @@ type Props = {
 type CardProps = Omit<Props, 'projects' | 'onAdd'> & { project: BlockedProjectRow };
 
 /**
- * 1プロジェクト1枚。見出しがプロジェクト名、本文が止まっているタスク（1行に1つ）で、どちらもその場で書き換える。
+ * 1プロジェクト1枚。見出しがプロジェクト名、本文がタスク（1行に1つ）で、どちらもその場で書き換える。
  * 保存は欄を離れたとき。付帯情報（待ち日数・返し方など）は持たない（docs/decisions.md「本人待ちの表示」）。
  */
 function BlockedProjectCard({ project, cardClassName, headerClassName, bodyClassName, onUpdate, onRemove }: CardProps) {
@@ -58,8 +58,8 @@ function BlockedProjectCard({ project, cardClassName, headerClassName, bodyClass
                     onBlur={() => {
                         if (tasks !== project.tasks) onUpdate(project.id, { tasks });
                     }}
-                    placeholder="止まっているタスク（1行に1つ）"
-                    aria-label={`${project.name || 'プロジェクト'}の止まっているタスク`}
+                    placeholder="タスク（1行に1つ）"
+                    aria-label={`${project.name || 'プロジェクト'}のタスク`}
                     className="min-h-6 resize-none leading-6"
                     spellCheck={false}
                     autoComplete="off"
@@ -70,7 +70,7 @@ function BlockedProjectCard({ project, cardClassName, headerClassName, bodyClass
     );
 }
 
-/** 本人の手で止まっているプロジェクトを1つにつき1枚のカードで並べる。中身は本人の手入力か、指示を受けた AI がスキルから書き換える。 */
+/** プロジェクトを1つにつき1枚のカードで並べる。中身は本人の手入力か、指示を受けた AI がスキルから書き換える。 */
 export function BlockedProjectCards({ projects, onAdd, ...cardProps }: Props) {
     return (
         <div className="space-y-2">
@@ -83,7 +83,7 @@ export function BlockedProjectCards({ projects, onAdd, ...cardProps }: Props) {
             )}
             <Button color="secondary" size="md" onClick={onAdd}>
                 <Plus className="w-4 h-4" />
-                止まっているプロジェクトを追加
+                プロジェクトを追加
             </Button>
         </div>
     );

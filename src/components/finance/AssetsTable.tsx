@@ -56,7 +56,7 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
     const patch = (key: 'cash' | 'nisa', value: string) => finance.setMeasurementDraft({ ...recordDraft, [key]: value });
     const error = finance.measurementError || finance.forecastError || inputError;
 
-    // 記録(または実測の訂正)の入力行。Ahead の目標の行と同じく、枠付きの Input を並べる。予測値は placeholder に出す。
+    // 記録(または実測の訂正)の入力行。枠付きの Input を並べる。予測値は placeholder に出す。
     // イベント列を持たないので、予測との差・ボタン・注意は2行目に全幅で置く。
     const editor = (
         <>

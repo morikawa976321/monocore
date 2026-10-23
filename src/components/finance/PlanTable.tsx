@@ -23,7 +23,7 @@ function nisaNote(event: Pick<FinanceEvent, 'cash' | 'nisa'>): string {
     return event.nisa ? `NISA ${signedYen(event.nisa)}` : '';
 }
 
-/** 「計画」のカード: イベント表。行をクリックで編集、末尾の「計画を追加」で下書き行(Ahead の目標と同じ作法)。 */
+/** 「計画」のカード: イベント表。行をクリックで編集、末尾の「計画を追加」で下書き行。 */
 export function PlanTable({ finance }: { finance: FinanceState }) {
     const { eventDraft: draft } = finance;
     const note = useRowNote();

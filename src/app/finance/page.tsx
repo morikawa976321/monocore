@@ -11,7 +11,7 @@ import { PlanTable } from '@/src/components/finance/PlanTable';
 import { CARD, CARD_BODY, NOTICE } from '@/src/components/finance/card';
 import { displayedRows } from '@/src/lib/finance/projection';
 
-/** 家計の見通し。外枠・ヘッダー・スクロール域・同期中の覆いは Ahead(/plan)と同じ構成。 */
+/** 家計の見通し。外枠・ヘッダー・スクロール域・同期中の覆いは Tasks(/plan)と同じ構成。 */
 export default function FinancePage() {
     const client = useMemo(() => createClient(), []);
     const finance = useFinance(client);
