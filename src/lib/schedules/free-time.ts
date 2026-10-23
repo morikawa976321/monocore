@@ -4,7 +4,7 @@ import { TIME_LINE_REGEX, activityMatchesName, isValidHhmm, isWakeActivity } fro
 export { activityMatchesName };
 
 /**
- * 予定テキストから「空き時間（自由時間）」を求める。スケジュール画面の日カードと /plan の両方が使う。
+ * 予定テキストから「空き時間（自由時間）」を求める。スケジュール画面の日カードの3色の帯が使う。
  *
  * スケジュール画面の予定を正として導出する（本人指定 2026-10-18。規則の由来は docs/decisions.md の /plan）。
  * 時間は日をまたいで連続しており、睡眠・非自由・自由の3つに分かれる。定義は docs/free-time-model.md §2 が正で、
@@ -30,7 +30,7 @@ export type SlotKind = 'sleep' | 'busy' | 'free';
 export type Run = { kind: SlotKind; start: number; end: number };
 export type DayEvent = { start: number; end: number; activity: string };
 export type DayAnalysis = {
-    /** 時刻範囲を持つ予定（起床を除く）。置いた時間の集計に使う。 */
+    /** 時刻範囲を持つ予定（起床を除く）。 */
     events: DayEvent[];
     runs: Run[];
     freeMinutes: number;
@@ -239,13 +239,6 @@ export function analyzeDayContent(content: string, loaded = false): DayAnalysis 
     return analyzeDays([{ date: '2000-01-01', content, loaded }]).get('2000-01-01')!;
 }
 
-/** [from, to) に含まれる自由時間の分数。 */
-export function freeMinutesBetween(day: DayAnalysis, from: number, to: number): number {
-    return day.runs
-        .filter((r) => r.kind === 'free')
-        .reduce((sum, r) => sum + Math.max(0, Math.min(r.end, to) - Math.max(r.start, from)), 0);
-}
-
 /** YYYY-MM-DD に日数を足す（タイムゾーンに依存しない暦の計算）。 */
 export function addDays(dateStr: string, days: number): string {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -260,118 +253,4 @@ export function daysBetween(a: string, b: string): number {
         return Date.UTC(y, m - 1, d);
     };
     return Math.round((toUtc(b) - toUtc(a)) / 86400000);
-}
-
-/**
- * 予定の無い日（0700 起床・2200-2300 消灯だけの日）。読み込んでいない日の代わりに「× 日数」で使う。
- * 0時に眠っている未読込の空の日で、未読込の空の日が続くときの2日目以降と同じ値になる（前の日が起きたまま
- * 終わる1日目とは食い違う。free-time.property.test.ts の P13）。
- */
-export const EMPTY_DAY = analyzeDays([
-    { date: '2000-01-01', content: '', loaded: false },
-    { date: '2000-01-02', content: '', loaded: false },
-]).get('2000-01-02')!;
-
-/** "HH:MM" または "HH:MM:SS" を分に。null は null。 */
-export function timeToMinutes(time: string | null): number | null {
-    if (!time) return null;
-    const [h, m] = time.split(':').map(Number);
-    return h * 60 + (m || 0);
-}
-
-export type GoalInput = {
-    id: string;
-    name: string;
-    dueOn: string;
-    /** 期日の時刻（分）。null ならその日の終わりまで。 */
-    dueMinutes: number | null;
-    needMinutes: number;
-};
-
-export type GoalStatus = {
-    goal: GoalInput;
-    /** 期日が今より前。間に合うかの判定から外す。 */
-    past: boolean;
-    /** 予定のうち、名前を語として含むものの、現在時刻から期日までの合計。 */
-    placedMinutes: number;
-    remainingMinutes: number;
-    /** 期日の早い順に並べたときの、この目標までの残り必要時間の累計。 */
-    cumulativeMinutes: number;
-    /** 今から期日までの自由時間。 */
-    supplyMinutes: number;
-    ok: boolean;
-};
-
-/**
- * 締切の早い順に「残り必要時間の累計 ≦ 締切までの自由時間」を確かめる。
- * 個別に足りていても、先の締切の目標が同じ自由時間を食うので、累計で比べる。
- */
-export function evaluateGoals(params: {
-    goals: GoalInput[];
-    /** 予定を読み込んだ日の解析。無い日は予定の無い日（EMPTY_DAY）として数える。 */
-    days: Map<string, DayAnalysis>;
-    today: string;
-    nowMinutes: number;
-}): GoalStatus[] {
-    const { goals, days, today, nowMinutes } = params;
-    const knownDates = [...days.keys()].sort();
-    const dueOf = (g: GoalInput) => g.dueMinutes ?? DAY_MINUTES;
-    const sorted = [...goals].sort((a, b) => (a.dueOn === b.dueOn ? dueOf(a) - dueOf(b) : a.dueOn < b.dueOn ? -1 : 1));
-    const freeOn = (date: string, from: number, to: number) => freeMinutesBetween(days.get(date) ?? EMPTY_DAY, from, to);
-    let cumulative = 0;
-    return sorted.map((goal) => {
-        const due = dueOf(goal);
-        const past = goal.dueOn < today || (goal.dueOn === today && due <= nowMinutes);
-        const name = goal.name.trim();
-        // 置いた時間は、現在時刻より後の分だけ（過去の予定と、今日の今までの分は数えない）。
-        let placed = 0;
-        if (name) {
-            for (const date of knownDates) {
-                if (date < today || date > goal.dueOn) continue;
-                const floor = date === today ? nowMinutes : 0;
-                const limit = date === goal.dueOn ? due : DAY_MINUTES;
-                for (const e of days.get(date)!.events) {
-                    if (!activityMatchesName(e.activity, name)) continue;
-                    placed += Math.max(0, Math.min(e.end, limit) - Math.max(e.start, floor));
-                }
-            }
-        }
-        const remaining = Math.max(0, goal.needMinutes - placed);
-        let supply = 0;
-        if (!past) {
-            // 読み込んだ日は1日ずつ、それ以外は予定の無い日の自由時間 × 日数。期日が何年先でも
-            // 日数に比例した計算をしない（年の打ち間違いで画面が固まらないように）。
-            const inRange = knownDates.filter((d) => d >= today && d <= goal.dueOn);
-            for (const date of inRange) {
-                supply += freeOn(date, date === today ? nowMinutes : 0, date === goal.dueOn ? due : DAY_MINUTES);
-            }
-            const known = new Set(inRange);
-            let unknownWholeDays = daysBetween(today, goal.dueOn) + 1 - inRange.length;
-            if (!known.has(today)) {
-                supply += freeOn(today, nowMinutes, today === goal.dueOn ? due : DAY_MINUTES);
-                unknownWholeDays -= 1;
-            }
-            if (goal.dueOn !== today && !known.has(goal.dueOn)) {
-                supply += freeOn(goal.dueOn, 0, due);
-                unknownWholeDays -= 1;
-            }
-            supply += Math.max(0, unknownWholeDays) * EMPTY_DAY.freeMinutes;
-            cumulative += remaining;
-        }
-        return {
-            goal,
-            past,
-            placedMinutes: placed,
-            remainingMinutes: remaining,
-            cumulativeMinutes: past ? 0 : cumulative,
-            supplyMinutes: supply,
-            // 自分の残りが 0 なら、足りないのは先の締切の目標であって、この目標ではない。
-            ok: past || remaining === 0 || cumulative <= supply,
-        };
-    });
-}
-
-/** 分を「12.5」形式の時間に。 */
-export function formatHours(minutes: number): string {
-    return (minutes / 60).toFixed(1);
 }

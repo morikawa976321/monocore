@@ -12,7 +12,7 @@ import {
     type BlockedProjectUpdate,
 } from '@/src/lib/supabase/queries/blocked-projects';
 
-/** 止まっているプロジェクトの取得と編集。編集は画面へ先に反映し、保存に失敗したら読み直す（usePlanGoals と同じ）。 */
+/** 止まっているプロジェクトの取得と編集。編集は画面へ先に反映し、保存に失敗したら読み直す。 */
 export function useBlockedProjects(supabase: SupabaseClient<Database>) {
     const [projects, setProjects] = useState<BlockedProjectRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);

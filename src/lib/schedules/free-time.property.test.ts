@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { addDays, analyzeDays, evaluateGoals, freeMinutesBetween, type DayAnalysis, type SlotKind } from './free-time';
+import { addDays, analyzeDays, type DayAnalysis, type SlotKind } from './free-time';
 
 /**
  * 睡眠・非自由・自由の数え方を、ランダムに作った予定で確かめる。定義と性質の一覧は docs/free-time-model.md。
@@ -177,16 +177,12 @@ describe('analyzeDays の性質', () => {
         );
     });
 
-    it('P2 freeMinutes は自由の run の和で、freeMinutesBetween は区間を分けても和が変わらない', () => {
-        const cut = fc.integer({ min: 0, max: DAY });
+    it('P2 freeMinutes は自由の run の和', () => {
         fc.assert(
-            fc.property(daysArb, cut, cut, cut, (days, x, y, z) => {
-                const [a, b, c] = [x, y, z].sort((p, q) => p - q);
+            fc.property(daysArb, (days) => {
                 for (const d of analyzeDays(toInputs(days)).values()) {
                     const free = d.runs.filter((r) => r.kind === 'free').reduce((s, r) => s + r.end - r.start, 0);
                     expect(d.freeMinutes).toBe(free);
-                    expect(freeMinutesBetween(d, 0, DAY)).toBe(d.freeMinutes);
-                    expect(freeMinutesBetween(d, a, c)).toBe(freeMinutesBetween(d, a, b) + freeMinutesBetween(d, b, c));
                 }
             }),
             RUNS,
@@ -331,46 +327,6 @@ describe('analyzeDays の性質', () => {
                 after.forEach((kind, m) => {
                     if (kind === 'free' && before[m] !== 'free') expect(allowed.has(m)).toBe(true);
                 });
-            }),
-            RUNS,
-        );
-    });
-});
-
-describe('evaluateGoals の性質', () => {
-    it('P12 締切を遅くすると、締切までの自由時間は減らない', () => {
-        const due = fc.tuple(fc.integer({ min: 0, max: 6 }), fc.integer({ min: 0, max: DAY }));
-        fc.assert(
-            fc.property(daysArb, fc.integer({ min: 0, max: DAY }), due, due, (days, now, p, q) => {
-                const [early, late] = [p, q].sort((u, v) => u[0] - v[0] || u[1] - v[1]);
-                const analyses = analyzeDays(toInputs(days));
-                const supply = ([d, t]: [number, number]) =>
-                    evaluateGoals({
-                        goals: [{ id: 'g', name: '', dueOn: addDays(FIRST_DATE, d), dueMinutes: t, needMinutes: 0 }],
-                        days: analyses,
-                        today: FIRST_DATE,
-                        nowMinutes: now,
-                    })[0];
-                const a = supply(early);
-                const b = supply(late);
-                fc.pre(!a.past && !b.past);
-                expect(a.supplyMinutes).toBeLessThanOrEqual(b.supplyMinutes);
-            }),
-            RUNS,
-        );
-    });
-
-    // /plan は読み込んだ範囲の外の日を「予定の無い日の自由時間 × 日数」で数える（EMPTY_DAY）。それが、未読込の
-    // 空の日を並べて解析したときと合うことの確認。合わないのは、直前の日が起きたまま終わったときの1日目だけ。
-    it('P13 未読込の空の日が続くとき、2日目以降は予定の無い日と同じで、1日目は0時に眠っていれば同じ', () => {
-        const empty = analyzeDays([{ date: '2000-01-01', content: '', loaded: false }]).get('2000-01-01')!.freeMinutes;
-        fc.assert(
-            fc.property(daysArb, fc.integer({ min: 1, max: 4 }), (days, extra) => {
-                const all = analyzeDays(toInputs([...days, ...Array.from({ length: extra }, () => ({ loaded: false, lines: [] }))]));
-                const tail = Array.from({ length: extra }, (_, i) => all.get(addDays(FIRST_DATE, days.length + i))!);
-                for (const d of tail.slice(1)) expect(d.freeMinutes).toBe(empty);
-                if (tail[0].runs[0].kind === 'sleep') expect(tail[0].freeMinutes).toBe(empty);
-                else expect(tail[0].freeMinutes).toBeGreaterThan(empty);
             }),
             RUNS,
         );

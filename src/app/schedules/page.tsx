@@ -58,7 +58,7 @@ export default function SchedulesPage() {
     const now = useNow();
     // 3色の帯。睡眠は日をまたぐので、読み込んだ日をまとめて解析する（打つたびに再計算する）。画面に出す日は
     // 既定予定を書き込んでから読んでいるので、起床・消灯の行が無ければ本人が消したものとして補わない。ただし
-    // 既定予定を書き込んだ記録の無い日（既定予定の effective_from より前の過去の日など）は、/plan と同じく
+    // 既定予定を書き込んだ記録の無い日（既定予定の effective_from より前の過去の日など）は、
     // 未読込として既定の起床・消灯で補う（本人選択 2026-10-18、docs/free-time-model.md カード4）。
     const analyses = useMemo(
         () =>
