@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/src/types/database.types';
 import {
-    deleteBlockedProject,
     getBlockedProjects,
     insertBlockedProject,
     updateBlockedProject,
@@ -15,7 +14,7 @@ import {
 /**
  * プロジェクトごとのタスクのカードの取得と編集。
  * 更新は保存できてから画面の行を差し替える。失敗・競合のときは行を変えないので、カードの入力欄は下書きを
- * 持ったままになり、次に欄を離れたときに保存し直す。削除は画面へ先に反映し、失敗したら読み直す。
+ * 持ったままになり、次に欄を離れたときに保存し直す。枠の行がまだ無ければ、最初の保存で作る。
  */
 export function useBlockedProjects(supabase: SupabaseClient<Database>) {
     const [projects, setProjects] = useState<BlockedProjectRow[]>([]);
@@ -37,15 +36,22 @@ export function useBlockedProjects(supabase: SupabaseClient<Database>) {
         void reload();
     }, [reload]);
 
-    const addProject = useCallback(async () => {
-        const { data, error: e } = await insertBlockedProject(supabase);
-        if (e || !data) {
-            setError('プロジェクトの追加に失敗しました。');
-            return;
-        }
-        setProjects((prev) => [...prev, data]);
-        setError(null);
-    }, [supabase]);
+    const createProject = useCallback(
+        async (name: string, tasks: string) => {
+            const { data, error: e } = await insertBlockedProject(supabase, { name, tasks });
+            if (e?.code === '23505') {
+                setError('このカードは別の場所で作られていたので保存していません。入力を控えてから再読み込みしてください。');
+                return;
+            }
+            if (e || !data) {
+                setError('保存に失敗しました。入力は残してあり、もう一度欄を離れると保存し直します。');
+                return;
+            }
+            setProjects((prev) => [...prev, data]);
+            setError(null);
+        },
+        [supabase]
+    );
 
     const updateProject = useCallback(
         async (id: string, loadedUpdatedAt: string, patch: BlockedProjectUpdate) => {
@@ -65,17 +71,5 @@ export function useBlockedProjects(supabase: SupabaseClient<Database>) {
         [supabase]
     );
 
-    const removeProject = useCallback(
-        async (id: string) => {
-            setProjects((prev) => prev.filter((p) => p.id !== id));
-            const { error: e } = await deleteBlockedProject(supabase, id);
-            if (e) {
-                setError('プロジェクトの削除に失敗しました。');
-                void reload();
-            }
-        },
-        [supabase, reload]
-    );
-
-    return { projects, isLoading, error, reload, addProject, updateProject, removeProject };
+    return { projects, isLoading, error, reload, createProject, updateProject };
 }

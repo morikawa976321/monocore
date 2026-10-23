@@ -4,7 +4,7 @@ import type { Database } from '../../../types/database.types'
 export type BlockedProjectRow = Database['public']['Tables']['blocked_projects']['Row']
 export type BlockedProjectUpdate = Database['public']['Tables']['blocked_projects']['Update']
 
-/** 止まっているプロジェクトを作った順に全件取得する。 */
+/** カードを作った順に全件取得する（画面は枠の名前で選ぶ）。 */
 export async function getBlockedProjects(
     supabase: SupabaseClient<Database>,
 ): Promise<{ data: BlockedProjectRow[] | null; error: PostgrestError | null }> {
@@ -15,11 +15,15 @@ export async function getBlockedProjects(
     return { data, error }
 }
 
-/** 空のカードを1枚追加する。user_id は DEFAULT auth.uid() + RLS により自動設定。 */
+/**
+ * 枠のカードを作る。user_id は DEFAULT auth.uid() + RLS により自動設定。同じ名前の行が既にあれば
+ * 一意制約(user_id, name)で失敗する(code 23505)。
+ */
 export async function insertBlockedProject(
     supabase: SupabaseClient<Database>,
+    row: { name: string; tasks: string },
 ): Promise<{ data: BlockedProjectRow | null; error: PostgrestError | null }> {
-    const { data, error } = await supabase.from('blocked_projects').insert({}).select('*').single()
+    const { data, error } = await supabase.from('blocked_projects').insert(row).select('*').single()
     return { data, error }
 }
 
@@ -41,12 +45,4 @@ export async function updateBlockedProject(
         .select('*')
         .maybeSingle()
     return { data, error }
-}
-
-export async function deleteBlockedProject(
-    supabase: SupabaseClient<Database>,
-    id: string,
-): Promise<{ error: PostgrestError | null }> {
-    const { error } = await supabase.from('blocked_projects').delete().eq('id', id)
-    return { error }
 }

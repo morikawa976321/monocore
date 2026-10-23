@@ -13,10 +13,10 @@ const CARD_HEADER =
     'px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 font-normal text-neutral-700 dark:text-neutral-300';
 const CARD_BODY = 'px-2 sm:px-4 py-2';
 
-/** Tasks。プロジェクトごとのタスクの一覧（表示名だけ変え、URL とファイル名は /plan のまま）。 */
+/** Tasks。枠ごとのタスクの一覧（表示名だけ変え、URL とファイル名は /plan のまま）。枠は src/lib/tasks/slots.ts。 */
 export default function PlanPage() {
     const supabase = useMemo(() => createClient(), []);
-    const { projects, isLoading, error, reload, addProject, updateProject, removeProject } = useBlockedProjects(supabase);
+    const { projects, isLoading, error, reload, createProject, updateProject } = useBlockedProjects(supabase);
     // 読み込み中になるのは最初の読み込みだけ（読み直しは前の内容を持ったまま差し替える）。
     const isInitialLoading = isLoading;
 
@@ -36,9 +36,8 @@ export default function PlanPage() {
                 <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4 space-y-2 sm:space-y-4">
                     <BlockedProjectCards
                         projects={projects}
-                        onAdd={() => void addProject()}
+                        onCreate={(name, tasks) => void createProject(name, tasks)}
                         onUpdate={(id, loadedUpdatedAt, patch) => void updateProject(id, loadedUpdatedAt, patch)}
-                        onRemove={(id) => void removeProject(id)}
                         cardClassName={CARD}
                         headerClassName={CARD_HEADER}
                         bodyClassName={CARD_BODY}
