@@ -19,7 +19,7 @@ const SERIES: { key: Key; name: string; line: string; label: string }[] = [
 ];
 
 /**
- * 合計・Cash・NISA の折れ線(実測は実線、予測は破線、縦の破線は最新実測月)。
+ * 合計・Cash・NISA の折れ線(実測は実線、予測は破線、縦の点線は最新実測月)。
  * 目盛の代わりに縦横の薄いグリッドを敷く(本人の指示 2026-10-23: 横は5年ごと、縦は500万円ごと)。
  * 凡例は持たず、線の右端に系列名と終点の額を置く(本人の指示 2026-10-23: 3本を見分けるため)。
  */
@@ -50,24 +50,25 @@ export function FinanceChart({ measurements, future }: { measurements: Measureme
                 viewBox="0 0 480 96"
                 preserveAspectRatio="none"
                 role="img"
-                aria-label={`月末資産の見通し。合計・Cash・NISA、実線は実測、破線は予測。縦の破線は最新実測月。${last.month} の見通しは ${SERIES.map(series => `${series.name} ${formatMan(last[series.key])}`).join('、')}。`}
+                aria-label={`月末資産の見通し。合計・Cash・NISA、実線は実測、破線は予測。縦の点線は最新実測月。${last.month} の見通しは ${SERIES.map(series => `${series.name} ${formatMan(last[series.key])}`).join('、')}。`}
                 className="block flex-1 min-w-0 h-full"
             >
-                {/* 縦横比を固定しない SVG なので、線幅は non-scaling-stroke で画面上の 1px に揃える */}
+                {/* 縦横比を固定しない SVG なので、線はすべて non-scaling-stroke にする。無いと線幅と破線の間隔が縦横で別々に伸び、水平な区間ほど太く見える */}
                 <g className="stroke-current text-neutral-200 dark:text-neutral-800" strokeWidth="1">
                     {levels.map(value => <line key={`y${value}`} x1="8" x2="472" y1={y(value)} y2={y(value)} vectorEffect="non-scaling-stroke" />)}
                     {years.map(serial => <line key={`x${serial}`} x1={xAt(serial)} x2={xAt(serial)} y1="8" y2="88" vectorEffect="non-scaling-stroke" />)}
                 </g>
-                <line x1="8" x2="472" y1={y(0)} y2={y(0)} className="stroke-current text-neutral-400 dark:text-neutral-600" strokeWidth="1" />
-                <line x1={x(base.month)} x2={x(base.month)} y1="8" y2="88" strokeDasharray="3 3" className="stroke-current text-amber-600 dark:text-amber-400" />
+                <line x1="8" x2="472" y1={y(0)} y2={y(0)} className="stroke-current text-neutral-400 dark:text-neutral-600" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                {/* 最新実測月の縦線は中立色。アンバーは Cash の線が使うので、同色にすると線と紛れる */}
+                <line x1={x(base.month)} x2={x(base.month)} y1="8" y2="88" strokeDasharray="2 3" className="stroke-current text-neutral-500" strokeWidth="1" vectorEffect="non-scaling-stroke" />
                 {SERIES.map(series => (
                     <g key={series.key} className={series.line}>
-                        <polyline points={points(actual, series.key)} fill="none" className="stroke-current" strokeWidth="1.5" />
-                        <polyline points={points(projected, series.key)} fill="none" className="stroke-current" strokeWidth="1.5" strokeDasharray="4 3" />
+                        <polyline points={points(actual, series.key)} fill="none" className="stroke-current" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                        <polyline points={points(projected, series.key)} fill="none" className="stroke-current" strokeWidth="2" strokeLinejoin="round" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" />
                     </g>
                 ))}
             </svg>
-            <div className="relative w-28 shrink-0" aria-hidden="true">
+            <div className="relative w-24 sm:w-28 shrink-0" aria-hidden="true">
                 {SERIES.map((series, i) => (
                     <span
                         key={series.key}
