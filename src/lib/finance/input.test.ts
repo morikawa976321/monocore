@@ -24,10 +24,15 @@ describe('NISA との振替', () => {
     });
 });
 
-describe('最新の実測月以前の単月の行', () => {
+describe('最新の実測月以前にしか効かない行', () => {
     it('開始月が最新の実測月以前なら止める', () => {
         expect(() => parseEvent(draft({ start: '2026-10' }), '2026-10')).toThrow('最新の実測月(2026-10)');
         expect(() => parseEvent(draft({ start: '2026-09' }), '2026-10')).toThrow();
+    });
+
+    it('終了月が開始月と同じ行、終了月も実測月以前の範囲の行も止める', () => {
+        expect(() => parseEvent(draft({ start: '2026-09', end: '2026-09' }), '2026-09')).toThrow('最新の実測月(2026-09)');
+        expect(() => parseEvent(draft({ start: '2026-07', end: '2026-10' }), '2026-10')).toThrow();
     });
 
     it('翌月以降の単月、終了月のある行、実測が無いときは通す', () => {

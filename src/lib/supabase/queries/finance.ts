@@ -37,7 +37,24 @@ export async function deleteFinanceMeasurement(client: Client, month: string) {
     return client.from('finance_measurements').delete().eq('month', month).select('month').maybeSingle();
 }
 
-/** user_id is supplied by DEFAULT auth.uid(), including on the insert side of upsert. */
-export async function upsertFinanceMeasurement(client: Client, input: FinanceMeasurementInput) {
-    return client.from('finance_measurements').upsert(input, { onConflict: 'user_id,month' }).select('*').single();
+/**
+ * 次の月の実測を記録する。user_id は DEFAULT auth.uid()。別タブや CLI が同じ月を先に記録していれば
+ * 主キー(user_id, month)の重複で失敗する(上書きしない)。
+ */
+export async function insertFinanceMeasurement(client: Client, input: FinanceMeasurementInput) {
+    return client.from('finance_measurements').insert(input).select('*').single();
+}
+
+/**
+ * 記録済みの月の訂正。updateFinanceEvent と同じく、読み込み時の updated_at を条件に含める楽観ロック。
+ * Cash と NISA を両方書き戻すので、条件が無いと他所で直した片方を古い値に戻してしまう。
+ */
+export async function updateFinanceMeasurement(client: Client, input: FinanceMeasurementInput, loadedUpdatedAt: string) {
+    return client
+        .from('finance_measurements')
+        .update({ cash: input.cash, nisa: input.nisa })
+        .eq('month', input.month)
+        .eq('updated_at', loadedUpdatedAt)
+        .select('*')
+        .maybeSingle();
 }

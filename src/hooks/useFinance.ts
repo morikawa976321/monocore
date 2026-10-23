@@ -8,7 +8,8 @@ import { isTransfer, parseEvent, parseMeasurement, type EventDraft, type Measure
 import { forecastAt, latestMeasurement, project, summarize, type FinanceEvent, type Measurement } from '@/src/lib/finance/projection';
 import {
     getFinanceEvents, getFinanceMeasurements, insertFinanceEvent, updateFinanceEvent,
-    deleteFinanceEvent, upsertFinanceMeasurement, deleteFinanceMeasurement, type FinanceEventRow,
+    deleteFinanceEvent, insertFinanceMeasurement, updateFinanceMeasurement, deleteFinanceMeasurement,
+    type FinanceEventRow, type FinanceMeasurementRow,
 } from '@/src/lib/supabase/queries/finance';
 
 type Event = FinanceEvent & { id: string; updatedAt: string };
@@ -17,7 +18,15 @@ function eventFromRow(row: FinanceEventRow): Event {
     return { id: row.id, updatedAt: row.updated_at, name: row.name, start: fromMonthDate(row.start_month), end: row.end_month ? fromMonthDate(row.end_month) : null, cash: row.cash_delta, nisa: row.nisa_delta, memo: row.memo };
 }
 
+type MeasurementRow = Measurement & { updatedAt: string };
+
+function measurementFromRow(row: FinanceMeasurementRow): MeasurementRow {
+    return { month: fromMonthDate(row.month), cash: row.cash, nisa: row.nisa, updatedAt: row.updated_at };
+}
+
 const CONFLICT_MESSAGE = 'この行は別の場所(別タブや CLI)で変更されています。表を最新にしたので、下書きを見直してから保存し直してください。';
+const MEASUREMENT_CONFLICT_MESSAGE = 'この月の実測は別の場所(別タブや CLI)で変更されています。表を最新にしたので、入力を見直してから保存し直してください。';
+const MEASUREMENT_TAKEN_MESSAGE = 'この月の実測は別の場所(別タブや CLI)で記録されています。表を最新にしたので、直すなら表の行から編集してください。';
 
 function message(error: unknown): string {
     return error instanceof Error ? error.message : '保存に失敗しました。下書きを残しています。';
@@ -25,7 +34,9 @@ function message(error: unknown): string {
 
 export function useFinance(client: SupabaseClient<Database>) {
     const [events, setEvents] = useState<Event[]>([]);
-    const [measurements, setMeasurements] = useState<Measurement[]>([]);
+    const [measurements, setMeasurements] = useState<MeasurementRow[]>([]);
+    // 取り直した直後の実測。競合のあと、次の保存の条件(updated_at)を付け替えるために同期的に読む。
+    const loadedMeasurements = useRef<MeasurementRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [eventDraft, setEventDraft] = useState<EventDraft | null>(null);
@@ -41,10 +52,11 @@ export function useFinance(client: SupabaseClient<Database>) {
         const [ev, ms] = await Promise.all([getFinanceEvents(client), getFinanceMeasurements(client)]);
         if (ev.error || ms.error) throw new Error('家計の読み込みに失敗しました。再読み込みしてください。');
         const loadedEvents = ev.data.map(eventFromRow);
-        const loadedMeasurements = ms.data.map(row => ({ month: fromMonthDate(row.month), cash: row.cash, nisa: row.nisa }));
-        latestMeasurement(loadedMeasurements);
+        const rows = ms.data.map(measurementFromRow);
+        latestMeasurement(rows);
         setEvents(loadedEvents);
-        setMeasurements(loadedMeasurements);
+        setMeasurements(rows);
+        loadedMeasurements.current = rows;
         return loadedEvents;
     }, [client]);
 
@@ -64,7 +76,12 @@ export function useFinance(client: SupabaseClient<Database>) {
 
     /** 保存後・タブ復帰時の静かな同期。失敗しても画面は今のままにする(次の操作か再読み込みで直る)。 */
     const refresh = useCallback(async (): Promise<Event[] | null> => {
-        try { return await fetchAll(); } catch { return null; /* 表示中の値を保つ */ }
+        try {
+            const loaded = await fetchAll();
+            // 初回の読み込みに失敗した画面も、ヘッダーの再読み込みで取れたら表を出す。
+            setLoadError(null);
+            return loaded;
+        } catch { return null; /* 表示中の値を保つ */ }
     }, [fetchAll]);
 
     useEffect(() => { void reload(); }, [reload]);
@@ -163,9 +180,13 @@ export function useFinance(client: SupabaseClient<Database>) {
         finally { busy.current = false; setSaving(false); }
     }
 
+    // 訂正を始めた時点の実測の updated_at(イベントの draftUpdatedAt と同じ考え方)。
+    const draftMeasurementUpdatedAt = useRef<string | null>(null);
+
     function editMeasurement(row: Measurement) {
         if (eventDraft || saving || editingMonth) return;
         setMeasurementError(null);
+        draftMeasurementUpdatedAt.current = measurements.find(m => m.month === row.month)?.updatedAt ?? null;
         setEditingMonth(row.month);
         setMeasurementDraft({ month: row.month, cash: String(row.cash), nisa: String(row.nisa) });
     }
@@ -186,9 +207,27 @@ export function useFinance(client: SupabaseClient<Database>) {
             const row = parseMeasurement(recordDraft);
             const next = [...measurements.filter(old => old.month !== row.month), row].sort((a, b) => a.month.localeCompare(b.month));
             project(next, events);
-            const result = await upsertFinanceMeasurement(client, { month: toMonthDate(row.month), cash: row.cash, nisa: row.nisa });
-            if (result.error || !result.data) throw new Error('実測の保存に失敗しました。入力を残しています。');
-            setMeasurements(next);
+            const input = { month: toMonthDate(row.month), cash: row.cash, nisa: row.nisa };
+            const result = editingMonth
+                ? await updateFinanceMeasurement(client, input, draftMeasurementUpdatedAt.current ?? '')
+                : await insertFinanceMeasurement(client, input);
+            if (result.error) {
+                if (!editingMonth && result.error.code === '23505') {
+                    await refresh();
+                    throw new Error(MEASUREMENT_TAKEN_MESSAGE);
+                }
+                throw new Error('実測の保存に失敗しました。入力を残しています。');
+            }
+            if (!result.data) {
+                // 楽観ロックに外れた(0 行更新)。入力は残し、表を最新にして次の保存の条件を付け替える。
+                await refresh();
+                const latest = loadedMeasurements.current.find(m => m.month === row.month);
+                if (!latest) throw new Error('この月の実測は別の場所で削除されています。取消してから記録し直してください。');
+                draftMeasurementUpdatedAt.current = latest.updatedAt;
+                throw new Error(MEASUREMENT_CONFLICT_MESSAGE);
+            }
+            const saved = measurementFromRow(result.data);
+            setMeasurements(rows => [...rows.filter(old => old.month !== saved.month), saved].sort((a, b) => a.month.localeCompare(b.month)));
             setMeasurementDraft(null);
             setEditingMonth(null);
             // 別タブや CLI が足した実測・計画を取り込む(起点が DB と食い違わないように)。

@@ -21,15 +21,16 @@ export function parseYen(text: string): number {
 }
 
 /**
- * latestMonth は最新の実測月。単月の行がそれ以前だと、見通しは翌月から計算するので効かず、表からも外れて
- * (visibleEvents)保存したのに消えたように見える。保存させずに止める(本人の指示 2026-10-23)。
+ * latestMonth は最新の実測月。行が効く最後の月(終了月、単月なら開始月)がそれ以前だと、見通しは翌月から
+ * 計算するので効かず、表からも外れて(visibleEvents)保存したのに消えたように見える。保存させずに止める
+ * (本人の指示 2026-10-23 は単月の行について。終了月が開始月と同じ行、終了月も過ぎた範囲の行も同じ理由で止める)。
  */
 export function parseEvent({ transfer, ...draft }: EventDraft, latestMonth?: string | null): FinanceEvent {
     const cash = parseYen(draft.cash);
     const event = { ...draft, name: draft.name.trim(), end: draft.end || null, cash, nisa: transfer ? opposite(cash) : parseYen(draft.nisa) };
     validateEvent(event);
-    if (latestMonth && !event.end && event.start <= latestMonth) {
-        throw new Error(`単月の行は、開始月を最新の実測月(${latestMonth})より後にしてください。それ以前の月は見通しに効かず、表にも出ません。`);
+    if (latestMonth && (event.end ?? event.start) <= latestMonth) {
+        throw new Error(`終了月(単月なら開始月)を最新の実測月(${latestMonth})より後にしてください。それ以前の月だけの行は見通しに効かず、表にも出ません。`);
     }
     return event;
 }
