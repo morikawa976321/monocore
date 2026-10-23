@@ -35,6 +35,7 @@ export function formatYen(value: number): string {
     return value.toLocaleString('ja-JP');
 }
 
+/** 正の値だけ + を付ける。0 は符号なし(2026-10-23 本人の指示)。 */
 export function signedYen(value: number): string {
-    return `${value >= 0 ? '+' : ''}${formatYen(value)}`;
+    return `${value > 0 ? '+' : ''}${formatYen(value)}`;
 }
