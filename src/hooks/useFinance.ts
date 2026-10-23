@@ -36,8 +36,8 @@ export function useFinance(client: SupabaseClient<Database>) {
     const [saving, setSaving] = useState(false);
     const busy = useRef(false);
 
-    /** 両表を DB から取り直す。下書き(eventDraft / measurementDraft)には触れない。 */
-    const fetchAll = useCallback(async () => {
+    /** 両表を DB から取り直す。下書き(eventDraft / measurementDraft)には触れない。読んだ計画を返す。 */
+    const fetchAll = useCallback(async (): Promise<Event[]> => {
         const [ev, ms] = await Promise.all([getFinanceEvents(client), getFinanceMeasurements(client)]);
         if (ev.error || ms.error) throw new Error('家計の読み込みに失敗しました。再読み込みしてください。');
         const loadedEvents = ev.data.map(eventFromRow);
@@ -45,6 +45,7 @@ export function useFinance(client: SupabaseClient<Database>) {
         latestMeasurement(loadedMeasurements);
         setEvents(loadedEvents);
         setMeasurements(loadedMeasurements);
+        return loadedEvents;
     }, [client]);
 
     const reload = useCallback(async () => {
@@ -62,8 +63,8 @@ export function useFinance(client: SupabaseClient<Database>) {
     }, [fetchAll]);
 
     /** 保存後・タブ復帰時の静かな同期。失敗しても画面は今のままにする(次の操作か再読み込みで直る)。 */
-    const refresh = useCallback(async () => {
-        try { await fetchAll(); } catch { /* 表示中の値を保つ */ }
+    const refresh = useCallback(async (): Promise<Event[] | null> => {
+        try { return await fetchAll(); } catch { return null; /* 表示中の値を保つ */ }
     }, [fetchAll]);
 
     useEffect(() => { void reload(); }, [reload]);
@@ -118,7 +119,11 @@ export function useFinance(client: SupabaseClient<Database>) {
             if (result.error) throw new Error('計画の保存に失敗しました。下書きを残しています。');
             if (!result.data) {
                 // 楽観ロックに外れた(0 行更新)。下書きは残し、表だけ最新にする。
-                await refresh();
+                // 次の保存は新しい版を条件にできるよう、取り直した行の updated_at に付け替える。
+                const loaded = await refresh();
+                const latest = loaded?.find(row => row.id === eventDraft.id);
+                draftUpdatedAt.current = latest?.updatedAt ?? null;
+                if (loaded && !latest) throw new Error('この行は別の場所で削除されています。取消してから、必要なら「+ 追加」で入れ直してください。');
                 throw new Error(CONFLICT_MESSAGE);
             }
             const saved = eventFromRow(result.data);

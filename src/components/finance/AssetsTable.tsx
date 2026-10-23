@@ -69,7 +69,8 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                         <td className={`${cell} text-neutral-700 dark:text-neutral-300`}>実測{row.month === base?.month ? ' · 起点' : ''}{labels(row.month, false) && ` ／ ${labels(row.month, false)}`}</td>
                     </tr>}</Fragment>;
                 })}
-                {!editingMonth && editor}
+                {/* 記録の入力行。編集中の実測が別所で削除されて一覧から消えたときも、ここに編集欄を出して取消できるようにする */}
+                {(!editingMonth || !displayed.some(row => row.month === editingMonth)) && editor}
                 {simulation.rows.map(row => <tr key={row.month} className="text-neutral-700 dark:text-neutral-300">
                     <td className={CELL}>{row.month}</td><td className={NUMBER}>{formatYen(row.cash)}</td><td className={NUMBER}>{formatYen(row.nisa)}</td><td className={NUMBER}>{formatYen(row.total)}</td><td className={CELL}>{labels(row.month, true)}</td>
                 </tr>)}
