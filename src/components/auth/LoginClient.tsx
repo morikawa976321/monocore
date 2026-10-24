@@ -49,7 +49,7 @@ export function LoginClient({ initialErrorCode }: LoginClientProps) {
     }
 
     return (
-        <div className="flex items-center justify-center min-h-screen -ml-12 bg-neutral-100 dark:bg-neutral-950">
+        <div className="flex items-center justify-center min-h-screen -ml-12 bg-neutral-250 dark:bg-neutral-900">
             <div className="w-full max-w-sm px-2 sm:px-6">
                 <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100 mb-4 sm:mb-12 text-center">
                     Login

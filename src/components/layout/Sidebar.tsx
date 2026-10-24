@@ -48,7 +48,7 @@ export function Sidebar() {
         <>
             {/* Desktop: 従来のサイドバー（sm 以上で表示） */}
             <nav
-                className="hidden sm:flex fixed inset-y-0 left-0 z-30 flex-col w-12 transition-all duration-150 ease-in-out bg-transparent border-r border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 group hover:w-64 hover:bg-neutral-50 dark:hover:bg-neutral-900 overflow-hidden"
+                className="hidden sm:flex fixed inset-y-0 left-0 z-30 flex-col w-12 transition-all duration-150 ease-in-out bg-transparent border-r border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600 group hover:w-64 hover:bg-neutral-200 dark:hover:bg-neutral-800 overflow-hidden"
                 aria-label="メインナビゲーション"
             >
                 <div className="flex flex-col flex-1 gap-2 p-1 mt-4">
@@ -96,7 +96,7 @@ export function Sidebar() {
 
             {/* Mobile: ドロワーパネル */}
             <div
-                className={`fixed inset-y-0 left-0 z-30 w-64 flex flex-col border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 transition-transform duration-150 ease-in-out sm:hidden ${
+                className={`fixed inset-y-0 left-0 z-30 w-64 flex flex-col border-r border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 transition-transform duration-150 ease-in-out sm:hidden ${
                     isOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
                 }`}
                 role="dialog"
@@ -151,7 +151,7 @@ const SidebarItem = ({
         <Link
             href={href}
             onClick={onNavigate}
-            className="flex items-center gap-2 sm:gap-4 px-2 py-2 font-medium transition-colors rounded-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-neutral-50 group-hover:px-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
+            className="flex items-center gap-2 sm:gap-4 px-2 py-2 font-medium transition-colors rounded-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-50 group-hover:px-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-600"
         >
             <div className="flex items-center justify-center w-8 h-8 shrink-0">{icon}</div>
             <span

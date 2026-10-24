@@ -16,7 +16,7 @@ import type { FinanceState } from '@/src/hooks/useFinance';
 const EDGE = 'pl-0 sm:pl-2';
 
 /** 行をクリックで編集に入れる行の見た目(Reports の一覧の行と同じ hover)。 */
-const CLICKABLE = 'cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out';
+const CLICKABLE = 'cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors duration-150 ease-in-out';
 
 /**
  * 「資産」のカード: 月末残高の表。実測(最新2行、古い分は畳む)→ 計画からの予測。
@@ -60,14 +60,14 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
     // イベント列を持たないので、予測との差・ボタン・注意は2行目に全幅で置く。
     const editor = (
         <>
-        <tr className="bg-neutral-100 dark:bg-neutral-800/50">
+        <tr className="bg-neutral-250 dark:bg-neutral-700/30">
             <td className={`${TD} tabular-nums`}>{recordDraft.month}</td>
             <td className={`${TD} ${NUM} ${GAP}`}><Input aria-label="Cash 実測" inputMode="text" autoFocus placeholder={forecast ? formatYen(forecast.cash) : ''} value={recordDraft.cash} onChange={event => patch('cash', event.target.value)} disabled={busy} className="w-36 text-right tabular-nums" /></td>
             <td className={`${TD} ${NUM} ${GAP}`}><Input aria-label="NISA 実測" inputMode="text" placeholder={forecast ? formatYen(forecast.nisa) : ''} value={recordDraft.nisa} onChange={event => patch('nisa', event.target.value)} disabled={busy} className="w-36 text-right tabular-nums" /></td>
             <td className={`${TD} ${NUM} ${GAP}`}>{total}</td>
             <td className={`${TD} w-8`} />
         </tr>
-        <tr className="bg-neutral-100 dark:bg-neutral-800/50">
+        <tr className="bg-neutral-250 dark:bg-neutral-700/30">
             <td className="px-2 pt-1 pb-2" colSpan={5}>
                 <div className="flex flex-wrap items-center gap-2">
                     <span className={`text-sm tabular-nums ${MUTED}`}>予測 {forecast ? `${formatYen(forecast.cash)} / ${formatYen(forecast.nisa)}` : '算出不可'} → {diff}</span>
@@ -106,7 +106,7 @@ export function AssetsTable({ finance }: { finance: FinanceState }) {
                                 <th scope="col" className={`${TH} w-8 pr-0 ${EDGE}`}><span className="sr-only">操作</span></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        <tbody className="divide-y divide-neutral-300 dark:divide-neutral-700">
                             {displayed.map(row => (
                                 <Fragment key={row.month}>
                                     {editingMonth === row.month ? editor : (

@@ -50,7 +50,7 @@ function ReportToc({
                     <a
                         href={`#${entry.anchor}`}
                         onClick={onNavigate}
-                        className="block truncate rounded-sm px-2 py-1 text-neutral-800 transition-colors duration-150 ease-in-out hover:bg-neutral-200 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-600"
+                        className="block truncate rounded-sm px-2 py-1 text-neutral-800 transition-colors duration-150 ease-in-out hover:bg-neutral-300 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:hover:text-neutral-50 dark:focus-visible:ring-neutral-600"
                     >
                         {entry.text}
                     </a>
@@ -215,11 +215,11 @@ export default function ReportDetailPage() {
     }, [isTocOpen, closeToc])
 
     return (
-        <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
+        <div className="flex flex-col h-screen bg-neutral-250 dark:bg-neutral-900">
             <PageHeader title={report?.title ?? 'Report'}>
                 <Link
                     href="/reports"
-                    className="inline-flex h-9 items-center gap-2 rounded-sm border-2 border-neutral-600 bg-neutral-50 px-2 text-sm font-medium text-neutral-900 transition-colors duration-150 ease-in-out hover:border-neutral-700 hover:bg-neutral-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:border-neutral-500 dark:bg-neutral-900 dark:text-neutral-50 dark:hover:border-neutral-400 dark:hover:bg-neutral-800 dark:focus-visible:ring-neutral-500"
+                    className="inline-flex h-9 items-center gap-2 rounded-sm border-2 border-neutral-600 bg-neutral-200 px-2 text-sm font-medium text-neutral-900 transition-colors duration-150 ease-in-out hover:border-neutral-700 hover:bg-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-500 dark:border-neutral-500 dark:bg-neutral-800 dark:text-neutral-50 dark:hover:border-neutral-400 dark:hover:bg-neutral-700 dark:focus-visible:ring-neutral-500"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     一覧
@@ -228,8 +228,8 @@ export default function ReportDetailPage() {
 
             <div className="flex-1 overflow-hidden relative">
                 {isLoading && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-100/80 dark:bg-neutral-950/80">
-                        <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 rounded p-4">
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-250/80 dark:bg-neutral-900/80">
+                        <div className="flex items-center gap-2 bg-neutral-200 border border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 rounded p-4">
                             <LoadingIndicator />
                             <span className="text-sm text-neutral-700 dark:text-neutral-300">読み込み中…</span>
                         </div>
@@ -238,7 +238,7 @@ export default function ReportDetailPage() {
 
                 {!isLoading && notFound && (
                     <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4">
-                        <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
+                        <section className="rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
                                 <p className="text-neutral-900 dark:text-neutral-100">
                                     レポートが見つかりません。
@@ -250,7 +250,7 @@ export default function ReportDetailPage() {
 
                 {!isLoading && errorMessage && (
                     <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4">
-                        <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
+                        <section className="rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
                                 <p className="text-amber-600 dark:text-amber-400">
                                     {errorMessage}
@@ -271,9 +271,9 @@ export default function ReportDetailPage() {
                                 {report.toc.length > 0 && (
                                     <nav
                                         aria-label="目次"
-                                        className="hidden sm:block sm:sticky sm:top-1 sm:w-56 sm:shrink-0 sm:max-h-screen sm:overflow-y-auto rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600"
+                                        className="hidden sm:block sm:sticky sm:top-1 sm:w-56 sm:shrink-0 sm:max-h-screen sm:overflow-y-auto rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden border border-neutral-400 dark:border-neutral-600"
                                     >
-                                        <header className="px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
+                                        <header className="px-2 sm:px-4 py-2 border-b border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-700/30 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
                                             目次
                                         </header>
                                         <div className="p-1 sm:p-2">
@@ -283,7 +283,7 @@ export default function ReportDetailPage() {
                                 )}
 
                                 <article
-                                    className="report-body min-w-0 flex-1 rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600 p-1 sm:p-4 pb-12 sm:pb-4"
+                                    className="report-body min-w-0 flex-1 rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden border border-neutral-400 dark:border-neutral-600 p-1 sm:p-4 pb-12 sm:pb-4"
                                     dangerouslySetInnerHTML={{ __html: report.bodyHtml }}
                                 />
                             </div>
@@ -319,7 +319,7 @@ export default function ReportDetailPage() {
                                 // ならないようinertにする(aria-hidden+pointer-events-noneだけだと
                                 // Tabで裏の非表示リンクへフォーカスが入ってしまうため)。
                                 inert={!isTocOpen}
-                                className={`sm:hidden fixed inset-y-0 right-0 z-30 w-64 flex flex-col border-l border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 transition-transform duration-150 ease-in-out ${
+                                className={`sm:hidden fixed inset-y-0 right-0 z-30 w-64 flex flex-col border-l border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 transition-transform duration-150 ease-in-out ${
                                     isTocOpen ? 'translate-x-0' : 'translate-x-full'
                                 }`}
                                 role="dialog"
@@ -327,7 +327,7 @@ export default function ReportDetailPage() {
                                 aria-label="目次"
                                 aria-hidden={!isTocOpen}
                             >
-                                <div className="flex items-center justify-between px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
+                                <div className="flex items-center justify-between px-2 sm:px-4 py-2 border-b border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-700/30">
                                     <span className="text-sm leading-6 text-neutral-700 dark:text-neutral-300">
                                         目次
                                     </span>

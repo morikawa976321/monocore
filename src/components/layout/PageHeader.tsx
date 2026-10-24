@@ -13,7 +13,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, onRefresh, isRefreshing = false, children }: PageHeaderProps) {
     return (
-        <header className="flex items-center justify-between px-2 sm:px-6 py-2 sm:py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 shrink-0">
+        <header className="flex items-center justify-between px-2 sm:px-6 py-2 sm:py-2 border-b border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 shrink-0">
             <div className="flex min-w-0 items-center gap-4">
                 <h1 className="text-base sm:text-lg font-medium leading-6 sm:leading-7 tracking-widest uppercase text-neutral-900 dark:text-neutral-100">
                     {title}

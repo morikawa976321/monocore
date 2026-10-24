@@ -109,11 +109,11 @@ export function OverlayPanel({ label, onClose, fitContent = false, children }: O
                     role="dialog"
                     aria-modal="true"
                     aria-label={label}
-                    className={`pointer-events-auto flex ${fitContent ? 'max-h-full' : 'h-full'} min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded border-2 border-neutral-400 bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900`}
+                    className={`pointer-events-auto flex ${fitContent ? 'max-h-full' : 'h-full'} min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded border-2 border-neutral-400 bg-neutral-200 dark:border-neutral-600 dark:bg-neutral-800`}
                 >
                     {children}
                     {/* モバイル・デスクトップ：右下で閉じる */}
-                    <div className="flex shrink-0 justify-end border-t border-neutral-200 px-2 py-2 dark:border-neutral-800">
+                    <div className="flex shrink-0 justify-end border-t border-neutral-300 px-2 py-2 dark:border-neutral-700">
                         <Button type="button" color="secondary" size="md" onClick={onClose} aria-label={`${label}を閉じる`}>
                             閉じる
                         </Button>

@@ -7,6 +7,9 @@
 @theme {
   --font-sans: var(--font-geist-sans), var(--font-noto-sans-jp);
   --font-mono: var(--font-geist-mono);
+  /* ライトのページ背景専用の中間段(README-design.md §2-2・§3)。200(パネル)との明るさの差を
+     旧ページ100/パネル50 より少し大きい程度に抑えつつ、大きな面を灰224前後に収めるため。 */
+  --color-neutral-250: oklch(90% 0 none);
 }
 
 /* --- Report body ---
@@ -33,7 +36,7 @@
   @apply mt-6 text-lg leading-7;
 }
 .report-body :where(h2) {
-  @apply mt-12 border-b border-neutral-200 pb-2 text-lg leading-7 dark:border-neutral-800;
+  @apply mt-12 border-b border-neutral-300 pb-2 text-lg leading-7 dark:border-neutral-700;
 }
 .report-body :where(h3, h4, h5, h6) {
   @apply mt-6 text-base leading-7;
@@ -76,14 +79,14 @@
 }
 
 .report-body :where(hr) {
-  @apply my-12 border-neutral-200 dark:border-neutral-800;
+  @apply my-12 border-neutral-300 dark:border-neutral-700;
 }
 
 .report-body :where(code) {
-  @apply rounded-sm bg-neutral-200 px-1 py-1 font-mono text-sm dark:bg-neutral-800;
+  @apply rounded-sm bg-neutral-300 px-1 py-1 font-mono text-sm dark:bg-neutral-700;
 }
 .report-body :where(pre) {
-  @apply my-4 overflow-x-auto rounded bg-neutral-200 p-2 sm:p-4 dark:bg-neutral-800;
+  @apply my-4 overflow-x-auto rounded bg-neutral-300 p-2 sm:p-4 dark:bg-neutral-700;
 }
 .report-body :where(pre code) {
   @apply bg-transparent p-0;
@@ -93,10 +96,10 @@
   @apply my-4 block w-full overflow-x-auto border-collapse text-sm leading-6;
 }
 .report-body :where(th, td) {
-  @apply border border-neutral-200 px-2 py-1 text-left align-top dark:border-neutral-800;
+  @apply border border-neutral-300 px-2 py-1 text-left align-top dark:border-neutral-700;
 }
 .report-body :where(th) {
-  @apply bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100;
+  @apply bg-neutral-300 font-medium text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100;
 }
 
 .report-body :where(img) {

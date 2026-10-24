@@ -14,9 +14,9 @@ const baseClassName =
 
 const variantClassNames: Record<InputVariant, string> = {
     field:
-        'rounded-sm border border-neutral-200 bg-neutral-50 px-3 py-2 placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600 dark:focus:ring-neutral-600 aria-invalid:border-amber-500 dark:aria-invalid:border-amber-400',
+        'rounded-sm border border-neutral-300 bg-neutral-200 px-3 py-2 placeholder:text-neutral-500 focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500 dark:focus:border-neutral-600 dark:focus:ring-neutral-600 aria-invalid:border-amber-500 dark:aria-invalid:border-amber-400',
     plain:
-        'border-none bg-transparent px-0 py-0 placeholder:text-neutral-400 dark:placeholder:text-neutral-600',
+        'border-none bg-transparent px-0 py-0 placeholder:text-neutral-500 dark:placeholder:text-neutral-500',
 };
 
 const textClassNames: Record<InputVariant, { normal: string; muted: string }> = {

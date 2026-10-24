@@ -70,7 +70,7 @@ export default function ReportsPage() {
     )
 
     return (
-        <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
+        <div className="flex flex-col h-screen bg-neutral-250 dark:bg-neutral-900">
             <PageHeader
                 title="Reports"
                 onRefresh={() => void loadReports('refresh')}
@@ -100,7 +100,7 @@ export default function ReportsPage() {
                     )}
 
                     {!isInitialLoading && reports.length === 0 && (
-                        <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
+                        <section className="rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
                                 <p className="text-neutral-900 dark:text-neutral-100">
                                     表示できるレポートはありません。
@@ -110,7 +110,7 @@ export default function ReportsPage() {
                     )}
 
                     {!isInitialLoading && reports.length > 0 && filteredReports.length === 0 && (
-                        <section className="rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600">
+                        <section className="rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden border border-neutral-400 dark:border-neutral-600">
                             <div className="p-1 sm:p-4">
                                 <p className="text-neutral-900 dark:text-neutral-100">
                                     「{query}」に一致するレポートはありません。
@@ -125,7 +125,7 @@ export default function ReportsPage() {
                                 <li key={report.slug}>
                                     <Link
                                         href={`/reports/${report.slug}`}
-                                        className="flex items-center justify-between gap-2 rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden border border-neutral-400 dark:border-neutral-600 px-2 sm:px-4 py-2 text-sm leading-6 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-500"
+                                        className="flex items-center justify-between gap-2 rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden border border-neutral-400 dark:border-neutral-600 px-2 sm:px-4 py-2 text-sm leading-6 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-500"
                                     >
                                         <span className="min-w-0 truncate text-neutral-900 dark:text-neutral-50">
                                             {report.title}
@@ -141,8 +141,8 @@ export default function ReportsPage() {
                 </div>
 
                 {isInitialLoading && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-100/80 dark:bg-neutral-950/80">
-                        <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 rounded p-4">
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-250/80 dark:bg-neutral-900/80">
+                        <div className="flex items-center gap-2 bg-neutral-200 border border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 rounded p-4">
                             <LoadingIndicator />
                             <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
                         </div>

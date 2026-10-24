@@ -84,7 +84,7 @@ export function useRowNote() {
     const tooltip = note && (
         <div
             role="tooltip"
-            className="fixed z-10 max-w-xs px-2 py-1 rounded-sm border border-neutral-200 bg-neutral-50 text-sm text-neutral-800 whitespace-pre-wrap pointer-events-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200"
+            className="fixed z-10 max-w-xs px-2 py-1 rounded-sm border border-neutral-300 bg-neutral-200 text-sm text-neutral-800 whitespace-pre-wrap pointer-events-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
             style={{ left: note.left, top: note.top }}
         >
             {note.text}

@@ -22,7 +22,7 @@ function Thumbnail({ src, alt }: { src: string | null; alt: string }) {
 
     if (!isUsable) {
         return (
-            <div className="flex w-40 shrink-0 aspect-3/2 items-center justify-center self-start bg-neutral-100 dark:bg-neutral-950">
+            <div className="flex w-40 shrink-0 aspect-3/2 items-center justify-center self-start bg-neutral-250 dark:bg-neutral-900">
                 <span className="text-sm text-neutral-700 dark:text-neutral-300">画像なし</span>
             </div>
         )
@@ -64,7 +64,7 @@ function ArticleCard({ article, timezone }: { article: ArticleListRow; timezone:
     // リンクが http/https でない記事も、読めなくする理由は無いので本文だけ出す。
     if (!isLinkUsable) {
         return (
-            <div className="flex items-start overflow-hidden rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900">
+            <div className="flex items-start overflow-hidden rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-200 dark:bg-neutral-800">
                 {body}
             </div>
         )
@@ -75,7 +75,7 @@ function ArticleCard({ article, timezone }: { article: ArticleListRow; timezone:
             href={article.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-start overflow-hidden rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-500"
+            className="flex items-start overflow-hidden rounded border border-neutral-400 dark:border-neutral-600 bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-500"
         >
             {body}
         </a>

@@ -12,7 +12,7 @@ import type { FinanceEvent } from '@/src/lib/finance/projection';
 import type { FinanceState } from '@/src/hooks/useFinance';
 
 /** 行をクリックで編集に入れる行の見た目(Reports の一覧の行と同じ hover)。 */
-const CLICKABLE = 'cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors duration-150 ease-in-out';
+const CLICKABLE = 'cursor-pointer hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors duration-150 ease-in-out';
 
 /**
  * NISA の増減は列を持たず、名前の後ろに添える(NISA が動く行は積立・売却の高々2行なので、全行に列を割かない)。
@@ -35,7 +35,7 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
     // メモ列を持たないので、メモとボタンは2行目に全幅で置く。
     const editor = draft && (
         <>
-        <tr className="bg-neutral-100 dark:bg-neutral-800/50">
+        <tr className="bg-neutral-250 dark:bg-neutral-700/30">
             <td className={TD}><Input aria-label="イベント名" value={draft.name} onChange={event => patch('name', event.target.value)} disabled={finance.saving} className="min-w-40" /></td>
             <td className={TD}><Input aria-label="開始月" placeholder="YYYY-MM" value={draft.start} onChange={event => patch('start', event.target.value)} disabled={finance.saving} className="w-28 tabular-nums" /></td>
             <td className={TD}><Input aria-label="終了月（空なら単月）" placeholder="YYYY-MM" value={draft.end} onChange={event => patch('end', event.target.value)} disabled={finance.saving} className="w-28 tabular-nums" /></td>
@@ -52,7 +52,7 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
             </td>
             <td className={`${TD} w-8 hidden sm:table-cell`} />
         </tr>
-        <tr className="bg-neutral-100 dark:bg-neutral-800/50">
+        <tr className="bg-neutral-250 dark:bg-neutral-700/30">
             <td className="px-2 pt-1 pb-2" colSpan={5}>
                 <Textarea aria-label="メモ" placeholder="メモ" value={draft.memo} onChange={event => patch('memo', event.target.value)} disabled={finance.saving} className="w-full resize-none" rows={2} />
                 <div className="flex flex-wrap gap-2 mt-2">
@@ -82,7 +82,7 @@ export function PlanTable({ finance }: { finance: FinanceState }) {
                                 <th scope="col" className={`${TH} w-8 pr-0 hidden sm:table-cell`}><span className="sr-only">操作</span></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+                        <tbody className="divide-y divide-neutral-300 dark:divide-neutral-700">
                             {rows.map(row => draft?.id === row.id ? <Fragment key={row.id}>{editor}</Fragment> : (
                                 <tr key={row.id} className={canEdit ? CLICKABLE : ''} onClick={() => { if (canEdit) finance.editEvent(row); }} {...note.rowProps(row.id, row.memo ?? '')}>
                                     <td className={TD}>

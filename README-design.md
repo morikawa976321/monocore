@@ -10,7 +10,7 @@ AIコーディングエージェントは、本ガイドラインに記載され
 
 ## 2. 制約と基本方針
 1. **Tailwind標準クラスのみを使用**: 独自クラスや、任意の値（例: `w-[123px]`、`rounded-[3px]`）は使用禁止。
-2. **完全な白と黒の禁止**: コントラストが強すぎる完全な白（`white`）と黒（`black`）の使用は禁止し、カラーパレットの両端（例: `neutral-50` や `neutral-950`）で代用すること。
+2. **大きな面に極端な白と黒を使わない**（2026-10-24改訂。本人の指針: design-system の `worldview.md`「大きな面の明るさ」）: 背景・パネル・カードなど面積を大きく占める場所には、`white`・`black` と、それに近い `neutral-50`・`neutral-100`・`neutral-950` を使わない。目安は灰の値（0〜255）で 20〜224 で、守る線ではなく参考値。文字・線・小さな印など面積の小さい場所には当てない（本文の `dark:text-neutral-50` などはそのまま使う）。`white`・`black` クラス自体は引き続き使わない（§10）。
 3. **影（Shadow）の完全撤廃**: `shadow-*` クラスは一切使用しない。階層（Elevation）は、**ボーダー（`border`）と背景色の明暗（Light/Dark）のみ**で表現する。
 4. **角丸（Border Radius）の最小化**: プロフェッショナルな硬質感を出すため、過度な角丸は禁止。
 5. **過度なアニメーションの禁止**: 装飾目的のアニメーション（`animate-bounce`など）は禁止。ボタンのHoverやFocus、操作のフィードバックといった実用目的のみに限定する。
@@ -28,19 +28,21 @@ AIコーディングエージェントは、本ガイドラインに記載され
   - Active/Selected状態は、通常状態より明確に1段以上コントラストを上げること（背景・文字・枠線のいずれか、推奨は複合）。
 
 ## 3. カラーパレット（Light / Dark）
-使用できる色は以下の**ニュートラル（Neutral）系、アクセントのアンバー（Amber）、破壊操作のアクセントのレッド（Red）、および透明（transparent）のみ**とする（※Redはキャンセル確認や致命的なエラーにのみ使用を許可する）。現時点での独自色の追加は禁止。
+使用できる色は以下の**ニュートラル（Neutral）系、アクセントのアンバー（Amber）、破壊操作のアクセントのレッド（Red）、および透明（transparent）のみ**とする（※Redはキャンセル確認や致命的なエラーにのみ使用を許可する）。独自の色相の追加は禁止（neutral の中間の段は下記「背景」の条件でだけ足してよい）。
 常に `dark:` バリアントを併記し、ダークモードに対応させること。
 
-- **背景 (Background / Surface)**
-  - App Background: `bg-neutral-100` / Dark: `bg-neutral-950`
-  - Base Surface (Card/Menu/Panel): `bg-neutral-50` / Dark: `bg-neutral-900`
-  - Sub Surface (Hovered/Selected): `bg-neutral-200` / Dark: `bg-neutral-800`
+- **背景 (Background / Surface)** — §2-2 に合わせて2026-10-24に改訂。ページとパネルの明るさの差は、旧値（ページ100・パネル50 / Dark: 950・900）より少し大きい程度に抑える（本人指定）
+  - App Background: `bg-neutral-250` / Dark: `bg-neutral-900`
+  - Base Surface (Card/Menu/Panel/Header/Input): `bg-neutral-200` / Dark: `bg-neutral-800`
+  - Sub Surface (Hovered/Selected、コード・表の見出しセル): `bg-neutral-300` / Dark: `bg-neutral-700`
+  - パネル内の見出し帯・表の見出し行: `bg-neutral-200`（パネルと同色）/ Dark: `bg-neutral-700/30`。表の見出し行は Light: `bg-neutral-250`
+  - `neutral-250` は Tailwind に無い段で、`src/app/globals.css` の `@theme` に `oklch(90% 0 none)` として定義している。200（灰229）と300（灰212）の間に段が無く、標準の段だけではページとパネルの差を小さくできないため。**独自に足してよいのは、§2-2 の目安に収めるための neutral の中間の段だけ**で、いまは250の1つ
 
 - **ボーダー (Border)** — **状態ではなく役割で選ぶ**（2026-08-09に実装の実態へ合わせて改訂。旧規定は Default=200/800 / Focus·Active=400/600 という状態の軸だけを持っており、実装が使っている役割の軸を記述していなかった）
   - **囲みの外枠** (Card / Section / Panel — 単独で立つ箱の外周): `border-neutral-400` / Dark: `border-neutral-600`
-  - **内部の区切り線** (header の下線・footer の上線・ドロワーやサイドバーの縁・テーブル罫線・`hr`・`h2` の下線): `border-neutral-200` / Dark: `border-neutral-800`
-  - **オーバーレイの小箱** (暗転した背景の上に浮く「同期中…」等): `border-neutral-200` / Dark: `border-neutral-800`。背景が暗転しているぶん枠は弱くてよい
-  - **Focus/Active**: `focus:border-neutral-400` / Dark: `focus:border-neutral-600`（入力欄など、平常時が200/800のものに当てる）
+  - **内部の区切り線** (header の下線・footer の上線・ドロワーやサイドバーの縁・テーブル罫線・`hr`・`h2` の下線): `border-neutral-300` / Dark: `border-neutral-700`
+  - **オーバーレイの小箱** (暗転した背景の上に浮く「同期中…」等): `border-neutral-300` / Dark: `border-neutral-700`。背景が暗転しているぶん枠は弱くてよい
+  - **Focus/Active**: `focus:border-neutral-400` / Dark: `focus:border-neutral-600`（入力欄など、平常時が300/700のものに当てる）
   - ボタンはこの表に含めない。**ボタンは必ず `components/ui/Button` を使う**（§8）。単独で立つ操作要素（FAB・全幅トグル等）も `<button>` である限り Button の `color`（primary / secondary / danger / ghost / link）で表現し、「囲みの外枠」トークンは Card / Section / Panel のような非操作コンテナ専用とする
 
 - **テキスト (Text)**
@@ -102,8 +104,8 @@ AIエージェントは、以下のクラスの組み合わせルールにのみ
   - **`ref` はforwardされる**（React 19のref-as-prop）。フォーカス復帰など、呼び出し側でDOM参照が要る箇所で使える。
   - Buttonが表現できない形が必要なら、**手書きせずButtonに `color` / `size` のバリアントを足す**。
 - **Surface / Card / Panel**
-  - Light: `bg-neutral-50 border border-neutral-400`
-  - Dark: `dark:bg-neutral-900 dark:border-neutral-600`
+  - Light: `bg-neutral-200 border border-neutral-400`
+  - Dark: `dark:bg-neutral-800 dark:border-neutral-600`
   - 共通: `rounded p-4` または `p-6`
   - （2026-08-09改訂。上の「ボーダー」の**囲みの外枠**に揃えた。旧記載は200/800で、ProjectCard・DaySection・各セクションの実装と食い違っていた）
 - **Input / Textarea** — **クラスを手書きしない。必ず `components/ui/Input` / `Textarea` を使う**。

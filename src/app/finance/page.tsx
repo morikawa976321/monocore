@@ -16,7 +16,7 @@ export default function FinancePage() {
     const finance = useFinance(client);
 
     return (
-        <div className="flex flex-col h-screen bg-neutral-100 dark:bg-neutral-950">
+        <div className="flex flex-col h-screen bg-neutral-250 dark:bg-neutral-900">
             <PageHeader title="Finance" onRefresh={() => void finance.refresh()} isRefreshing={finance.saving}>
                 {finance.isLoading && (
                     <div className="inline-flex items-center gap-2">
@@ -55,8 +55,8 @@ export default function FinancePage() {
                 </div>
 
                 {finance.isLoading && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-100/80 dark:bg-neutral-950/80">
-                        <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 rounded p-4">
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-250/80 dark:bg-neutral-900/80">
+                        <div className="flex items-center gap-2 bg-neutral-200 border border-neutral-300 dark:bg-neutral-800 dark:border-neutral-700 rounded p-4">
                             <LoadingIndicator />
                             <span className="text-sm text-neutral-700 dark:text-neutral-300">同期中…</span>
                         </div>

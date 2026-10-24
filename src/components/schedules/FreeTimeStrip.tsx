@@ -8,8 +8,8 @@ const DAY_MINUTES = 24 * 60;
  * （neutral-200 / dark:800 は背景とほぼ同じで見分けられなかった、2026-10-07 本人指摘）。
  */
 const KIND_CLASS: Record<SlotKind, string> = {
-    sleep: 'bg-neutral-300 dark:bg-neutral-600',
-    busy: 'bg-neutral-500 dark:bg-neutral-400',
+    sleep: 'bg-neutral-400 dark:bg-neutral-600',
+    busy: 'bg-neutral-600 dark:bg-neutral-400',
     free: 'bg-amber-500/40 dark:bg-amber-500/40',
 };
 
@@ -43,7 +43,7 @@ export function FreeTimeStrip({ analysis, nowMinutes }: FreeTimeStripProps) {
             {TICKS.map((h) => (
                 <div
                     key={h}
-                    className={`absolute bottom-0 -translate-x-1/2 bg-neutral-50 dark:bg-neutral-900 ${h % 6 === 0 ? 'top-0 w-0.5' : 'h-1/2 w-px'}`}
+                    className={`absolute bottom-0 -translate-x-1/2 bg-neutral-200 dark:bg-neutral-800 ${h % 6 === 0 ? 'top-0 w-0.5' : 'h-1/2 w-px'}`}
                     style={{ left: `${percent(h * 60)}%` }}
                 />
             ))}

@@ -64,13 +64,13 @@ export function DaySection({
         <section
             // 今日のセクションだけ親から渡されたrefを当て、初期スクロール先に使う。
             ref={isToday ? todayRef : null}
-            className={`group rounded bg-neutral-50 dark:bg-neutral-900 overflow-hidden ${isToday
+            className={`group rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden ${isToday
                     ? 'border-2 border-amber-500 dark:border-amber-500'
                     : 'border border-neutral-400 dark:border-neutral-600'
                 }`}
         >
             {/* 日付行。本文の解析結果に応じて警告ラベルも表示する。 */}
-            <header className="px-2 sm:px-4 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-sm leading-6 flex items-center justify-between">
+            <header className="px-2 sm:px-4 py-2 border-b border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-700/30 text-sm leading-6 flex items-center justify-between">
                 <div className="flex items-center text-neutral-700 dark:text-neutral-300">
                     <span>{entry.dateLabel}</span>
                     {/* 不正な行がある日だけ警告表示する。その日は保存されない。PC では帯の左端が日ごとに
