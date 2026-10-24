@@ -70,7 +70,7 @@ export function FinanceChart({ measurements, future }: { measurements: Measureme
                         className="block w-full h-full"
                     >
                         {/* 縦横比を固定しない SVG なので、線はすべて non-scaling-stroke にする。無いと線幅と破線の間隔が縦横で別々に伸び、水平な区間ほど太く見える */}
-                        <g className="stroke-current text-neutral-200 dark:text-neutral-800" strokeWidth="1">
+                        <g className="stroke-current text-neutral-300 dark:text-neutral-700" strokeWidth="1">
                             {levels.map(value => <line key={`y${value}`} x1="8" x2="472" y1={y(value)} y2={y(value)} vectorEffect="non-scaling-stroke" />)}
                             {years.map(serial => <line key={`x${serial}`} x1={xAt(serial)} x2={xAt(serial)} y1="8" y2="88" vectorEffect="non-scaling-stroke" />)}
                         </g>

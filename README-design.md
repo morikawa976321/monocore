@@ -34,8 +34,9 @@ AIコーディングエージェントは、本ガイドラインに記載され
 - **背景 (Background / Surface)** — §2-2 に合わせて2026-10-24に改訂。ページとパネルの明るさの差は、旧値（ページ100・パネル50 / Dark: 950・900）より少し大きい程度に抑える（本人指定）
   - App Background: `bg-neutral-250` / Dark: `bg-neutral-900`
   - Base Surface (Card/Menu/Panel/Header/Input): `bg-neutral-200` / Dark: `bg-neutral-800`
-  - Sub Surface (Hovered/Selected、コード・表の見出しセル): `bg-neutral-300` / Dark: `bg-neutral-700`
-  - パネル内の見出し帯・表の見出し行: `bg-neutral-200`（パネルと同色）/ Dark: `bg-neutral-700/30`。表の見出し行は Light: `bg-neutral-250`
+  - Sub Surface (Hovered/Selected、レポート本文のコード・表の見出しセル): `bg-neutral-300` / Dark: `bg-neutral-700`
+  - パネル内の見出し帯（カードの header）: `bg-neutral-200`（パネルと同色）/ Dark: `bg-neutral-700/30`
+  - パネル内で編集中の行（Finance の表の入力行）: `bg-neutral-250` / Dark: `bg-neutral-700/30`
   - `neutral-250` は Tailwind に無い段で、`src/app/globals.css` の `@theme` に `oklch(90% 0 none)` として定義している。200（灰229）と300（灰212）の間に段が無く、標準の段だけではページとパネルの差を小さくできないため。**独自に足してよいのは、§2-2 の目安に収めるための neutral の中間の段だけ**で、いまは250の1つ
 
 - **ボーダー (Border)** — **状態ではなく役割で選ぶ**（2026-08-09に実装の実態へ合わせて改訂。旧規定は Default=200/800 / Focus·Active=400/600 という状態の軸だけを持っており、実装が使っている役割の軸を記述していなかった）
