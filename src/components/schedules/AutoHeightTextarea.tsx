@@ -22,21 +22,33 @@ export function AutoHeightTextarea({
         fitHeight(ref.current);
     }, [value]);
 
-    // 欄の幅が変わると（画面幅の変更、親にスクロールバーが出る等）折り返しが変わり、画面幅が sm をまたげば
-    // 文字の大きさ・行の高さも変わる。値が同じでも測り直す（測り直さないと overflow: hidden で最終行が欠ける）。
-    // 見るのは幅だけ。高さの変化は fitHeight 自身が起こすので、それに反応すると測り直しが連鎖する。
+    // 値が同じでも、欄の幅が変われば（親にスクロールバーが出る等）折り返しが変わり、画面幅が sm をまたげば
+    // 文字の大きさ・行の高さが変わる。どちらでも測り直す（測り直さないと overflow: hidden で最終行が欠ける）。
+    // 画面の回転では欄の幅が同じまま sm をまたぐことがあるので、欄の幅とは別に画面の resize も見る。
+    // 欄は幅だけ見る（高さの変化は fitHeight 自身が起こす）。測り直しは次のフレームに送る。ResizeObserver の
+    // 通知の中で高さを変えると「ResizeObserver loop completed with undelivered notifications」が出る。
     useLayoutEffect(() => {
         const ta = ref.current;
         if (!ta) return;
+        let raf = 0;
+        const refit = () => {
+            window.cancelAnimationFrame(raf);
+            raf = window.requestAnimationFrame(() => fitHeight(ta));
+        };
         let width = ta.getBoundingClientRect().width;
         const ro = new ResizeObserver(() => {
             const w = ta.getBoundingClientRect().width;
             if (w === width) return;
             width = w;
-            fitHeight(ta);
+            refit();
         });
         ro.observe(ta);
-        return () => ro.disconnect();
+        window.addEventListener('resize', refit);
+        return () => {
+            ro.disconnect();
+            window.removeEventListener('resize', refit);
+            window.cancelAnimationFrame(raf);
+        };
     }, []);
 
     return (
