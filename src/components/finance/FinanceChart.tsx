@@ -13,9 +13,13 @@ const AXIS = 'text-sm tabular-nums text-neutral-700 dark:text-neutral-300';
 type Key = 'total' | 'cash' | 'nisa';
 type Row = Balance & { total: number };
 
-/** 描く順(後ろほど上に重なる)。線の色と、線端ラベルの名前・文字色。 */
+/**
+ * 描く順(後ろほど上に重なる)。線の色と、線端ラベルの名前・文字色。
+ * NISA の線はカードの背景(neutral-200 / neutral-800)から4段離す。3段以下だと背景に溶ける(本人の指摘 2026-10-24)。
+ * 合計(neutral-900 / neutral-50)とは明度で分け、最新実測月の縦線(neutral-500)とは同じ色にしない。
+ */
 const SERIES: { key: Key; name: string; line: string; label: string }[] = [
-    { key: 'nisa', name: 'NISA', line: 'text-neutral-400 dark:text-neutral-500', label: 'text-neutral-700 dark:text-neutral-300' },
+    { key: 'nisa', name: 'NISA', line: 'text-neutral-600 dark:text-neutral-400', label: 'text-neutral-700 dark:text-neutral-300' },
     { key: 'cash', name: 'Cash', line: 'text-amber-600 dark:text-amber-400', label: 'text-amber-600 dark:text-amber-400' },
     { key: 'total', name: '合計', line: 'text-neutral-900 dark:text-neutral-50', label: 'text-neutral-900 dark:text-neutral-50' },
 ];
