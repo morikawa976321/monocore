@@ -22,12 +22,21 @@ export function AutoHeightTextarea({
         fitHeight(ref.current);
     }, [value]);
 
-    // 画面幅が変わると折り返しと、sm: で切り替える文字の大きさ・行の高さが変わる。値が同じでも測り直す
-    // （測り直さないと overflow: hidden で最終行が欠ける）。
+    // 欄の幅が変わると（画面幅の変更、親にスクロールバーが出る等）折り返しが変わり、画面幅が sm をまたげば
+    // 文字の大きさ・行の高さも変わる。値が同じでも測り直す（測り直さないと overflow: hidden で最終行が欠ける）。
+    // 見るのは幅だけ。高さの変化は fitHeight 自身が起こすので、それに反応すると測り直しが連鎖する。
     useLayoutEffect(() => {
-        const onResize = () => fitHeight(ref.current);
-        window.addEventListener('resize', onResize);
-        return () => window.removeEventListener('resize', onResize);
+        const ta = ref.current;
+        if (!ta) return;
+        let width = ta.getBoundingClientRect().width;
+        const ro = new ResizeObserver(() => {
+            const w = ta.getBoundingClientRect().width;
+            if (w === width) return;
+            width = w;
+            fitHeight(ta);
+        });
+        ro.observe(ta);
+        return () => ro.disconnect();
     }, []);
 
     return (
