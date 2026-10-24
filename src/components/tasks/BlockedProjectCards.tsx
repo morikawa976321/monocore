@@ -68,7 +68,8 @@ function SlotCard({ name, project, cardClassName, headerClassName, bodyClassName
                     }}
                     placeholder="タスク（1行に1つ）"
                     aria-label={`${name}のタスク`}
-                    className="min-h-6 resize-none leading-6"
+                    // 文字の大きさは予定の本文・Inbox と同じ（狭い画面は text-sm、sm 以上は text-base）。
+                    className="min-h-6 resize-none leading-6 sm:text-base sm:leading-7"
                     spellCheck={false}
                     autoComplete="off"
                     autoCorrect="off"
