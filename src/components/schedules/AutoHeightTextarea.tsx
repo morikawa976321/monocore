@@ -1,6 +1,12 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { Textarea } from '@/src/components/ui/Textarea';
 
+function fitHeight(ta: HTMLTextAreaElement | null) {
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+}
+
 /** 内容に応じて高さが自動調整される textarea。 */
 export function AutoHeightTextarea({
     value,
@@ -13,11 +19,16 @@ export function AutoHeightTextarea({
 
     // useLayoutEffect: 親のスクロール補正より前に高さを確定させる（useEffect だと1フレーム遅れて伸びる）。
     useLayoutEffect(() => {
-        const ta = ref.current;
-        if (!ta) return;
-        ta.style.height = 'auto';
-        ta.style.height = ta.scrollHeight + 'px';
+        fitHeight(ref.current);
     }, [value]);
+
+    // 画面幅が変わると折り返しと、sm: で切り替える文字の大きさ・行の高さが変わる。値が同じでも測り直す
+    // （測り直さないと overflow: hidden で最終行が欠ける）。
+    useLayoutEffect(() => {
+        const onResize = () => fitHeight(ref.current);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     return (
         <Textarea
