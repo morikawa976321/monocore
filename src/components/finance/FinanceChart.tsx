@@ -2,9 +2,9 @@ import type { Balance, Measurement } from '@/src/lib/finance/projection';
 import { displayedRows, totalOf } from '@/src/lib/finance/projection';
 import { currentMonth, monthNumber } from '@/src/lib/finance/month';
 
-/** グリッドの間隔。月の通し番号は年×12 なので、60 の倍数がちょうど5の倍数の年の1月になる。 */
-const GRID_MONTHS = 60;
-const GRID_YEN = 5_000_000;
+/** グリッドの間隔。月の通し番号は年×12 なので、12 の倍数がちょうど各年の1月になる。 */
+const GRID_MONTHS = 12;
+const GRID_YEN = 1_000_000;
 /** 線端ラベルどうしの最小間隔(viewBox の縦 96 に対する単位)。h-64 で約21px、text-sm の行高 20px を超える。 */
 const LABEL_GAP = 8;
 /** 縦横の目盛の文字。補助テキスト(MUTED)と同じ色。 */
@@ -26,7 +26,7 @@ const SERIES: { key: Key; name: string; line: string; label: string }[] = [
 
 /**
  * 合計・Cash・NISA の折れ線(実測は実線、予測は破線、縦の点線は最新実測月)。
- * 縦横の薄いグリッドを敷き、同じ位置に目盛の数を置く(本人の指示 2026-10-23: 横は5年ごと、縦は500万円ごと、単位なし)。
+ * 縦横の薄いグリッドを敷き、同じ位置に目盛の数を置く(本人の指示: 単位なし 2026-10-23、横は1年ごと・縦は100万円ごと 2026-10-26)。
  * 凡例は持たず、線の右端に系列名と終点の額を置く(本人の指示 2026-10-23: 3本を見分けるため)。
  */
 export function FinanceChart({ measurements, future }: { measurements: Measurement[]; future: Balance[] }) {
