@@ -1,4 +1,4 @@
-import { localTimeToUtc } from '../date';
+import { localTimeToUtc, utcToLocalTime } from '../date';
 import { dayContentToScheduleItems } from './text-format';
 
 /**
@@ -30,7 +30,8 @@ export function timerStateAt(dateStr: string, content: string, timezone: string,
         .map((item) => ({
             activity: firstLine(item.activity),
             start: Date.parse(item.start_at),
-            end: Date.parse(item.end_at!),
+            // 終了の 2359 は24時として数える(free-time.ts と同じ。テキストに 2400 は書けない)。
+            end: Date.parse(item.end_at!) + (utcToLocalTime(item.end_at!, timezone).hhmm === '2359' ? 60_000 : 0),
         }))
         .filter((b) => b.end > b.start)
         .sort((a, b) => a.start - b.start);

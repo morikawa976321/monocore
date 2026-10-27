@@ -52,6 +52,12 @@ describe('timerStateAt', () => {
         expect(s.kind === 'active' && [s.activity, s.end]).toEqual(['打合せ', at('1430')]);
     });
 
+    it('終了の 2359 は24時として数える', () => {
+        const s = timerStateAt(DAY, '2200-2359 作業', TZ, at('2359', 30));
+        expect(s.kind === 'active' && s.end).toBe(at('2359') + 60_000);
+        expect(timerStateAt(DAY, '2359-2359 作業', TZ, at('2359', 30)).kind).toBe('active');
+    });
+
     it('不正な行は無視する', () => {
         expect(timerStateAt(DAY, 'メモだけの行\n2500-2600 不正', TZ, at('1200'))).toEqual({ kind: 'idle', next: null });
     });

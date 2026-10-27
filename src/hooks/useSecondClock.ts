@@ -19,18 +19,32 @@ function tick() {
 }
 
 function start(): () => void {
+    let url: string | null = null;
+    let worker: Worker | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const release = () => {
+        worker?.terminate();
+        worker = null;
+        if (url) URL.revokeObjectURL(url);
+        url = null;
+    };
+    const switchToInterval = () => {
+        release();
+        if (intervalId === null) intervalId = setInterval(tick, 1000);
+    };
     try {
-        const url = URL.createObjectURL(new Blob([WORKER_SOURCE], { type: 'text/javascript' }));
-        const worker = new Worker(url);
+        url = URL.createObjectURL(new Blob([WORKER_SOURCE], { type: 'text/javascript' }));
+        worker = new Worker(url);
         worker.onmessage = tick;
-        return () => {
-            worker.terminate();
-            URL.revokeObjectURL(url);
-        };
+        // 生成のあとで読み込みや起動に失敗したときは error イベントで来る(例外にならない)。
+        worker.onerror = switchToInterval;
     } catch {
-        const id = setInterval(tick, 1000);
-        return () => clearInterval(id);
+        switchToInterval();
     }
+    return () => {
+        release();
+        if (intervalId !== null) clearInterval(intervalId);
+    };
 }
 
 function subscribe(listener: () => void): () => void {
