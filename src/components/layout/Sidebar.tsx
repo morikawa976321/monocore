@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
     Clock,
+    CloudSun,
     FileText,
     Menu,
     Newspaper,
@@ -17,6 +18,7 @@ import { Button } from "@/src/components/ui/Button";
 
 const MENU_ITEMS = [
     { href: "/schedules", icon: Clock, label: "Schedule" },
+    { href: "/weather", icon: CloudSun, label: "Weather" },
     { href: "/reports", icon: FileText, label: "Reports" },
     { href: "/news", icon: Newspaper, label: "News" },
     { href: "/finance", icon: Wallet, label: "Finance" },
