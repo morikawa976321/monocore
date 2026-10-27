@@ -358,9 +358,18 @@ export function useSchedules(
         await reloadSchedules(stamp ?? undefined);
     }, [rangeStart, rangeEnd, tz, readStamp, reloadSchedules]);
 
+    // 今日の節へ飛ぶのは一覧のスクロール枠だけを動かす。scrollIntoView は祖先のスクロールを全部動かすので、
+    // スマホで h-screen(100vh)がアドレスバーの分だけ見える高さより大きいとき、文書ごと下へずれてヘッダーが画面外へ出る。
+    const scrollToToday = useCallback(() => {
+        const container = scrollContainerRef.current;
+        const section = todaySectionRef.current;
+        if (!container || !section) return;
+        container.scrollTop += section.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    }, []);
+
     useEffect(() => {
         if (!todayStr || entries.length === 0) return;
-        todaySectionRef.current?.scrollIntoView({ block: 'start' });
+        scrollToToday();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [todayStr]);
 
@@ -376,8 +385,8 @@ export function useSchedules(
     useLayoutEffect(() => {
         if (!scrollTodayAfterInitialMergeRef.current || !todayStr) return;
         scrollTodayAfterInitialMergeRef.current = false;
-        todaySectionRef.current?.scrollIntoView({ block: 'start' });
-    }, [entries, todayStr]);
+        scrollToToday();
+    }, [entries, todayStr, scrollToToday]);
 
     const clearDebounceTimer = useCallback(() => {
         if (!debounceTimerRef.current) return;
