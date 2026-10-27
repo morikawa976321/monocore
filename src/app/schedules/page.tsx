@@ -5,6 +5,7 @@ import { createClient } from '@/src/lib/supabase/client';
 import { InboxPanel } from '@/src/components/inbox/InboxPanel';
 import { TasksPanel } from '@/src/components/tasks/TasksPanel';
 import { DaySection } from '@/src/components/schedules/DaySection';
+import { ScheduleTimerBar, ScheduleTimerChip, ScheduleTimerPanel } from '@/src/components/schedules/ScheduleTimer';
 import { Button } from '@/src/components/ui/Button';
 import { useBlockedProjects } from '@/src/hooks/useBlockedProjects';
 import { useInbox } from '@/src/hooks/useInbox';
@@ -78,9 +79,13 @@ export default function SchedulesPage() {
     const [tasksOpen, setTasksOpen] = useState(false);
     const tasks = useBlockedProjects(supabase);
 
+    // タイマーのモーダルも同じ形で、Inbox・Tasks と同時には開かない(本人指定 2026-10-27「既存の2モーダルと同じ挙動でいい」)。
+    const [timerOpen, setTimerOpen] = useState(false);
+
     const handleInboxToggle = () => {
         if (inboxOpen) saveInboxNow();
         setTasksOpen(false);
+        setTimerOpen(false);
         setInboxOpen((prev) => !prev);
     };
 
@@ -89,8 +94,18 @@ export default function SchedulesPage() {
             saveInboxNow();
             setInboxOpen(false);
         }
+        setTimerOpen(false);
         if (!tasksOpen) void tasks.reload();
         setTasksOpen((prev) => !prev);
+    };
+
+    const handleTimerToggle = () => {
+        if (inboxOpen) {
+            saveInboxNow();
+            setInboxOpen(false);
+        }
+        setTasksOpen(false);
+        setTimerOpen((prev) => !prev);
     };
 
     return (
@@ -99,6 +114,8 @@ export default function SchedulesPage() {
                 title="Schedules"
                 onRefresh={() => void reloadSchedules()}
                 isRefreshing={isResumeSyncing}
+                titleAccessory={<ScheduleTimerChip entries={entries} onOpen={handleTimerToggle} />}
+                underline={<ScheduleTimerBar entries={entries} />}
             >
                 {isInitialSyncing && (
                     <div className="inline-flex items-center gap-2">
@@ -230,6 +247,8 @@ export default function SchedulesPage() {
                         onClose={() => setTasksOpen(false)}
                     />
                 )}
+
+                {timerOpen && <ScheduleTimerPanel entries={entries} onClose={() => setTimerOpen(false)} />}
 
                 {inboxOpen && (
                     <InboxPanel
