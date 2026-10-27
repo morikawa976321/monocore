@@ -14,17 +14,27 @@ export function useWeather(today: string | null) {
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const hasLoaded = useRef(false)
+    const latestRequest = useRef(0)
 
     const load = useCallback(async () => {
+        // 23:59 の手動更新と 0:00 の自動取得が重なったとき、遅れて届いた前日の応答で巻き戻さない
+        const request = ++latestRequest.current
         if (hasLoaded.current) {
             setIsRefreshing(true)
         } else {
             setIsInitialLoading(true)
         }
+        let result: OpenMeteoForecast | null = null
         try {
-            setForecast(await fetchForecast(getDefaultTimezone()))
-            setErrorMessage(null)
+            result = await fetchForecast(getDefaultTimezone())
         } catch {
+            // 下で、最新の要求のときだけ失敗を出す
+        }
+        if (request !== latestRequest.current) return
+        if (result) {
+            setForecast(result)
+            setErrorMessage(null)
+        } else {
             setErrorMessage('天気の読み込みに失敗しました。')
         }
         hasLoaded.current = true
