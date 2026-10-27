@@ -33,8 +33,10 @@ function span({ state, now }: Timer): { from: number; to: number; remaining: num
     return { from, to, remaining: Math.min(1, Math.max(0, (to - now) / (to - from))) };
 }
 
-function clock(t: number, timezone: string): string {
+/** 時刻の HH:MM。区間の終わり(end)が翌日の 0:00 なら 24:00 と書く(終了の 2359 は24時として数えるため)。 */
+function clock(t: number, timezone: string, end = false): string {
     const { hhmm } = utcToLocalTime(new Date(t).toISOString(), timezone);
+    if (end && hhmm === '0000') return '24:00';
     return `${hhmm.slice(0, 2)}:${hhmm.slice(2)}`;
 }
 
@@ -132,8 +134,10 @@ export function ScheduleTimerPanel({ entries, onClose }: ScheduleTimerPanelProps
 
     return (
         <OverlayPanel label="タイマー" onClose={onClose}>
-            {/* 4つを1つの塊にして上下中央に置く(本人指定 2026-10-28: 「中央に要素をもう少しギュッと詰めて」)。 */}
-            <div className="@container flex min-h-0 flex-1 flex-col justify-center gap-6 p-6 sm:gap-8 sm:p-12">
+            {/* 4つを1つの塊にして上下中央に置く(本人指定 2026-10-28: 「中央に要素をもう少しギュッと詰めて」)。
+                横向きのスマホなど塊が高さに収まらないときは、safe で上揃えに戻してスクロールさせる(ただの center だと
+                はみ出しが上下に振り分けられ、予定名の上端が枠の外で切れて読めない)。 */}
+            <div className="@container flex min-h-0 flex-1 flex-col justify-center-safe gap-6 overflow-y-auto p-6 sm:gap-8 sm:p-12">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
                     <p
                         className={`min-w-0 truncate text-4xl font-medium sm:text-6xl ${s?.kind === 'active' ? 'text-neutral-900 dark:text-neutral-50' : 'text-neutral-700 dark:text-neutral-300'}`}
@@ -142,13 +146,13 @@ export function ScheduleTimerPanel({ entries, onClose }: ScheduleTimerPanelProps
                     </p>
                     {timer && sp && (
                         <p className="text-lg tabular-nums text-neutral-700 sm:text-2xl dark:text-neutral-300">
-                            {clock(sp.from, timer.timezone)}–{clock(sp.to, timer.timezone)}
+                            {clock(sp.from, timer.timezone)}–{clock(sp.to, timer.timezone, true)}
                         </p>
                     )}
                 </div>
                 {timer && sp && <BigRemaining text={formatRemaining(sp.to - timer.now)} />}
                 {sp && (
-                    <div className="relative h-16 overflow-hidden rounded-sm bg-neutral-300 sm:h-24 dark:bg-neutral-700" aria-hidden="true">
+                    <div className="relative h-16 shrink-0 overflow-hidden rounded-sm bg-neutral-300 sm:h-24 dark:bg-neutral-700" aria-hidden="true">
                         <div
                             className="absolute inset-y-0 left-0 bg-amber-500 dark:bg-amber-500"
                             style={{ width: `${sp.remaining * 100}%` }}
