@@ -9,14 +9,14 @@ import { useWeather } from '@/src/hooks/useWeather'
 import { buildWeatherDays, WEATHER_LOCATION } from '@/src/lib/weather/forecast'
 
 export default function WeatherPage() {
-    const { forecast, isInitialLoading, isRefreshing, errorMessage, reload } = useWeather()
     const now = useNow()
-    // now は毎分変わるが、表の先頭の行が進むのは時が変わったときだけ
     const today = now?.today ?? null
-    const currentHour = now === null ? null : Math.floor(now.nowMinutes / 60)
+    const nowMinutes = now?.nowMinutes ?? null
+    const { forecast, isInitialLoading, isRefreshing, errorMessage, reload } = useWeather(today)
+    // 日の出・日の入りの行は過ぎた分で消えるので、毎分組み直す
     const days = useMemo(
-        () => (forecast && today !== null && currentHour !== null ? buildWeatherDays(forecast, today, currentHour) : []),
-        [forecast, today, currentHour]
+        () => (forecast && today !== null && nowMinutes !== null ? buildWeatherDays(forecast, today, nowMinutes) : []),
+        [forecast, today, nowMinutes]
     )
 
     return (

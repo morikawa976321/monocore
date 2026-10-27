@@ -67,10 +67,11 @@ function minutesOf(localIso: string): number {
 
 /**
  * 今の時刻の行から明日の終わりまでを日ごとに分け、日の出・日の入りの行をその時刻を含む行の直後に差し込む。
- * today は 'YYYY-MM-DD'、currentHour は 0〜23(どちらも予報と同じ timezone)。
+ * 過ぎた日の出・日の入りは出さない。today は 'YYYY-MM-DD'、nowMinutes は 0 時からの分(どちらも予報と同じ timezone)。
  */
-export function buildWeatherDays(forecast: OpenMeteoForecast, today: string, currentHour: number): WeatherDay[] {
+export function buildWeatherDays(forecast: OpenMeteoForecast, today: string, nowMinutes: number): WeatherDay[] {
     const { hourly, daily } = forecast
+    const currentHour = Math.floor(nowMinutes / 60)
     const sun = new Map(daily.time.map((date, i) => [date, { sunrise: daily.sunrise[i], sunset: daily.sunset[i] }]))
     const days: WeatherDay[] = []
 
@@ -107,7 +108,7 @@ export function buildWeatherDays(forecast: OpenMeteoForecast, today: string, cur
         if (!s) return
         for (const kind of ['sunrise', 'sunset'] as const) {
             const m = minutesOf(s[kind])
-            if (Math.floor(m / 60) === hour) {
+            if (Math.floor(m / 60) === hour && !(date === today && m < nowMinutes)) {
                 day.rows.push({ kind, time: `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` })
             }
         }

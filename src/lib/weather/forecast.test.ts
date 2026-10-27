@@ -36,7 +36,7 @@ const hours = (rows: WeatherDay['rows']) => rows.filter((r): r is WeatherHourRow
 
 describe('buildWeatherDays', () => {
     it('今の時刻の行から始め、日ごとに分ける', () => {
-        const days = buildWeatherDays(forecast(['2026-10-27', '2026-10-28']), '2026-10-27', 21)
+        const days = buildWeatherDays(forecast(['2026-10-27', '2026-10-28']), '2026-10-27', 21 * 60 + 30)
         expect(days.map((d) => d.date)).toEqual(['2026-10-27', '2026-10-28'])
         expect(hours(days[0].rows).map((r) => r.hour)).toEqual([21, 22, 23])
         expect(hours(days[1].rows)).toHaveLength(24)
@@ -45,7 +45,7 @@ describe('buildWeatherDays', () => {
     })
 
     it('日の出・日の入りは、その時刻を含む行の直後に入る', () => {
-        const [, tomorrow] = buildWeatherDays(forecast(['2026-10-27', '2026-10-28']), '2026-10-27', 21)
+        const [, tomorrow] = buildWeatherDays(forecast(['2026-10-27', '2026-10-28']), '2026-10-27', 21 * 60)
         const i = tomorrow.rows.findIndex((r) => r.kind === 'sunrise')
         expect(tomorrow.rows[i]).toEqual({ kind: 'sunrise', time: '5:58' })
         expect(tomorrow.rows[i - 1]).toMatchObject({ kind: 'hour', hour: 5 })
@@ -54,9 +54,12 @@ describe('buildWeatherDays', () => {
         expect(tomorrow.rows[j - 1]).toMatchObject({ kind: 'hour', hour: 16 })
     })
 
-    it('過ぎた日の出・日の入りは出さない', () => {
-        const [today] = buildWeatherDays(forecast(['2026-10-27', '2026-10-28']), '2026-10-27', 21)
-        expect(today.rows.some((r) => r.kind !== 'hour')).toBe(false)
+    it('過ぎた日の出・日の入りは、同じ時間帯の行が残っていても出さない', () => {
+        const [before] = buildWeatherDays(forecast(['2026-10-27']), '2026-10-27', 16 * 60 + 49)
+        expect(before.rows.some((r) => r.kind === 'sunset')).toBe(true)
+        const [after] = buildWeatherDays(forecast(['2026-10-27']), '2026-10-27', 16 * 60 + 59)
+        expect(after.rows[0]).toMatchObject({ kind: 'hour', hour: 16 })
+        expect(after.rows.some((r) => r.kind !== 'hour')).toBe(false)
     })
 
     it('行の始まりが日の出前か日の入り後なら夜', () => {
