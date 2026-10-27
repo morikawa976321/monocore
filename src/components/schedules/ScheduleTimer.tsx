@@ -132,7 +132,8 @@ export function ScheduleTimerPanel({ entries, onClose }: ScheduleTimerPanelProps
 
     return (
         <OverlayPanel label="タイマー" onClose={onClose}>
-            <div className="@container flex min-h-0 flex-1 flex-col p-6 sm:p-12">
+            {/* 4つを1つの塊にして上下中央に置く(本人指定 2026-10-28: 「中央に要素をもう少しギュッと詰めて」)。 */}
+            <div className="@container flex min-h-0 flex-1 flex-col justify-center gap-6 p-6 sm:gap-8 sm:p-12">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
                     <p
                         className={`min-w-0 truncate text-4xl font-medium sm:text-6xl ${s?.kind === 'active' ? 'text-neutral-900 dark:text-neutral-50' : 'text-neutral-700 dark:text-neutral-300'}`}
@@ -145,9 +146,7 @@ export function ScheduleTimerPanel({ entries, onClose }: ScheduleTimerPanelProps
                         </p>
                     )}
                 </div>
-                <div className="flex min-h-0 flex-1 items-center">
-                    {timer && sp && <BigRemaining text={formatRemaining(sp.to - timer.now)} />}
-                </div>
+                {timer && sp && <BigRemaining text={formatRemaining(sp.to - timer.now)} />}
                 {sp && (
                     <div className="relative h-16 overflow-hidden rounded-sm bg-neutral-300 sm:h-24 dark:bg-neutral-700" aria-hidden="true">
                         <div
@@ -156,7 +155,7 @@ export function ScheduleTimerPanel({ entries, onClose }: ScheduleTimerPanelProps
                         />
                     </div>
                 )}
-                <p className="mt-6 text-lg text-neutral-700 sm:text-2xl dark:text-neutral-300">{following}</p>
+                <p className="text-lg text-neutral-700 sm:text-2xl dark:text-neutral-300">{following}</p>
             </div>
         </OverlayPanel>
     );
