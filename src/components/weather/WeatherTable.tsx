@@ -39,7 +39,7 @@ const CELL = 'py-2 border-b border-neutral-300 dark:border-neutral-700'
 const MUTED = 'text-neutral-500'
 
 /** 降水量・降雪量。0 は薄く出して、降る行を目立たせる */
-function Amount({ value }: { value: number | null }) {
+export function Amount({ value }: { value: number | null }) {
     if (value === null) return <span className={MUTED}>—</span>
     if (value === 0) return <span className={MUTED}>0</span>
     return <>{Number.isInteger(value) ? value : value.toFixed(1)}</>

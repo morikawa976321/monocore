@@ -28,6 +28,10 @@ function forecast(dates: string[]): OpenMeteoForecast {
             time: dates,
             sunrise: dates.map((d) => `${d}T05:58`),
             sunset: dates.map((d) => `${d}T16:50`),
+            temperature_2m_max: dates.map(() => 20),
+            temperature_2m_min: dates.map(() => 10),
+            precipitation_probability_max: dates.map(() => 0),
+            precipitation_sum: dates.map(() => 0),
         },
     }
 }
@@ -42,6 +46,11 @@ describe('buildWeatherDays', () => {
         expect(hours(days[1].rows)).toHaveLength(24)
         expect(hours(days[0].rows)[0].isCurrent).toBe(true)
         expect(hours(days[1].rows).some((r) => r.isCurrent)).toBe(false)
+    })
+
+    it('週間予報の分が取れていても、今日と明日だけを出す', () => {
+        const days = buildWeatherDays(forecast(['2026-10-27', '2026-10-28', '2026-10-29']), '2026-10-27', 21 * 60)
+        expect(days.map((d) => d.date)).toEqual(['2026-10-27', '2026-10-28'])
     })
 
     it('日の出・日の入りは、その時刻を含む行の直後に入る', () => {

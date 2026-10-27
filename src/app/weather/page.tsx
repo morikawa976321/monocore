@@ -4,9 +4,11 @@ import { useMemo } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { WeatherTable } from '@/src/components/weather/WeatherTable'
+import { WeeklyTable } from '@/src/components/weather/WeeklyTable'
 import { useNow } from '@/src/hooks/useNow'
 import { useWeather } from '@/src/hooks/useWeather'
 import { buildWeatherDays, WEATHER_LOCATION } from '@/src/lib/weather/forecast'
+import { buildWeeklyDays } from '@/src/lib/weather/weekly'
 
 export default function WeatherPage() {
     const now = useNow()
@@ -18,6 +20,10 @@ export default function WeatherPage() {
         () => (forecast && today !== null && nowMinutes !== null ? buildWeatherDays(forecast, today, nowMinutes) : []),
         [forecast, today, nowMinutes]
     )
+    const weeklyDays = useMemo(
+        () => (forecast && today !== null ? buildWeeklyDays(forecast, today) : []),
+        [forecast, today]
+    )
 
     return (
         <div className="flex flex-col h-screen bg-neutral-250 dark:bg-neutral-900">
@@ -28,8 +34,16 @@ export default function WeatherPage() {
             <div className="flex-1 overflow-hidden relative">
                 <div className="h-full overflow-y-auto px-2 sm:px-6 py-1 sm:py-4">
                     {today !== null && days.length > 0 && (
-                        <div className="max-w-3xl mx-auto space-y-4 pb-12">
-                            <WeatherTable days={days} today={today} />
+                        <div className="max-w-6xl mx-auto space-y-4 pb-12">
+                            {/* デスクトップは1時間ごとを左、週間予報を右に並べて横幅を使う。モバイルは縦に積む */}
+                            <div className="grid gap-4 lg:grid-cols-5 items-start">
+                                <div className="lg:col-span-3">
+                                    <WeatherTable days={days} today={today} />
+                                </div>
+                                <div className="lg:col-span-2">
+                                    <WeeklyTable days={weeklyDays} />
+                                </div>
+                            </div>
                             <p className="text-sm text-neutral-700 dark:text-neutral-300">
                                 {WEATHER_LOCATION.name}の予報。データ:{' '}
                                 <a

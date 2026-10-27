@@ -19,10 +19,22 @@ const HOURLY_FIELDS = [
 
 type HourlyField = (typeof HOURLY_FIELDS)[number]
 
+const DAILY_FIELDS = [
+    'temperature_2m_max',
+    'temperature_2m_min',
+    'precipitation_probability_max',
+    'precipitation_sum',
+] as const
+
+type DailyField = (typeof DAILY_FIELDS)[number]
+
 export type OpenMeteoForecast = {
     hourly: { time: string[] } & Record<HourlyField, (number | null)[]>
-    daily: { time: string[]; sunrise: string[]; sunset: string[] }
+    daily: { time: string[]; sunrise: string[]; sunset: string[] } & Record<DailyField, (number | null)[]>
 }
+
+/** 週間予報の日数(tenki.jp と同じ2週間)。1時間ごとの表はこのうち今日・明日だけを使う */
+export const FORECAST_DAYS = 14
 
 export async function fetchForecast(timezone: string): Promise<OpenMeteoForecast> {
     const params = new URLSearchParams({
@@ -32,9 +44,9 @@ export async function fetchForecast(timezone: string): Promise<OpenMeteoForecast
         // 既定は km/h。tenki.jp と同じ m/s で受け取る
         wind_speed_unit: 'ms',
         hourly: HOURLY_FIELDS.join(','),
-        daily: 'sunrise,sunset',
-        // 今日の残りと明日。モデルを指定すると降水確率が欠けるので(気象庁モデルは null)既定の組み合わせのまま
-        forecast_days: '2',
+        daily: ['sunrise', 'sunset', ...DAILY_FIELDS].join(','),
+        // モデルを指定すると降水確率が欠けるので(気象庁モデルは null)既定の組み合わせのまま
+        forecast_days: String(FORECAST_DAYS),
     })
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
     if (!res.ok) throw new Error(`Open-Meteo ${res.status}`)
@@ -73,12 +85,13 @@ export function buildWeatherDays(forecast: OpenMeteoForecast, today: string, now
     const { hourly, daily } = forecast
     const currentHour = Math.floor(nowMinutes / 60)
     const sun = new Map(daily.time.map((date, i) => [date, { sunrise: daily.sunrise[i], sunset: daily.sunset[i] }]))
+    const shownDates = new Set(daily.time.filter((date) => date >= today).slice(0, 2))
     const days: WeatherDay[] = []
 
     hourly.time.forEach((time, i) => {
         const date = time.slice(0, 10)
         const hour = parseInt(time.slice(11, 13), 10)
-        if (date < today || (date === today && hour < currentHour)) return
+        if (!shownDates.has(date) || (date === today && hour < currentHour)) return
 
         let day = days[days.length - 1]
         if (!day || day.date !== date) {
