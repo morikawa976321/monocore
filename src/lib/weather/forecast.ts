@@ -4,12 +4,8 @@
  * Open-Meteo はキー不要・CORS 許可(Access-Control-Allow-Origin: *)で、表示には出典の明記が要る(CC BY 4.0)。
  */
 
-/** 予報の地点。住んでいる地域が分かるので実際の値は環境変数で与え、公開リポジトリに置かない(未設定なら東京駅) */
-export const WEATHER_LOCATION = {
-    name: process.env.NEXT_PUBLIC_WEATHER_NAME || '東京',
-    latitude: Number(process.env.NEXT_PUBLIC_WEATHER_LATITUDE || 35.6812),
-    longitude: Number(process.env.NEXT_PUBLIC_WEATHER_LONGITUDE || 139.7671),
-}
+/** 予報の地点。値はサーバーが読んで渡す(`location.ts`) */
+export type WeatherLocation = { name: string; latitude: number; longitude: number }
 
 const HOURLY_FIELDS = [
     'weather_code',
@@ -41,10 +37,10 @@ export type OpenMeteoForecast = {
 /** 週間予報の日数(tenki.jp と同じ2週間)。1時間ごとの表はこのうち今日・明日だけを使う */
 export const FORECAST_DAYS = 14
 
-export async function fetchForecast(timezone: string): Promise<OpenMeteoForecast> {
+export async function fetchForecast(location: Pick<WeatherLocation, 'latitude' | 'longitude'>, timezone: string): Promise<OpenMeteoForecast> {
     const params = new URLSearchParams({
-        latitude: String(WEATHER_LOCATION.latitude),
-        longitude: String(WEATHER_LOCATION.longitude),
+        latitude: String(location.latitude),
+        longitude: String(location.longitude),
         timezone,
         // 既定は km/h。tenki.jp と同じ m/s で受け取る
         wind_speed_unit: 'ms',

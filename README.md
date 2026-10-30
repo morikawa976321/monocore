@@ -11,7 +11,7 @@
 | ルート | 役割 |
 | :--- | :--- |
 | `/schedules` | 予定の一覧・編集。日別メモ欄と、Tasks・Inbox のモーダルを同居。日カードの見出しに睡眠・非自由・自由の3色の帯 |
-| `/weather` | 指定した地点（環境変数 `NEXT_PUBLIC_WEATHER_NAME` / `_LATITUDE` / `_LONGITUDE`。未設定なら東京駅）の1時間ごとの天気（今の時刻から明日の終わりまで）と14日間の週間予報（読み取り専用） |
+| `/weather` | 指定した地点（環境変数 `WEATHER_NAME` / `WEATHER_LATITUDE` / `WEATHER_LONGITUDE`。サーバーでだけ読む。未設定なら東京駅）の1時間ごとの天気（今の時刻から明日の終わりまで）と14日間の週間予報（読み取り専用） |
 | `/reports` | `mf/reports/` の読み取り専用ミラー |
 | `/news` | RSS で集めた記事の一覧（ソース別。読み取り専用） |
 
