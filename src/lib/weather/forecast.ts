@@ -4,7 +4,12 @@
  * Open-Meteo はキー不要・CORS 許可(Access-Control-Allow-Origin: *)で、表示には出典の明記が要る(CC BY 4.0)。
  */
 
-export const WEATHER_LOCATION = { name: '目黒区', latitude: 35.6415, longitude: 139.6982 } as const
+/** 予報の地点。住んでいる地域が分かるので実際の値は環境変数で与え、公開リポジトリに置かない(未設定なら東京駅) */
+export const WEATHER_LOCATION = {
+    name: process.env.NEXT_PUBLIC_WEATHER_NAME || '東京',
+    latitude: Number(process.env.NEXT_PUBLIC_WEATHER_LATITUDE || 35.6812),
+    longitude: Number(process.env.NEXT_PUBLIC_WEATHER_LONGITUDE || 139.7671),
+}
 
 const HOURLY_FIELDS = [
     'weather_code',

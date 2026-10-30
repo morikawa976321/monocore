@@ -94,7 +94,7 @@
 
 ## /weather は tenki.jp の1時間天気の置き換え(2026-10-27 本人決定)
 
-- 本人が tenki.jp の目黒区1時間天気(`tenki.jp/forecast/3/16/4410/13110/1hour.html`)を monocore に出したいと求めた。tenki.jp は利用規約第8条が「ブラウザ・RSSリーダー以外のもの」での取得を禁じ、iframe も `X-Frame-Options: sameorigin` で拒むので、データ源は Open-Meteo にした(AI の提案。本人は以後 Open-Meteo の前提で形を詰めた)。
+- 本人が tenki.jp の1時間天気を monocore に出したいと求めた。tenki.jp は利用規約第8条が「ブラウザ・RSSリーダー以外のもの」での取得を禁じ、iframe も `X-Frame-Options: sameorigin` で拒むので、データ源は Open-Meteo にした(AI の提案。本人は以後 Open-Meteo の前提で形を詰めた)。
 - 項目は本人指定: 時刻・天気・気温・降水確率・降水量(降雪量)・湿度・風向風速を1時間ごと、加えて日の出・日の入り。
 - 形は AI が横スクロール表・予定と統合・グラフ・要約の4案、続いて縦のグラフ2案を出し、本人が次のように絞った:
   > デスクトップでもモバイルでも横スクロールはしたくない。縦に伸びるのは許容する。
