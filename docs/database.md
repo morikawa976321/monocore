@@ -1,6 +1,6 @@
 # Supabase 運用 — 権限・migration・観測・復旧
 
-実装が守る規約は `README.md`(データの正と書き込み規約・Database Management)、設計制約は `docs/design.md`。ここに置くのは**実機で確かめた落とし穴と手順**で、コードの特定行に紐づくものはそのコード側のコメントが正(該当箇所を示す)。バックアップと復元は `docs/supabase-backup.md`。
+実装が守る規約は `docs/DEVELOPMENT.md`(データの正と書き込み規約・Database Management)、設計制約は `docs/design.md`。ここに置くのは**実機で確かめた落とし穴と手順**で、コードの特定行に紐づくものはそのコード側のコメントが正(該当箇所を示す)。バックアップと復元は `docs/supabase-backup.md`。
 
 ## 1. service_role と `auth.uid()`
 

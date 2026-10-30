@@ -2,7 +2,7 @@
 
 AI coding agents: follow this file for build commands, architecture, code style, and design rules. This project is a minimalist Personal OS (schedules, inbox).
 
-**See also:** `README.md` · `README-design.md` · `docs/directory_structure.md`
+**See also:** `docs/DEVELOPMENT.md` · `README-design.md` · `docs/directory_structure.md`
 
 ---
 
@@ -16,7 +16,7 @@ AI coding agents: follow this file for build commands, architecture, code style,
 - Migration list: `npx supabase migration list`
 - DB reset (local, **destructive**): `npx supabase db reset`
 
-Reference: `README.md` (Database Management, Testing)
+Reference: `docs/DEVELOPMENT.md` (Database Management, Testing)
 
 ---
 
@@ -43,7 +43,7 @@ Reference: `docs/directory_structure.md`
 3. **Focus on app logic** — Use `@supabase/ssr` fully; keep boilerplate minimal.
 4. **Prioritize development speed above all** — In this solo, small-scale project, default decisions should favor faster implementation and iteration unless they introduce major product risk.
 
-Reference: `README.md` (Technology Stack, Development Philosophy)
+Reference: `docs/DEVELOPMENT.md` (Technology Stack, Development Philosophy)
 
 ---
 
@@ -62,7 +62,7 @@ Reference: `README.md` (Technology Stack, Development Philosophy)
 - **Icons:** Use `lucide-react` only. Do not import icons from other packages.
 - **Commits:** Use prefixes — `feat:`, `fix:`, `refactor:`, `docs:`, `chore:` (e.g. `feat: add search to inventory list`).
 
-Reference: `README.md` (development rules), `docs/directory_structure.md` (coding style)
+Reference: `docs/DEVELOPMENT.md` (development rules), `docs/directory_structure.md` (coding style)
 
 ---
 
@@ -96,7 +96,7 @@ Do not duplicate those rules here. Quick pointers for agents:
 
 | Path | Content |
 |------|--------|
-| `README.md` | Tech stack, development philosophy, DB workflow, test setup, UI/UX requirements, commit rules |
+| `docs/DEVELOPMENT.md` | Tech stack, development philosophy, DB workflow, test setup, UI/UX requirements, commit rules |
 | `README-design.md` | Design system (single source of truth) |
 | `docs/directory_structure.md` | Directory map, folder roles, dev flow, operational rules, coding style (function declarations) |
 | `docs/design.md` | Constraints the implementation must keep, and open questions |
