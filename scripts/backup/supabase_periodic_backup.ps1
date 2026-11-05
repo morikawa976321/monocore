@@ -331,11 +331,15 @@ Write-Log ('pg_dump: ' + $pgDumpVersion + ' (' + $pgDumpBin + ')')
 #   process.stdin.isTTY を見るだけで、CI/無人フラグは自動では立たない)。無人環境では誰も
 #   応答できず無期限に固まる。**`--yes` でこのプロンプト自体を無効化するのが本丸の対策**
 #   (標準入力を閉じるだけでも noTTY() 判定で暗黙に回避されるが、暗黙の副作用に頼らない)。
-#   代償: supabaseがどこにも固定されていないため、`--yes` は「レジストリの最新版を無人で
-#   自動導入することへの常時同意」でもある。CLIの破壊的変更で `db dump --dry-run` の出力形式が
-#   変われば下の `Get-DryRunVar` が黙って外れ、`credentials_failed` と誤報告される。
-#   devDependenciesへの追加やバージョン固定(`npx supabase@<major>`)による恒久対策は
-#   今回は見送った(このインシデントの直接原因ではないため)。
+#   代償: 版を固定しないと、`--yes` は「レジストリの最新版を無人で自動導入することへの
+#   常時同意」になる。CLIの破壊的変更で `db dump --dry-run` が失敗するか出力形式が変われば、
+#   下の `Get-DryRunVar` が黙って外れ、`credentials_failed` と報告される。
+# ■ メジャー版を `supabase@2` に固定している(2026-11-05)
+#   2026-11-03〜05 の3日間、上の懸念がそのまま起きた。CLI v3.0.0 が出て、v3 は
+#   supabase/config.toml の `[inbucket]` 節を拒否し(DbConfigLoadError「Use [local_smtp] instead」)、
+#   dry-run が接続情報を一行も出さずに exit 1 で終わった。`supabase@2` なら同じ config で通る(実測)。
+#   v3 へ上げるのは、config.toml を v3 の形に直し、v3 の dry-run が同じ `export PGxxx="..."`
+#   を出すことを確かめてから。v3 は `--linked` を非推奨にして `--remote` を案内している。
 #
 # ■ `npx`は.cmdファイルなので `[Diagnostics.Process]::Start` に直接渡せず(実測: FileNotFound)、
 #   `cmd.exe /c` 経由で起動する。`.Arguments`(単一文字列)を使う — `.ArgumentList` は
@@ -385,7 +389,7 @@ $canRetryDryRun = ($dryRunAttempt -lt $dryRunMaxAttempts)
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = "$env:ComSpec"
-$psi.Arguments = '/c npx --yes supabase db dump --linked --dry-run'
+$psi.Arguments = '/c npx --yes supabase@2 db dump --linked --dry-run'
 $psi.WorkingDirectory = $repoRoot
 $psi.UseShellExecute = $false
 $psi.RedirectStandardOutput = $true
