@@ -26,16 +26,17 @@
 
 ## 3. migration の運用
 
-- **素の `npx supabase` は 2026-11-03 から CLI v3 を引き、この repo では動かない。** v3.0.0 は `supabase/config.toml` の `[inbucket]` 節を拒否する(DbConfigLoadError「Use [local_smtp] instead」)。supabase は package.json に無いので、npx は毎回レジストリの最新版を使う。config を v3 の形に直すまでは `npx supabase@2 ...` と版を付けて打つ。定時バックアップ(`scripts/backup/supabase_periodic_backup.ps1`)はこれで 11-03〜05 に3日続けて失敗し、`supabase@2` に固定して直した(2026-11-05)。
-- **本番へ push する前に `npx supabase migration list`(または `db push --dry-run`)で差分を見る。** 2026-07-17 に 2026-04-13 の migration が3ヶ月間本番未適用のまま隠れていた(ローカルは applied、本番には関数が無い)。「今回追加した分だけ」の思い込みで push すると、古い未適用分を見落とすか想定外に巻き込む。
+- **CLI v3 は、対象を指定しないコマンドがローカルへ向く。本番には `--remote` を付ける。** `db push`・`db dump`・`migration list`/`repair`・`gen types`・`inspect db` が該当する(`--linked` は非推奨で v4 で消える)。素の `db push` は本番に当たらず、ローカルが起動していれば成功して見えるので、本番へ適用したつもりで終わらないよう気をつける(`Target:` の行に対象が出る)。本番を変えるコマンドは対話が無いと `--yes` なしで失敗する(HostedMutationConsentRequiredError)。`db query` は本番の読み取りでも `--read-only` か `--yes` が要る。
+- **`npx supabase` は版を固定していない。** supabase は package.json に無いので、npx は毎回レジストリの最新版を使う。2026-11-03 に v3.0.0 が出たとき、`supabase/config.toml` の `[inbucket]` を v3 が拒否し、定時バックアップが 11-03〜05 に3日続けて失敗した。config を v3 の形に直し(2026-11-06)、無人のバックアップだけ `supabase@3` にメジャーを固定している。
+- **本番へ push する前に `npx supabase migration list --remote`(または `db push --remote --dry-run`)で差分を見る。** 2026-07-17 に 2026-04-13 の migration が3ヶ月間本番未適用のまま隠れていた(ローカルは applied、本番には関数が無い)。「今回追加した分だけ」の思い込みで push すると、古い未適用分を見落とすか想定外に巻き込む。
 - **リモートへの `supabase db push` は、Claude Code のセッションから通るときと自動許可のゲートに拒否されるときがある**(2026-07 時点は Bash/PowerShell とも拒否、2026-09-28 は `--dry-run` の後に通った。ローカルの `migration up` は常に通る)。拒否されうる前提で、DDL を含む作業は「本人が1コマンド打つ」工程が挟まっても成立するように組む: リモート適用後にしか検証できないこと(本番データ確認・投入スクリプトの実走)を完了条件に混ぜない/列の RENAME は DB とアプリのどちらが先でも画面が落ちるので、指示にはコマンドだけでなく順序(適用→デプロイ)を書く/定時ジョブ(ops-daily。毎日04:00)と同時間帯なら、失敗しても安全な失敗の仕方を用意しておく。
-- **migration はコミットした時点で、他のセッションの `db push` に乗って本番へ当たりうる**。2026-10-07 に `20261007120000_add_plan_goals.sql` が、レビューの指摘(期日の上限 CHECK)を書き足す前の版のまま別セッションの push で適用された。適用済みのファイルを後から直しても本番には当たらないので、差分は冪等な追いかけの migration で当てる(`20261007130000`)。直したら `npx supabase db query --linked` で本番の制約・権限を読み直して確かめる。
-- 履歴の drift(スキーマは適用済みだが `supabase_migrations.schema_migrations` に記録が無く、`migration up` が再実行しようとして失敗する)は `npx supabase migration repair --status applied <version> --local` で帳簿だけ合わせる。スキーマもデータも触らない。非冪等な migration(`CREATE TRIGGER`、`sort_order` のバックフィル UPDATE)は再実行すると手動並び順が壊れるので、repair が正解。
+- **migration はコミットした時点で、他のセッションの `db push` に乗って本番へ当たりうる**。2026-10-07 に `20261007120000_add_plan_goals.sql` が、レビューの指摘(期日の上限 CHECK)を書き足す前の版のまま別セッションの push で適用された。適用済みのファイルを後から直しても本番には当たらないので、差分は冪等な追いかけの migration で当てる(`20261007130000`)。直したら `npx supabase db query --remote --read-only` で本番の制約・権限を読み直して確かめる。
+- 履歴の drift(スキーマは適用済みだが `supabase_migrations.schema_migrations` に記録が無く、`migration up` が再実行しようとして失敗する)は `npx supabase migration repair --status applied <version>` で帳簿だけ合わせる(対象を指定しなければローカル)。スキーマもデータも触らない。非冪等な migration(`CREATE TRIGGER`、`sort_order` のバックフィル UPDATE)は再実行すると手動並び順が壊れるので、repair が正解。
 - ローカル Supabase の `postgres` ロールは superuser ではない(`rolbypassrls` のみ。拡張の導入で `permission denied to create extension`)。superuser は `supabase_admin`: `docker exec -i -e PGPASSWORD=postgres <db_container> psql -U supabase_admin -d postgres`。
 
 ## 4. `supabase gen types`
 
-`npx supabase gen types typescript --local` の生成物で `src/types/database.types.ts` を**丸ごと上書きしない**。一時ファイルへ出して diff を取り、必要な差分(新テーブルのブロック)だけ手で入れる。理由:
+`npx supabase gen types typescript` の生成物で `src/types/database.types.ts` を**丸ごと上書きしない**。一時ファイルへ出して diff を取り、必要な差分(新テーブルのブロック)だけ手で入れる。理由:
 
 - 初回実行で postgres-meta の Docker イメージが未取得だと `docker pull` の進捗ログが stdout に混ざり、生成ファイルが `Connecting to db 5432` / `Unable to find image ...` で始まって lint が落ちる(2026-08-09)。イメージはキャッシュされるので同じコマンドの再実行で直る。生成直後に `head` で先頭を見る。
 - CLI 2.114.0 は `__InternalSupabase: { PostgrestVersion: "14.1" }` ブロックを出力しない(2026-08-14)。supabase-js が型推論に使うブロックで、上書きすると黙って消える。
@@ -51,7 +52,7 @@
 
 ## 6. 観測 — `pg_stat_statements` と Logs Explorer
 
-- `npx supabase inspect db calls --linked` の上位1件は PostgREST が全リクエストで打つ `select set_config('search_path',…), set_config('request.jwt.claims',…), …`。2026-08-26 時点で **105,652,935 回**(全実行時間の 75.4%)、2位(`SHOW transaction_read_only` 53,806 回)から約 2000 倍離れていた。アプリの実クエリは数万回。この乖離は**リクエスト本数**の指標で、大多数のリクエストが実クエリに到達していない(認証失敗・OPTIONS・存在しないパス等)ことを示す。Disk IO 予算の枯渇はデータ量でもクエリ効率でもなくリクエスト本数で起きた(実体は §8 のストーム)。
+- `npx supabase inspect db calls --remote` の上位1件は PostgREST が全リクエストで打つ `select set_config('search_path',…), set_config('request.jwt.claims',…), …`。2026-08-26 時点で **105,652,935 回**(全実行時間の 75.4%)、2位(`SHOW transaction_read_only` 53,806 回)から約 2000 倍離れていた。アプリの実クエリは数万回。この乖離は**リクエスト本数**の指標で、大多数のリクエストが実クエリに到達していない(認証失敗・OPTIONS・存在しないパス等)ことを示す。Disk IO 予算の枯渇はデータ量でもクエリ効率でもなくリクエスト本数で起きた(実体は §8 のストーム)。
 - `Sync IO time` が全行 `00:00:00` なのは `track_io_timing` が off だから。IO の帰属は `pg_stat_statements` からは取れない。`outliers` 上位の `-- source: dashboard` 付きは Studio の内省クエリでアプリとは無関係。
 - **例外で終わった RPC は `calls` に載らない**。2026-08-25 のストームは毎秒数百回撃っていたが、生きている行の累計は 1,073 のまま増えなかった。migration `20260902001000` 以降は競合も正常終了なので `calls` に載る。`replace_schedules_for_day` の現行行は `queryid = 4142597199470143787`(`stats_since` 2026-08-03)、平常値は**1日 35 回程度**。桁で伸びていたら何かが空回りしている。エラーログには出ないので、これが唯一の検知手段。
 - 関数のシグネチャを変えると、旧シグネチャを呼んでいたクエリの行は削除されず**その時点の `calls` のまま凍結して残る**(`order by calls desc` の先頭に居座る)。`calls` を単独で見ず **`stats_since` を必ず併記する**(pg_stat_statements 1.11 / PostgreSQL 16 以降)。同じ関数名で複数行あれば `queryid` を並べて別物と確認する。2026-08-26 の障害調査は凍結行の 19,283 を現役の呼び出し回数と誤読した。

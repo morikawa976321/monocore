@@ -152,8 +152,10 @@ monocore は AI 活用基盤（context-engine）の**人間向け窓口**であ�
 
 ### マイグレーション状態の確認
 
+対象を指定しないとローカルを見ます。本番と比べるときは `--remote` を付けます。
+
 ```bash
-npx supabase migration list
+npx supabase migration list --remote
 ```
 
 ### マイグレーションの適用
@@ -166,8 +168,11 @@ npx supabase migration up
 
 #### リモート（本番・ステージング）
 
+`--remote` が無いとローカルへ当たります。先に `--dry-run` で差分を見ます。
+
 ```bash
-npx supabase db push
+npx supabase db push --remote --dry-run
+npx supabase db push --remote --yes
 ```
 
 #### ローカル DB のリセット

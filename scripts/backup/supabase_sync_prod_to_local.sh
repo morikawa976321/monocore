@@ -145,14 +145,14 @@ sha256_file() {
 
 load_prod_env_from_dry_run() {
   local dry_file="${BACKUP_RUN_DIR}/_dryrun.tmp.txt"
-  log "Resolve production connection via: npx supabase db dump --linked --dry-run"
+  log "Resolve production connection via: npx supabase db dump --remote --dry-run"
   set +e
-  npx supabase db dump --linked --dry-run >"${dry_file}" 2>&1
+  npx supabase db dump --remote --dry-run >"${dry_file}" 2>&1
   local ec=$?
   set -e
   if [[ "${ec}" -ne 0 ]]; then
     sed -E 's/(PASSWORD|password|PGPASSWORD)=[^[:space:]]+/\1=***/g' "${dry_file}" >>"${LOG_FILE}" || true
-    die "supabase db dump --linked --dry-run failed (exit ${ec})"
+    die "supabase db dump --remote --dry-run failed (exit ${ec})"
   fi
 
   extract_export() {

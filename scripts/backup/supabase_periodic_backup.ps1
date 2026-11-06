@@ -23,7 +23,7 @@
 #   pg_dump.exe を直接実行する方式へ切り替えた。
 #
 # ■ 資格情報を一切永続化しない(docs/supabase-backup.md の既存方針を踏襲)
-#   `npx supabase db dump --linked --dry-run` が接続情報(PGHOST/PGPORT/PGUSER/PGPASSWORD/
+#   `npx supabase@3 db dump --remote --dry-run` が接続情報(PGHOST/PGPORT/PGUSER/PGPASSWORD/
 #   PGDATABASE)を都度解決する(CLIのログイン済みセッションを使う。dry-runはDockerを使わない
 #   ことを実地で確認済み)。取得した値はこのスクリプト内のメモリ上でのみ扱い、ディスク上の
 #   どのファイルにも書かない。pg_dump.exe へは子プロセスの環境変数(PGHOST等)として渡すのみで、
@@ -319,7 +319,7 @@ if (-not $pgDumpBin) {
 Write-Log ('pg_dump: ' + $pgDumpVersion + ' (' + $pgDumpBin + ')')
 
 # ---------------------------------------------------------------
-# 2. 本番の接続情報を解決(npx supabase db dump --linked --dry-run。Dockerは使わない)
+# 2. 本番の接続情報を解決(npx supabase@3 db dump --remote --dry-run。Dockerは使わない)
 #
 # タイムアウト付きで実行する(2026-09-09追加)。単純な `& npx ... | Out-String` には
 # タイムアウトが無く、2026-09-09朝の枠でこの呼び出しが3時間以上ハングした実測がある。
@@ -334,12 +334,13 @@ Write-Log ('pg_dump: ' + $pgDumpVersion + ' (' + $pgDumpBin + ')')
 #   代償: 版を固定しないと、`--yes` は「レジストリの最新版を無人で自動導入することへの
 #   常時同意」になる。CLIの破壊的変更で `db dump --dry-run` が失敗するか出力形式が変われば、
 #   下の `Get-DryRunVar` が黙って外れ、`credentials_failed` と報告される。
-# ■ メジャー版を `supabase@2` に固定している(2026-11-05)
+# ■ メジャー版を `supabase@3` に固定している(2026-11-06)
 #   2026-11-03〜05 の3日間、上の懸念がそのまま起きた。CLI v3.0.0 が出て、v3 は
 #   supabase/config.toml の `[inbucket]` 節を拒否し(DbConfigLoadError「Use [local_smtp] instead」)、
-#   dry-run が接続情報を一行も出さずに exit 1 で終わった。`supabase@2` なら同じ config で通る(実測)。
-#   v3 へ上げるのは、config.toml を v3 の形に直し、v3 の dry-run が同じ `export PGxxx="..."`
-#   を出すことを確かめてから。v3 は `--linked` を非推奨にして `--remote` を案内している。
+#   dry-run が接続情報を一行も出さずに exit 1 で終わった。config を v3 の形に直したうえで、
+#   無人で次のメジャーを引かないよう固定している。v4 へ上げるのは、v4 の dry-run が同じ
+#   `export PGxxx="..."` を出すことを確かめてから。
+#   v3 の `db dump` は対象を指定しないとローカルへ向くので `--remote` が要る(`--linked` は非推奨)。
 #
 # ■ `npx`は.cmdファイルなので `[Diagnostics.Process]::Start` に直接渡せず(実測: FileNotFound)、
 #   `cmd.exe /c` 経由で起動する。`.Arguments`(単一文字列)を使う — `.ArgumentList` は
@@ -389,7 +390,7 @@ $canRetryDryRun = ($dryRunAttempt -lt $dryRunMaxAttempts)
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = "$env:ComSpec"
-$psi.Arguments = '/c npx --yes supabase@2 db dump --linked --dry-run'
+$psi.Arguments = '/c npx --yes supabase@3 db dump --remote --dry-run'
 $psi.WorkingDirectory = $repoRoot
 $psi.UseShellExecute = $false
 $psi.RedirectStandardOutput = $true
@@ -401,7 +402,7 @@ try {
     $dryRunProc = [System.Diagnostics.Process]::Start($psi)
 } catch {
     Complete-BackupFailure 'dryrun_spawn_failed' `
-        ('npx supabase db dump --linked --dry-run の起動に失敗: ' + $_.Exception.Message) 0
+        ('npx supabase@3 db dump --remote --dry-run の起動に失敗: ' + $_.Exception.Message) 0
 }
 
 try {
@@ -410,21 +411,21 @@ try {
     $dryRunStderrTask = $dryRunProc.StandardError.ReadToEndAsync()
 } catch {
     Complete-BackupFailure 'dryrun_io_setup_failed' `
-        ('npx supabase db dump --linked --dry-run の入出力設定に失敗: ' + $_.Exception.Message) `
+        ('npx supabase@3 db dump --remote --dry-run の入出力設定に失敗: ' + $_.Exception.Message) `
         $dryRunProc.Id
 }
 
 $dryRunExited = $dryRunProc.WaitForExit($dryRunTimeoutSeconds * 1000)
 if (-not $dryRunExited -and $canRetryDryRun) {
     try { & taskkill /T /F /PID $dryRunProc.Id 2>&1 | Out-Null } catch {}
-    Write-Log ("npx supabase db dump --linked --dry-run が{0}秒応答なし。{1}秒後に再試行({2}/{3})" -f `
+    Write-Log ("npx supabase@3 db dump --remote --dry-run が{0}秒応答なし。{1}秒後に再試行({2}/{3})" -f `
         $dryRunTimeoutSeconds, $dryRunRetryDelaySeconds, ($dryRunAttempt + 1), $dryRunMaxAttempts)
     Start-Sleep -Seconds $dryRunRetryDelaySeconds
     continue
 }
 if (-not $dryRunExited) {
     Complete-BackupFailure 'timeout' `
-        ("npx supabase db dump --linked --dry-run が{0}秒応答なしのため打ち切った" -f $dryRunTimeoutSeconds) `
+        ("npx supabase@3 db dump --remote --dry-run が{0}秒応答なしのため打ち切った" -f $dryRunTimeoutSeconds) `
         $dryRunProc.Id
 }
 
@@ -432,11 +433,11 @@ try {
     $dryRunReadOk = [System.Threading.Tasks.Task]::WaitAll(@($dryRunStdoutTask, $dryRunStderrTask), $dryRunReadTimeoutSeconds * 1000)
 } catch {
     Complete-BackupFailure 'dryrun_read_failed' `
-        ('npx supabase db dump --linked --dry-run の出力読み取りが失敗: ' + $_.Exception.Message) 0
+        ('npx supabase@3 db dump --remote --dry-run の出力読み取りが失敗: ' + $_.Exception.Message) 0
 }
 if (-not $dryRunReadOk) {
     Complete-BackupFailure 'dryrun_read_timeout' `
-        ("npx supabase db dump --linked --dry-run の出力読み取りが{0}秒応答なしのため打ち切った(プロセス自体は終了済み)" -f $dryRunReadTimeoutSeconds) `
+        ("npx supabase@3 db dump --remote --dry-run の出力読み取りが{0}秒応答なしのため打ち切った(プロセス自体は終了済み)" -f $dryRunReadTimeoutSeconds) `
         0
 }
 $dryRunOut = $dryRunStdoutTask.Result + "`n" + $dryRunStderrTask.Result
@@ -456,7 +457,7 @@ $pgDatabase = Get-DryRunVar 'PGDATABASE' $dryRunOut
 $dryRunResolved = ($pgHost -and $pgPort -and $pgUser -and $pgPassword -and $pgDatabase)
 if ($dryRunResolved) { break }
 if ($canRetryDryRun) {
-    Write-Log ("npx supabase db dump --linked --dry-run から接続情報を解決できなかった。{0}秒後に再試行({1}/{2})" -f `
+    Write-Log ("npx supabase@3 db dump --remote --dry-run から接続情報を解決できなかった。{0}秒後に再試行({1}/{2})" -f `
         $dryRunRetryDelaySeconds, ($dryRunAttempt + 1), $dryRunMaxAttempts)
     Start-Sleep -Seconds $dryRunRetryDelaySeconds
     continue
@@ -465,7 +466,7 @@ if ($canRetryDryRun) {
 
 if (-not $pgHost -or -not $pgPort -or -not $pgUser -or -not $pgPassword -or -not $pgDatabase) {
     $reason = 'credentials_failed'
-    $problems += 'npx supabase db dump --linked --dry-run から接続情報を解決できなかった'
+    $problems += 'npx supabase@3 db dump --remote --dry-run から接続情報を解決できなかった'
     Write-Log ('異常: ' + $problems[-1])
     Write-Status $false
     Write-Log ("===== monocore db backup end {0} exit=1 (credentials failed) =====" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))

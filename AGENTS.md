@@ -12,8 +12,8 @@ AI coding agents: follow this file for build commands, architecture, code style,
 - Dev: `npm run dev`
 - Test: `npm test` (Vitest, then `scraper/` pytest via `scripts/run-pytest.mjs`)
 - DB migrations (local): `npx supabase migration up`
-- DB migrations (remote): `npx supabase db push`
-- Migration list: `npx supabase migration list`
+- DB migrations (remote): `npx supabase db push --remote --yes` (CLI v3: a bare `db push` targets the local stack, not production)
+- Migration list: `npx supabase migration list --remote` (bare = local stack)
 - DB reset (local, **destructive**): `npx supabase db reset`
 
 Reference: `docs/DEVELOPMENT.md` (Database Management, Testing)
@@ -83,7 +83,7 @@ Do not duplicate those rules here. Quick pointers for agents:
 
 - **Check `git log` before starting work.** The owner sometimes commits directly to this repo from Cursor while a Claude Code session is running (2026-07-17: 6 unrelated commits in two hours). Migrations and skills that assume an older schema break silently otherwise.
 - **Work directly on local `main` and push it to `origin` without asking** (owner, 2026-10-23: 「以後はローカルのmainで直接作業してそのままリモートにpushしていい」). No feature branch or PR is needed. Still commit by path (`git add <path>` → `git commit -- <path>`), since other sessions share the index.
-- **Every change gets a sol review before it is pushed** (owner, 2026-10-23: 「どの修正もsolレビューを受けてからPush」). Commit locally, run the Codex `review` role (`codex-role.cmd review`, see the delegate skill) on those commits, verify and fix the findings, then push. This includes migrations: apply them to the remote (`supabase db push`) only after the review, too.
+- **Every change gets a sol review before it is pushed** (owner, 2026-10-23: 「どの修正もsolレビューを受けてからPush」). Commit locally, run the Codex `review` role (`codex-role.cmd review`, see the delegate skill) on those commits, verify and fix the findings, then push. This includes migrations: apply them to the remote (`supabase db push --remote --yes`) only after the review, too.
 - Do **not** put DB calls in `page.tsx`; use `lib/supabase/queries/` only.
 - Do **not** rename existing classes/methods/files without explicit approval.
 - Do **not** guess business logic — ask when unclear.
