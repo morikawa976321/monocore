@@ -279,6 +279,40 @@ describe('runResumeSyncOnce', () => {
         expect(running.current).toBe(false);
     });
 
+    it('上限を超えて見限った後に保存待ちが終わっても、読み直しは始めない', async () => {
+        vi.useFakeTimers();
+        let releaseIdle!: () => void;
+        let calls = 0;
+        const reload = vi.fn(async () => {});
+        const { deps, log, running } = setup({
+            // 2回目の waitForIdle(ロック後)だけ、保存が終わらない状況を作る。
+            waitForIdle: () => (++calls === 2 ? new Promise<void>((resolve) => (releaseIdle = resolve)) : Promise.resolve()),
+            reload,
+        });
+        const run = runResumeSyncOnce(deps, running);
+        await vi.advanceTimersByTimeAsync(2000);
+        await run;
+        expect(log).toEqual(['lock', 'failed:timeout', 'unlock']);
+        releaseIdle();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(reload).not.toHaveBeenCalled();
+    });
+
+    it('見限った後の読み直しには、見限られたと知らせる', async () => {
+        vi.useFakeTimers();
+        let isAbandoned!: () => boolean;
+        const { deps, running } = setup({
+            reload: (_stamp, abandoned) => {
+                isAbandoned = abandoned;
+                return new Promise<never>(() => {});
+            },
+        });
+        const run = runResumeSyncOnce(deps, running);
+        await vi.advanceTimersByTimeAsync(2000);
+        await run;
+        expect(isAbandoned()).toBe(true);
+    });
+
     it('同期中の呼び出しは重ねない', async () => {
         const { deps, log, running } = setup();
         const check = vi.fn(async () => ({ stamp: 's1' }));

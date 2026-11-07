@@ -55,7 +55,7 @@ const RESUME_RELOAD_TIMEOUT_MS = 75_000;
 const APPLIED_DAYS_ERROR = '既定予定の記録の読み込みに失敗しました（睡眠の帯が正しくない日があります）。';
 
 type UseSchedulesCompanions = {
-    loadNotes: (startDay: string, endDay: string) => Promise<NotesLoadResult | null>;
+    loadNotes: (startDay: string, endDay: string, isCurrent?: () => boolean) => Promise<NotesLoadResult | null>;
     flushPendingNoteSaves: () => void;
     hasPendingNoteChanges: boolean;
     hasPendingInboxChanges: boolean;
@@ -138,6 +138,8 @@ export function useSchedules(
     const forceReloadRef = useRef(false);
     // reloadSchedules の世代。期限切れで見限った読み込みや、新しい読み込みに追い越された読み込みの結果は反映しない。
     const reloadEpochRef = useRef(0);
+    // 復帰同期が始めた読み直しの世代。見限るとき、手動の再読み込みに追い越されていなければ読み込み中の表示を戻す。
+    const resumeReloadEpochRef = useRef(0);
     const initialDoneRef = useRef(false);
     const dirtyDateLabelsRef = useRef(new Set<string>());
     const saveQueueRef = useRef(new ScheduleSaveQueue());
@@ -305,11 +307,13 @@ export function useSchedules(
      * resumeStamp を渡されたら（戻ったときに取った目印）既定予定の書き込みを省き、その目印を記録する。範囲は
      * 戻る前と同じなので既定予定は書き込み済み。渡されなければ書き込んでから目印を取る。
      */
-    const reloadSchedules = useCallback(async (resumeStamp?: string) => {
+    const reloadSchedules = useCallback(async (resumeStamp?: string, isAbandoned?: () => boolean) => {
         if (!rangeStart || !rangeEnd) return;
         // 新しい読み込みに追い越された、または期限切れで見限られたら、この読み込みの結果は反映しない
         // (遅れて届いた古い内容で、その間に保存した予定を戻さない)。読み込み中の表示は追い越した側が持つ。
         const epoch = ++reloadEpochRef.current;
+        if (isAbandoned) resumeReloadEpochRef.current = epoch;
+        const isStale = () => epoch !== reloadEpochRef.current || (isAbandoned?.() ?? false);
         setLoadingTop(true);
         setLoadingBottom(true);
         const startDay = format(rangeStart, 'yyyy-MM-dd');
@@ -320,15 +324,15 @@ export function useSchedules(
         if (stamp === undefined) {
             if (await applyDefaults(startDay, endDay)) defaultsFailedRef.current = false;
             stamp = await readStamp(startDay, endDay);
-            if (epoch !== reloadEpochRef.current) return;
+            if (isStale()) return;
         }
         const [schedulesResult, revisionsResult, , notesResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(supabase, startDay, endDay),
             readAppliedDays(startDay, endDay),
-            loadNotes(startDay, endDay),
+            loadNotes(startDay, endDay, () => !isStale()),
         ]);
-        if (epoch !== reloadEpochRef.current) return;
+        if (isStale()) return;
         loadedStampRef.current =
             stamp && notesResult?.applied && !schedulesResult.error && !revisionsResult.error
                 ? { range: `${startDay}..${endDay}`, stamp }
@@ -412,9 +416,12 @@ export function useSchedules(
                         resyncWantedRef.current = true;
                     },
                     onFailed: (error) => {
-                        reloadEpochRef.current += 1;
-                        setLoadingTop(false);
-                        setLoadingBottom(false);
+                        // 見限った読み直しは isAbandoned で自分から終わる。読み込み中の表示は、手動の再読み込みに
+                        // 追い越されていなければ(追い越した側が持つので)ここで戻す。
+                        if (resumeReloadEpochRef.current === reloadEpochRef.current) {
+                            setLoadingTop(false);
+                            setLoadingBottom(false);
+                        }
                         forceReloadRef.current = true;
                         setSyncError(
                             error instanceof SyncTimeoutError

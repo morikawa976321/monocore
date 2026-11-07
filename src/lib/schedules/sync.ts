@@ -65,7 +65,8 @@ export type ResumeSyncDeps = {
     waitForIdle(): Promise<void>;
     /** 目印の確認。読み直すなら { stamp }(stamp が無ければ既定予定の書き込みから)、不要なら null。読むだけで編集ロックは掛けない。 */
     check(): Promise<{ stamp?: string } | null>;
-    reload(stamp?: string): Promise<void>;
+    /** isAbandoned() が true になった(上限を超えて見限られた)ら、結果を反映せずに終わる。 */
+    reload(stamp: string | undefined, isAbandoned: () => boolean): Promise<void>;
     /** 編集ロック。読み直しの間だけ掛ける。 */
     setLocked(locked: boolean): void;
     /** 編集中などで見送った。編集が終わったらやり直す。 */
@@ -89,8 +90,14 @@ export async function runResumeSyncOnce(deps: ResumeSyncDeps, running: { current
     }
     running.current = true;
     let locked = false;
+    // 上限を超えて見限った後に、保存待ちが終わって続きが動き出さないようにする(元の処理は止められない)。
+    let abandoned = false;
+    const isAbandoned = () => abandoned;
     try {
-        const reload = await withTimeout(deps.waitForIdle().then(deps.check), deps.checkTimeoutMs);
+        const reload = await withTimeout(
+            deps.waitForIdle().then(() => (abandoned ? null : deps.check())),
+            deps.checkTimeoutMs
+        );
         if (!reload) return;
         // 確認の間に編集や保存が始まっていたら、画面を置き換えずに終わってからやり直す。
         if (!deps.canSyncNow()) {
@@ -100,10 +107,15 @@ export async function runResumeSyncOnce(deps: ResumeSyncDeps, running: { current
         locked = true;
         deps.setLocked(true);
         // ロックを掛けた後にも保存の完了を待つ(掛ける直前に始まった保存の版を、読み直しが追い越さないように)。
-        await withTimeout(deps.waitForIdle().then(() => deps.reload(reload.stamp)), deps.reloadTimeoutMs);
+        await withTimeout(
+            deps.waitForIdle().then(() => (abandoned ? undefined : deps.reload(reload.stamp, isAbandoned))),
+            deps.reloadTimeoutMs
+        );
     } catch (error) {
+        abandoned = true;
         deps.onFailed(error);
     } finally {
+        abandoned = true;
         if (locked) deps.setLocked(false);
         running.current = false;
     }
