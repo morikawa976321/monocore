@@ -121,7 +121,10 @@ export function DaySection({
                 スマホで予定欄とメモ欄が隣接してタップし分けられず(推奨 44px 前後)、記法警告も出ない
                 メモ欄へ予定を書く無言の失敗になる。40px はその妥協。 */}
             <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-neutral-300 dark:divide-neutral-700 px-1 sm:px-4 py-0 sm:py-2">
-                <div className="sm:basis-3/5 sm:min-w-0 sm:pr-4">
+                {/* 列を flex-col にして欄を grow させる。行数の違う隣の欄に高さを合わせて列が伸びたとき、
+                    最後の行より下の余白も欄の中になり、クリックでキャレットが置ける
+                    (grow が無いと余白は欄の外で、クリックしてもどこにもフォーカスが入らなかった)。 */}
+                <div className="flex flex-col sm:basis-3/5 sm:min-w-0 sm:pr-4">
                     <AutoHeightTextarea
                         value={entry.content}
                         onChange={(e) => {
@@ -132,7 +135,7 @@ export function DaySection({
                         onBlur={onBlur}
                         readOnly={isReadOnly}
                         className={[
-                            'min-h-6 py-2 resize-none',
+                            'grow min-h-6 py-2 resize-none',
                             'leading-6 sm:text-base sm:leading-7',
                             isReadOnly ? 'cursor-not-allowed' : '',
                         ].join(' ')}
@@ -142,13 +145,13 @@ export function DaySection({
                         rows={1}
                     />
                 </div>
-                <div className="sm:basis-2/5 sm:min-w-0 sm:pl-4">
+                <div className="flex flex-col sm:basis-2/5 sm:min-w-0 sm:pl-4">
                     <AutoHeightTextarea
                         value={note}
                         onChange={(e) => onNoteChange(e.target.value)}
                         readOnly={isReadOnly}
                         className={[
-                            'min-h-6 py-2 resize-none',
+                            'grow min-h-6 py-2 resize-none',
                             'leading-6 sm:text-base sm:leading-7',
                             isReadOnly ? 'cursor-not-allowed' : '',
                         ].join(' ')}

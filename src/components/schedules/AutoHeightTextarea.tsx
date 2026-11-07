@@ -3,8 +3,12 @@ import { Textarea } from '@/src/components/ui/Textarea';
 
 function fitHeight(ta: HTMLTextAreaElement | null) {
     if (!ta) return;
+    // 呼び出し側が grow で列の高さいっぱいに伸ばしていると、scrollHeight が「伸びた後の高さ」になり、
+    // 隣の欄が縮んでも高さが戻らなくなる。測る間だけ grow を切って、内容の高さを取る。
+    ta.style.flexGrow = '0';
     ta.style.height = 'auto';
     ta.style.height = ta.scrollHeight + 'px';
+    ta.style.flexGrow = '';
 }
 
 /** 内容に応じて高さが自動調整される textarea。 */
