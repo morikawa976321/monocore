@@ -30,6 +30,85 @@ export class ScheduleSaveQueue {
     }
 }
 
+export class SyncTimeoutError extends Error {
+    constructor(ms: number) {
+        super(`${ms}ms 以内に終わりませんでした`);
+        this.name = 'SyncTimeoutError';
+    }
+}
+
+/**
+ * promise が ms 以内に決着しなければ SyncTimeoutError で reject する。元の promise は止めない(結果は捨てる)。
+ * 復帰同期の編集ロックを、通信が決着しなくても必ず降ろすための最後の上限。
+ */
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new SyncTimeoutError(ms)), ms);
+        promise.then(
+            (value) => {
+                clearTimeout(timer);
+                resolve(value);
+            },
+            (error: unknown) => {
+                clearTimeout(timer);
+                reject(error);
+            },
+        );
+    });
+}
+
+export type ResumeSyncDeps = {
+    /** 初回の読み込みが終わっているか。読み込み中は、その読み込みが最新を持ってくる。 */
+    isReady(): boolean;
+    /** 画面を置き換えてよい状態か(編集中・保存待ち・未保存のメモが無い)。 */
+    canSyncNow(): boolean;
+    waitForIdle(): Promise<void>;
+    /** 目印の確認。読み直すなら { stamp }(stamp が無ければ既定予定の書き込みから)、不要なら null。読むだけで編集ロックは掛けない。 */
+    check(): Promise<{ stamp?: string } | null>;
+    reload(stamp?: string): Promise<void>;
+    /** 編集ロック。読み直しの間だけ掛ける。 */
+    setLocked(locked: boolean): void;
+    /** 編集中などで見送った。編集が終わったらやり直す。 */
+    onDeferred(): void;
+    /** 決着しなかった・失敗した。期限切れの読み込みの結果を捨て、次の復帰で全読み直しする。 */
+    onFailed(error: unknown): void;
+    checkTimeoutMs: number;
+    reloadTimeoutMs: number;
+};
+
+/**
+ * 復帰時の同期1回分。目印の確認は編集ロックなしで行い、読み直すと決まってから読み直しの間だけロックを掛ける。
+ * どちらにも上限があり、通信が決着しなくてもロックは必ず降りて running も戻る(降りないと、以後の復帰同期が
+ * 永久に無視され、Inbox が開けないまま固まる)。running は呼び出し側が同期をまたいで持つ。
+ */
+export async function runResumeSyncOnce(deps: ResumeSyncDeps, running: { current: boolean }): Promise<void> {
+    if (!deps.isReady() || running.current) return;
+    if (!deps.canSyncNow()) {
+        deps.onDeferred();
+        return;
+    }
+    running.current = true;
+    let locked = false;
+    try {
+        const reload = await withTimeout(deps.waitForIdle().then(deps.check), deps.checkTimeoutMs);
+        if (!reload) return;
+        // 確認の間に編集や保存が始まっていたら、画面を置き換えずに終わってからやり直す。
+        if (!deps.canSyncNow()) {
+            deps.onDeferred();
+            return;
+        }
+        locked = true;
+        deps.setLocked(true);
+        // ロックを掛けた後にも保存の完了を待つ(掛ける直前に始まった保存の版を、読み直しが追い越さないように)。
+        await withTimeout(deps.waitForIdle().then(() => deps.reload(reload.stamp)), deps.reloadTimeoutMs);
+    } catch (error) {
+        deps.onFailed(error);
+    } finally {
+        if (locked) deps.setLocked(false);
+        running.current = false;
+    }
+}
+
 export function applyScheduleRevisions(
     entries: DayEntry[],
     revisions: ScheduleDayRevision[]

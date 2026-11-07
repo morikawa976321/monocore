@@ -1,10 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     MAX_CONSECUTIVE_SAVE_FAILURES,
     ScheduleSaveQueue,
+    SyncTimeoutError,
     applyScheduleRevisions,
     decideAfterSave,
     decodeScheduleSaveOutcome,
+    runResumeSyncOnce,
+    withTimeout,
+    type ResumeSyncDeps,
     type ScheduleSaveOutcome,
 } from './sync';
 
@@ -82,6 +86,25 @@ describe('ScheduleSaveQueue', () => {
         release();
         await waiting;
         expect(settled).toHaveBeenCalledOnce();
+    });
+});
+
+describe('withTimeout', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('決着しない promise を上限時間で SyncTimeoutError にする', async () => {
+        vi.useFakeTimers();
+        const result = withTimeout(new Promise<never>(() => {}), 1000);
+        const assertion = expect(result).rejects.toBeInstanceOf(SyncTimeoutError);
+        await vi.advanceTimersByTimeAsync(1000);
+        await assertion;
+    });
+
+    it('上限より前に決着すれば値も失敗もそのまま返す', async () => {
+        await expect(withTimeout(Promise.resolve(7), 1000)).resolves.toBe(7);
+        await expect(withTimeout(Promise.reject(new Error('boom')), 1000)).rejects.toThrow('boom');
     });
 });
 
@@ -181,5 +204,113 @@ describe('decideAfterSave', () => {
 
     it('reports a successful save with its new revision', () => {
         expect(decideAfterSave({ kind: 'saved', revision: 5 }, 2)).toEqual({ kind: 'saved', revision: 5 });
+    });
+});
+
+describe('runResumeSyncOnce', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    function setup(overrides: Partial<ResumeSyncDeps> = {}) {
+        const log: string[] = [];
+        const deps: ResumeSyncDeps = {
+            isReady: () => true,
+            canSyncNow: () => true,
+            waitForIdle: async () => {},
+            check: async () => ({ stamp: 's1' }),
+            reload: async () => {
+                log.push('reload');
+            },
+            setLocked: (locked) => {
+                log.push(locked ? 'lock' : 'unlock');
+            },
+            onDeferred: () => {
+                log.push('deferred');
+            },
+            onFailed: (error) => {
+                log.push(error instanceof SyncTimeoutError ? 'failed:timeout' : 'failed');
+            },
+            checkTimeoutMs: 1000,
+            reloadTimeoutMs: 2000,
+            ...overrides,
+        };
+        return { deps, log, running: { current: false } };
+    }
+
+    it('目印が同じなら読み直さず、ロックも掛けない', async () => {
+        const { deps, log, running } = setup({ check: async () => null });
+        await runResumeSyncOnce(deps, running);
+        expect(log).toEqual([]);
+        expect(running.current).toBe(false);
+    });
+
+    it('読み直す間だけロックを掛け、終わったら降ろす', async () => {
+        const { deps, log, running } = setup();
+        await runResumeSyncOnce(deps, running);
+        expect(log).toEqual(['lock', 'reload', 'unlock']);
+        expect(running.current).toBe(false);
+    });
+
+    it('目印の確認が決着しなくても、ロックを掛けないまま running が戻り、次の同期が走る', async () => {
+        vi.useFakeTimers();
+        let hang = true;
+        const { deps, log, running } = setup({
+            check: () => (hang ? new Promise<never>(() => {}) : Promise.resolve({ stamp: 's2' })),
+        });
+        const first = runResumeSyncOnce(deps, running);
+        await vi.advanceTimersByTimeAsync(1000);
+        await first;
+        expect(log).toEqual(['failed:timeout']);
+        expect(running.current).toBe(false);
+
+        hang = false;
+        await runResumeSyncOnce(deps, running);
+        expect(log).toEqual(['failed:timeout', 'lock', 'reload', 'unlock']);
+    });
+
+    it('読み直しが決着しなくても、上限でロックを降ろして失敗にする(Inbox が開けなくなる不具合)', async () => {
+        vi.useFakeTimers();
+        const { deps, log, running } = setup({ reload: () => new Promise<never>(() => {}) });
+        const run = runResumeSyncOnce(deps, running);
+        await vi.advanceTimersByTimeAsync(2000);
+        await run;
+        expect(log).toEqual(['lock', 'failed:timeout', 'unlock']);
+        expect(running.current).toBe(false);
+    });
+
+    it('同期中の呼び出しは重ねない', async () => {
+        const { deps, log, running } = setup();
+        const check = vi.fn(async () => ({ stamp: 's1' }));
+        deps.check = check;
+        await Promise.all([runResumeSyncOnce(deps, running), runResumeSyncOnce(deps, running)]);
+        expect(check).toHaveBeenCalledOnce();
+        expect(log).toEqual(['lock', 'reload', 'unlock']);
+    });
+
+    it('編集中なら何も読まず、見送ったと知らせる', async () => {
+        const { deps, log, running } = setup({ canSyncNow: () => false });
+        await runResumeSyncOnce(deps, running);
+        expect(log).toEqual(['deferred']);
+    });
+
+    it('確認の間に編集が始まったら、置き換えずに見送る', async () => {
+        let editing = false;
+        const { deps, log, running } = setup({
+            canSyncNow: () => !editing,
+            check: async () => {
+                editing = true;
+                return { stamp: 's1' };
+            },
+        });
+        await runResumeSyncOnce(deps, running);
+        expect(log).toEqual(['deferred']);
+        expect(running.current).toBe(false);
+    });
+
+    it('初回の読み込み中は何もしない', async () => {
+        const { deps, log, running } = setup({ isReady: () => false });
+        await runResumeSyncOnce(deps, running);
+        expect(log).toEqual([]);
     });
 });

@@ -38,8 +38,18 @@ import {
     decideAfterSave,
     decodeScheduleSaveOutcome,
     MAX_CONSECUTIVE_SAVE_FAILURES,
+    runResumeSyncOnce,
     ScheduleSaveQueue,
+    SyncTimeoutError,
 } from '@/src/lib/schedules/sync';
+
+/**
+ * 復帰時の同期の上限(docs/decisions.md「復帰同期のタイムアウト」)。1回の通信の上限は 15 秒で、GET は
+ * 3回までやり直される(lib/supabase/client.ts。最悪 67 秒)。これは通信が全部止まったときの最後の砦で、
+ * 超えたら編集ロックを必ず降ろす。
+ */
+const RESUME_CHECK_TIMEOUT_MS = 75_000;
+const RESUME_RELOAD_TIMEOUT_MS = 75_000;
 
 /** 既定予定を書き込んだ記録を読み損ねた日があるときの表示。その日は前の判定のまま描かれる。再読み込みで直る。 */
 const APPLIED_DAYS_ERROR = '既定予定の記録の読み込みに失敗しました（睡眠の帯が正しくない日があります）。';
@@ -105,7 +115,7 @@ export function useSchedules(
     const [isInitialSyncing, setIsInitialSyncing] = useState(true);
     const [isResumeSyncing, setIsResumeSyncing] = useState(false);
     const [syncError, setSyncError] = useState<string | null>(null);
-    // 戻ったときの判定（syncIfChanged）で、最新の警告の有無を読むため。
+    // 戻ったときの判定（checkResume）で、最新の警告の有無を読むため。
     const syncErrorRef = useRef<string | null>(null);
     useLayoutEffect(() => {
         syncErrorRef.current = syncError;
@@ -119,7 +129,16 @@ export function useSchedules(
     const focusedDateLabelRef = useRef<string | null>(null);
     const pendingSaveDateLabelRef = useRef<string | null>(null);
     const entriesRef = useRef<DayEntry[]>(entries);
-    const isResumeSyncingRef = useRef(false);
+    // 復帰同期が実行中か。編集ロック(isResumeSyncing)とは別に持つ。ロックは読み直しの間だけ掛け、
+    // 目印の確認中は掛けない。
+    const resumeRunningRef = useRef(false);
+    // 見送った復帰同期をやり直したい。編集中・未保存のメモがなくなったときに実行する。
+    const resyncWantedRef = useRef(false);
+    // 復帰同期が決着しなかった・失敗した。次の復帰で目印によらず全読み直しする(syncError は編集で消えるので別に持つ)。
+    const forceReloadRef = useRef(false);
+    // reloadSchedules の世代。期限切れで見限った読み込みや、新しい読み込みに追い越された読み込みの結果は反映しない。
+    const reloadEpochRef = useRef(0);
+    const initialDoneRef = useRef(false);
     const dirtyDateLabelsRef = useRef(new Set<string>());
     const saveQueueRef = useRef(new ScheduleSaveQueue());
     // 画面が持っている予定とメモが DB のどの版か（読み込んだ範囲と、予定・メモの目印）。タブに戻ったときは
@@ -136,7 +155,6 @@ export function useSchedules(
     useLayoutEffect(() => {
         focusedDateLabelRef.current = focusedDateLabel;
         entriesRef.current = entries;
-        isResumeSyncingRef.current = isResumeSyncing;
     });
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -276,6 +294,7 @@ export function useSchedules(
             })
             .finally(() => {
                 setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
+                initialDoneRef.current = true;
                 setIsInitialSyncing(false);
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -288,6 +307,9 @@ export function useSchedules(
      */
     const reloadSchedules = useCallback(async (resumeStamp?: string) => {
         if (!rangeStart || !rangeEnd) return;
+        // 新しい読み込みに追い越された、または期限切れで見限られたら、この読み込みの結果は反映しない
+        // (遅れて届いた古い内容で、その間に保存した予定を戻さない)。読み込み中の表示は追い越した側が持つ。
+        const epoch = ++reloadEpochRef.current;
         setLoadingTop(true);
         setLoadingBottom(true);
         const startDay = format(rangeStart, 'yyyy-MM-dd');
@@ -298,6 +320,7 @@ export function useSchedules(
         if (stamp === undefined) {
             if (await applyDefaults(startDay, endDay)) defaultsFailedRef.current = false;
             stamp = await readStamp(startDay, endDay);
+            if (epoch !== reloadEpochRef.current) return;
         }
         const [schedulesResult, revisionsResult, , notesResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
@@ -305,6 +328,7 @@ export function useSchedules(
             readAppliedDays(startDay, endDay),
             loadNotes(startDay, endDay),
         ]);
+        if (epoch !== reloadEpochRef.current) return;
         loadedStampRef.current =
             stamp && notesResult?.applied && !schedulesResult.error && !revisionsResult.error
                 ? { range: `${startDay}..${endDay}`, stamp }
@@ -322,6 +346,7 @@ export function useSchedules(
             // サーバの最新revisionを取り込めたので、打ち切っていた日の自動保存を再開してよい。
             autoSaveSuspendedRef.current.clear();
             saveFailureCountRef.current.clear();
+            forceReloadRef.current = false;
             setSyncError(null);
         } else {
             setSyncError('スケジュールの同期に失敗しました。');
@@ -332,31 +357,90 @@ export function useSchedules(
     }, [rangeStart, rangeEnd, tz, supabase, loadNotes, applyDefaults, readAppliedDays, readStamp]);
 
     /**
-     * タブに戻ったとき: 目印だけを問い合わせ、読み込んだ範囲のまま変わっていなければ何も読まない。
-     * ただし次のときは目印によらず、既定予定の書き込みも含めて全部読み直す（読み直しが立て直しを兼ねるため）:
-     * 既定予定の書き込みが失敗したまま、自動保存を止めた日や保存の失敗が残っている、同期の警告が出ている。
+     * タブに戻ったとき: 目印だけを問い合わせ、読み込んだ範囲のまま変わっていなければ null(何も読まない)。
+     * 読み直すなら { stamp } を返す(stamp が無いときは既定予定の書き込みも含めて読み直す)。
+     * 次のときは目印によらず、既定予定の書き込みも含めて全部読み直す（読み直しが立て直しを兼ねるため）:
+     * 既定予定の書き込みが失敗したまま、自動保存を止めた日や保存の失敗が残っている、同期の警告が出ている、
+     * 前回の復帰同期が決着しなかった。読むだけなので編集ロックは掛けない(掛けるのは読み直しの間だけ)。
      */
-    const syncIfChanged = useCallback(async () => {
-        if (!rangeStart || !rangeEnd) return;
+    const checkResume = useCallback(async (): Promise<{ stamp?: string } | null> => {
+        if (!rangeStart || !rangeEnd) return null;
         // 予定が変わっていなくても日付はまたぎうる（今日の強調と今日へのスクロールのため）。
         setTodayStr(format(toZonedTime(new Date(), tz), 'yyyy-MM-dd'));
         if (
-            defaultsFailedRef.current
+            forceReloadRef.current
+            || defaultsFailedRef.current
             || autoSaveSuspendedRef.current.size > 0
             || saveFailureCountRef.current.size > 0
             || syncErrorRef.current !== null
         ) {
-            await reloadSchedules();
-            return;
+            return {};
         }
         const startDay = format(rangeStart, 'yyyy-MM-dd');
         const endDay = format(rangeEnd, 'yyyy-MM-dd');
         const stamp = await readStamp(startDay, endDay);
         const loaded = loadedStampRef.current;
-        if (stamp !== null && loaded?.range === `${startDay}..${endDay}` && loaded.stamp === stamp) return;
+        if (stamp !== null && loaded?.range === `${startDay}..${endDay}` && loaded.stamp === stamp) return null;
         // 目印が取れなかったときは、既定予定の書き込みも含めて今までどおり読み直す。
-        await reloadSchedules(stamp ?? undefined);
-    }, [rangeStart, rangeEnd, tz, readStamp, reloadSchedules]);
+        return { stamp: stamp ?? undefined };
+    }, [rangeStart, rangeEnd, tz, readStamp]);
+
+    /** 画面を置き換えてよい状態か。編集中・保存待ち・未保存のメモがあるときは置き換えない。 */
+    const canSyncNow = useCallback(
+        () =>
+            pendingSaveDateLabelRef.current == null
+            && focusedDateLabelRef.current == null
+            && !hasPendingNoteChangesRef.current,
+        []
+    );
+
+    /**
+     * 復帰時の同期(visible と online から呼ぶ)。制御は runResumeSyncOnce(上限・ロックの保証はそちらのテストが持つ)。
+     * 上限を超えた読み直しは見限り(reloadEpoch)、次の復帰で目印によらず全読み直しする。
+     */
+    const runResumeSync = useCallback(
+        () =>
+            runResumeSyncOnce(
+                {
+                    isReady: () => initialDoneRef.current,
+                    canSyncNow,
+                    waitForIdle: () => saveQueueRef.current.waitForIdle(),
+                    check: checkResume,
+                    reload: reloadSchedules,
+                    setLocked: setIsResumeSyncing,
+                    onDeferred: () => {
+                        resyncWantedRef.current = true;
+                    },
+                    onFailed: (error) => {
+                        reloadEpochRef.current += 1;
+                        setLoadingTop(false);
+                        setLoadingBottom(false);
+                        forceReloadRef.current = true;
+                        setSyncError(
+                            error instanceof SyncTimeoutError
+                                ? '復帰時の同期が終わらなかったため中断しました。'
+                                : '復帰時の同期に失敗しました。'
+                        );
+                    },
+                    checkTimeoutMs: RESUME_CHECK_TIMEOUT_MS,
+                    reloadTimeoutMs: RESUME_RELOAD_TIMEOUT_MS,
+                },
+                resumeRunningRef
+            ),
+        [canSyncNow, checkResume, reloadSchedules]
+    );
+
+    // 復帰同期の要求。見送られたときは runResumeSync が resyncWanted を立て直す。
+    const requestResumeSync = useCallback(() => {
+        resyncWantedRef.current = false;
+        void runResumeSync();
+    }, [runResumeSync]);
+
+    // 見送った復帰同期は、編集が終わって未保存のメモもなくなったときにやり直す。
+    useEffect(() => {
+        if (focusedDateLabel != null || hasPendingNoteChanges) return;
+        if (resyncWantedRef.current && document.visibilityState === 'visible') requestResumeSync();
+    }, [focusedDateLabel, hasPendingNoteChanges, requestResumeSync]);
 
     // 今日の節へ飛ぶのは一覧のスクロール枠だけを動かす。scrollIntoView は祖先のスクロールを全部動かすので、
     // スマホで h-screen(100vh)がアドレスバーの分だけ見える高さより大きいとき、文書ごと下へずれてヘッダーが画面外へ出る。
@@ -551,22 +635,15 @@ export function useSchedules(
                 setFocusedDateLabel(null);
                 pendingSaveDateLabelRef.current = null;
             } else if (document.visibilityState === 'visible') {
-                if (
-                    pendingSaveDateLabelRef.current != null
-                    || focusedDateLabelRef.current != null
-                    || hasPendingInboxChanges
-                    || hasPendingNoteChangesRef.current
-                ) {
-                    return;
-                }
-                if (isResumeSyncingRef.current) return;
-                isResumeSyncingRef.current = true;
-                setIsResumeSyncing(true);
-                void saveQueueRef.current.waitForIdle().then(syncIfChanged).finally(() => {
-                    isResumeSyncingRef.current = false;
-                    setIsResumeSyncing(false);
-                });
+                // 保存に失敗して残ったメモは、戻ったときにもう一度保存する(残っている間は復帰同期を見送るため)。
+                // Inbox の未保存は予定の読み直しに関係しないので見送る理由にしない。
+                if (hasPendingNoteChangesRef.current) flushPendingNoteSaves();
+                requestResumeSync();
             }
+        };
+        // 画面を隠さずに通信だけが切れて戻った場合(戻った直後はまだ通信が戻っていないことがある)。
+        const handleOnline = () => {
+            if (document.visibilityState === 'visible') requestResumeSync();
         };
         const handlePageHide = () => {
             flushPendingScheduleSave();
@@ -581,7 +658,9 @@ export function useSchedules(
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('pagehide', handlePageHide);
         window.addEventListener('freeze', handleFreeze);
+        window.addEventListener('online', handleOnline);
         return () => {
+            window.removeEventListener('online', handleOnline);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('pagehide', handlePageHide);
             window.removeEventListener('freeze', handleFreeze);
@@ -593,7 +672,7 @@ export function useSchedules(
         flushPendingNoteSaves,
         hasPendingInboxChanges,
         saveInboxNow,
-        syncIfChanged,
+        requestResumeSync,
     ]);
 
     const loadMoreFuture = useCallback(async () => {
