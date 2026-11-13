@@ -10,8 +10,8 @@ import type { OpenMeteoForecast } from './forecast'
 
 const KEY = 'monocore:weather-cache'
 
-/** Open-Meteo のモデルは1時間ごとに更新される。これより新しい分は取り直さない。 */
-export const FRESH_MS = 30 * 60 * 1000
+/** これより新しい分は取り直さない(本人指定 2026-11-13: 2時間)。 */
+export const FRESH_MS = 2 * 60 * 60 * 1000
 
 type CachedForecast = {
     /** 地点と timezone の指紋。変わったら別物として捨てる。 */
