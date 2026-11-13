@@ -14,6 +14,7 @@ import {
 import { ThemeToggle } from "./ThemeToggle";
 import { createClient } from "@/src/lib/supabase/client";
 import { clearReportCache } from "@/src/lib/reports/cache";
+import { clearWeatherCache } from "@/src/lib/weather/cache";
 import { Button } from "@/src/components/ui/Button";
 
 const MENU_ITEMS = [
@@ -33,6 +34,7 @@ export function Sidebar() {
         const supabase = createClient();
         // ブラウザに置いたレポートの本文は、ログアウトしたら残さない。
         clearReportCache();
+        clearWeatherCache();
         await supabase.auth.signOut();
         window.location.href = "/login";
     }
