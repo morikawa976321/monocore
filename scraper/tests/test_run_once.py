@@ -26,10 +26,14 @@ def no_sleep(monkeypatch):
 
 
 class FakeStore:
-    def __init__(self, existing_links=None):
+    def __init__(self, existing_links=None, expired_image_urls=None, image_rows=None, events=None):
         self._existing_links = set(existing_links or [])
+        self._expired_image_urls = list(expired_image_urls or [])
+        self._image_rows = list(image_rows or [])
+        self.events = events if events is not None else []
         self.upserted = None
         self.deleted_with = None
+        self.updated = {}
 
     def fetch_existing_links(self):
         return set(self._existing_links)
@@ -38,9 +42,44 @@ class FakeStore:
         self.upserted = articles
         return len(articles)
 
-    def delete_expired(self, max_age_days):
+    def fetch_expired_image_urls(self, max_age_days, now=None):
+        return list(self._expired_image_urls)
+
+    def fetch_image_rows(self):
+        return list(self._image_rows)
+
+    def update_image_url(self, link, image_url):
+        self.updated[link] = image_url
+
+    def delete_expired(self, max_age_days, now=None):
+        self.events.append("delete_rows")
         self.deleted_with = max_age_days
         return 2
+
+
+class FakeStorage:
+    """ThumbnailStorage の差し替え。bucket 配下の URL だけを自分のものと見なす。"""
+
+    PREFIX = "https://s.test/thumbs/"
+
+    def __init__(self, events=None):
+        self.events = events if events is not None else []
+        self.deleted = None
+
+    def name_from_url(self, image_url):
+        if image_url and image_url.startswith(self.PREFIX):
+            return image_url[len(self.PREFIX):]
+        return None
+
+    def public_url(self, name):
+        return self.PREFIX + name
+
+    def upload(self, name, data):
+        self.events.append(f"upload:{name}")
+
+    def delete(self, names):
+        self.events.append("delete_objects")
+        self.deleted = list(names)
 
 
 def article(link):
@@ -95,3 +134,56 @@ def test_collect_all_shares_one_link_set_across_sites():
         collect_all(CONFIG, set(), sleep_seconds=0)
 
     assert "https://dup.test/1" in seen
+
+
+def test_run_once_deletes_expired_thumbnails_before_rows():
+    """画像を先に消すこと。行を先に消すと、画像の削除に失敗したとき二度と掃除されない。"""
+    events = []
+    store = FakeStore(
+        expired_image_urls=[
+            FakeStorage.PREFIX + "old1.webp",
+            "https://external.test/original.jpg",  # 縮小前の行。バケットの外なので触らない
+            FakeStorage.PREFIX + "old2.webp",
+        ],
+        events=events,
+    )
+    storage = FakeStorage(events)
+
+    with patch.object(run_once_module, "collect_new_rss_articles", return_value=[]):
+        run_once(store, CONFIG, storage)
+
+    assert storage.deleted == ["old1.webp", "old2.webp"]
+    assert events == ["delete_objects", "delete_rows"]
+
+
+def test_run_once_makes_thumbnails_for_new_articles_before_upsert():
+    store = FakeStore()
+    storage = FakeStorage()
+    new = {"source": "S", "title": "T", "link": "https://a.test/1", "published": None, "image": "https://img.test/1.jpg"}
+
+    with (
+        patch.object(run_once_module, "collect_new_rss_articles", side_effect=lambda *a, **k: [dict(new)] if "a.test" in a[0] else []),
+        patch.object(run_once_module, "attach_thumbnails", side_effect=lambda st, arts: [x.update(image=st.public_url("t.webp")) for x in arts]),
+    ):
+        run_once(store, CONFIG, storage)
+
+    assert [a["image"] for a in store.upserted] == [FakeStorage.PREFIX + "t.webp"]
+
+
+def test_backfill_only_touches_rows_pointing_outside_the_bucket():
+    store = FakeStore(
+        image_rows=[
+            {"link": "https://a.test/done", "image_url": FakeStorage.PREFIX + "x.webp"},
+            {"link": "https://a.test/orig", "image_url": "https://img.test/orig.jpg"},
+            {"link": "https://a.test/fail", "image_url": "https://img.test/fail.jpg"},
+        ]
+    )
+
+    def fake_build(storage, link, image_url, fetch=None):
+        return None if "fail" in image_url else storage.public_url("new.webp")
+
+    with patch.object(run_once_module, "build_thumbnail_url", side_effect=fake_build):
+        result = run_once_module.backfill_thumbnails(store, FakeStorage(), sleep_seconds=0)
+
+    assert result == {"targets": 2, "converted": 1}
+    assert store.updated == {"https://a.test/orig": FakeStorage.PREFIX + "new.webp"}

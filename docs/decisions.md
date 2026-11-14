@@ -101,6 +101,7 @@
 - 保持は 8 日で物理削除。DB に蓄積して表示側だけ直近 N 日に絞る案は採らなかった(2026-08-14)。
 - scraper は Python のまま置き、node へ書き直さない。統合で得たいもの(フォルダをなくす・スキーマとライターを同じコミットに乗せる)は言語に依存しない。書き直しの対価は、既に直したバグ(エンコーディングのフォールバック、OGP の属性順2パターン、`published_parsed` と `updated_parsed` の優先順、JST 変換、RDF フィードの解釈)と、一度解いた実行環境の問題(`pythonw.exe` のウィンドウレス起動。`node.exe` はコンソールアプリなので毎時ウィンドウが点滅する)を買い直すこと。polyglot の対価(venv・requirements・pytest が入る)は受け入れる。2026-08-14。
 - 移設元 `mf/news_scraping` の git 履歴は存在しない(archive ではなく削除)。scraper のコードがそう書かれている理由は**コード内のコメントにしか残っていない**ので、コメントを消すと復元できない。
+- サムネイルは scraper が 480×320 の WebP に縮めて Supabase Storage の公開バケット `news-thumbs` に置き、`articles.image_url` はその URL を指す(2026-11-15)。og:image 原寸(実測: 幅の中央値 1200px・1枚の中央値 229KB・最大 2.9MB)を 160×107 CSS px の枠に読んでいて、初回表示だけで約 11MB だった。縮小後は 1枚 約 13KB。外部のリサイズ中継(wsrv.nl 等)は依存と閲覧先の漏えいが増えるので、`next/image` は Vercel の画像最適化の無料枠を毎日入れ替わる記事で超えやすいので採らなかった。作れなかった記事は元の URL のまま保存して続行し、`python run_once.py --backfill` で作り直す。期限切れの記事の画像は、行を消す前に scraper が消す(順序の理由は `scraper/run_once.py`)。
 
 ## /drain 報告板(2026-10-09 廃止)
 

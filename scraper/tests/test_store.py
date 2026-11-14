@@ -32,6 +32,7 @@ class FakeSession:
     """requests.Session の差し替え。呼び出しを記録するだけ。"""
 
     def __init__(self, get_responses=None, post_response=None, delete_response=None):
+        self.patch_calls = []
         self.get_responses = list(get_responses or [])
         self.post_response = post_response or FakeResponse(201)
         self.delete_response = delete_response or FakeResponse(204)
@@ -50,6 +51,10 @@ class FakeSession:
     def delete(self, url, headers=None, timeout=None):
         self.delete_calls.append({"url": url, "headers": headers})
         return self.delete_response
+
+    def patch(self, url, params=None, headers=None, data=None, timeout=None):
+        self.patch_calls.append({"url": url, "params": params, "data": data})
+        return FakeResponse(204)
 
 
 def make_store(session):
@@ -170,6 +175,29 @@ def test_delete_expired_returns_none_when_count_absent():
     session = FakeSession(delete_response=FakeResponse(204))
     store = make_store(session)
     assert store.delete_expired(8) is None
+
+
+def test_fetch_expired_image_urls_uses_the_same_filter_as_delete():
+    """画像の掃除対象と行の削除対象は、同じしきい値・同じ条件で決まること。"""
+    session = FakeSession(
+        get_responses=[FakeResponse(200, [{"image_url": "https://x.test/a.webp"}, {"image_url": None}])]
+    )
+    store = make_store(session)
+    now = datetime(2026, 8, 14, 13, 0, 0, tzinfo=timezone.utc)
+
+    urls = store.fetch_expired_image_urls(8, now)
+
+    assert urls == ["https://x.test/a.webp"]
+    assert expired_filter(expiry_threshold(now, 8)) in session.get_calls[0]["url"]
+
+
+def test_update_image_url_targets_one_link():
+    session = FakeSession()
+    make_store(session).update_image_url("https://example.test/a?x=1&y=2", "https://x.test/t.webp")
+
+    call = session.patch_calls[0]
+    assert call["params"] == {"link": "eq.https://example.test/a?x=1&y=2"}
+    assert json.loads(call["data"].decode("utf-8")) == {"image_url": "https://x.test/t.webp"}
 
 
 # ---------------------------------------------------------------

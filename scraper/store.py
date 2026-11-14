@@ -9,6 +9,10 @@
     リポジトリの外にあるので鍵をコミットする事故が起きない。既定は remote（本番）で、
     local はローカルSupabaseを指す検証専用。**キーの値はログにも例外にも出さない。**
 
+■ サムネイル
+    image_url は表示用の縮小画像(Storage の公開URL)を指す。作成と掃除は thumbnails.py、
+    記事行の読み書きだけをここが持つ。
+
 ■ ローカル状態を持たない
     既存リンク集合は毎回 DB から引く。書き込みに失敗した記事は次の巡回で自然に
     再取得されるので、「ローカルとDBが食い違う」状態が原理的に発生しない。
@@ -122,31 +126,59 @@ class ArticleStore:
             # response.text にキーは含まれない（キーはヘッダにしか無い）。
             raise StoreError(f"{what} に失敗しました: HTTP {response.status_code} {response.text}")
 
-    def fetch_existing_links(self):
-        """既存の link を全件返す。max_rows で切れないよう Range でページングする。"""
-        links = set()
+    def _fetch_all(self, url, params=None):
+        """GET を max_rows で切れないよう Range でページングして、全行のリストを返す。"""
+        rows = []
         offset = 0
         while True:
             headers = dict(self._headers)
             headers["Range-Unit"] = "items"
             headers["Range"] = f"{offset}-{offset + PAGE_SIZE - 1}"
-            response = self._session.get(
-                self._endpoint,
-                params={"select": "link"},
-                headers=headers,
-                timeout=self._timeout,
-            )
-            self._check(response, "既存リンクの取得")
+            response = self._session.get(url, params=params, headers=headers, timeout=self._timeout)
+            self._check(response, "記事の取得")
 
-            rows = response.json()
-            for row in rows:
-                link = row.get("link")
-                if link:
-                    links.add(link)
-
-            if len(rows) < PAGE_SIZE:
-                return links
+            page = response.json()
+            rows.extend(page)
+            if len(page) < PAGE_SIZE:
+                return rows
             offset += PAGE_SIZE
+
+    def fetch_existing_links(self):
+        """既存の link を全件返す。max_rows で切れないよう Range でページングする。"""
+        rows = self._fetch_all(self._endpoint, params={"select": "link"})
+        return {row["link"] for row in rows if row.get("link")}
+
+    def fetch_image_rows(self):
+        """画像のある記事の (link, image_url) を全件返す。サムネイルの作り直しに使う。"""
+        return self._fetch_all(
+            self._endpoint,
+            params={"select": "link,image_url", "image_url": "not.is.null"},
+        )
+
+    def fetch_expired_image_urls(self, max_age_days, now=None):
+        """delete_expired が消す行の image_url を返す(Storage 側の掃除に使う)。
+
+        同じ now を delete_expired にも渡すこと。しきい値がずれると、消える行と
+        掃除した画像が食い違い、画像だけが残る。
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+        threshold = expiry_threshold(now, max_age_days)
+        rows = self._fetch_all(
+            f"{self._endpoint}?select=image_url&image_url=not.is.null&{expired_filter(threshold)}"
+        )
+        return [row["image_url"] for row in rows if row.get("image_url")]
+
+    def update_image_url(self, link, image_url):
+        """1記事の image_url だけを書き換える。"""
+        response = self._session.patch(
+            self._endpoint,
+            params={"link": f"eq.{link}"},
+            headers={**self._headers, "Prefer": "return=minimal"},
+            data=json.dumps({"image_url": image_url}, ensure_ascii=False).encode("utf-8"),
+            timeout=self._timeout,
+        )
+        self._check(response, "画像URLの更新")
 
     def upsert_articles(self, articles, collected_at=None):
         """記事を link 単位で upsert する。既存行は上書きしない。
