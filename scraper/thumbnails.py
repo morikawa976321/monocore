@@ -21,6 +21,7 @@
 ■ 取得先の制限
     og:image の URL は外部サイトが決めるので、http/https 以外・公開アドレスでないホスト
     (ループバック・LAN・リンクローカル)は取りに行かない。リダイレクトも1回ずつ同じ検査を通す。
+    URL は requests と同じ解釈で検査する(`_require_public_http_url` の docstring)。
     DNS の名前解決と実際の接続の間に別アドレスへ差し替える攻撃(DNS rebinding)までは防がない
     (手元PCの1時間おきのジョブで、取った画像が画像として読めなければ捨てるため受け入れた)。
 """
@@ -33,6 +34,7 @@ import socket
 from urllib.parse import urljoin, urlparse
 
 import requests
+import urllib3
 from PIL import Image, ImageOps
 
 from log_config import get_logger
@@ -62,6 +64,7 @@ _USER_AGENT = (
     "Chrome/118.0.0.0 Safari/537.36"
 )
 _REDIRECT_STATUSES = (301, 302, 303, 307, 308)
+_NAT64_NETWORK = ipaddress.IPv6Network("64:ff9b::/96")
 
 
 class ThumbnailError(Exception):
@@ -73,20 +76,44 @@ def thumbnail_name(link):
     return hashlib.sha256(link.encode("utf-8")).hexdigest()[:32] + ".webp"
 
 
+def _is_public_address(address):
+    if address.is_multicast or not address.is_global:
+        return False
+    # NAT64(64:ff9b::/96)は末尾32bitが IPv4 アドレスで、is_global は中身を見ない。
+    if isinstance(address, ipaddress.IPv6Address) and address in _NAT64_NETWORK:
+        return _is_public_address(ipaddress.IPv4Address(int(address) & 0xFFFFFFFF))
+    return True
+
+
 def _require_public_http_url(url):
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+    """取得してよい URL かを検査し、requests が実際に送る形に正規化した URL を返す。
+
+    検査と送信で URL の解釈が違うと迂回される(ホストの直後に「バックスラッシュ + @ + 公開IP」を
+    続けた URL は、標準の urlparse ではホストが公開IP、requests/urllib3 では前半の内部アドレスに
+    なる。argon のレビューで指摘され、テストに例を入れてある)。そこで requests と同じ
+    組み立てを通した URL を urllib3 のパーサで読み、その URL をそのまま送る。
+    """
+    try:
+        prepared_url = requests.Request("GET", url).prepare().url
+        parsed = urllib3.util.parse_url(prepared_url)
+    except (requests.RequestException, ValueError, urllib3.exceptions.LocationParseError):
+        raise ThumbnailError("URL を解釈できません") from None
+
+    if parsed.scheme not in ("http", "https") or not parsed.host or parsed.auth:
         raise ThumbnailError("http/https の URL ではありません")
 
+    host = parsed.host.strip("[]")
     try:
-        infos = socket.getaddrinfo(parsed.hostname, parsed.port or None, proto=socket.IPPROTO_TCP)
+        infos = socket.getaddrinfo(host, parsed.port, proto=socket.IPPROTO_TCP)
     except OSError:
         raise ThumbnailError("ホスト名を解決できません") from None
 
     for info in infos:
         address = info[4][0].split("%")[0]  # IPv6 のスコープ ID(fe80::1%eth0)を落とす
-        if not ipaddress.ip_address(address).is_global:
+        if not _is_public_address(ipaddress.ip_address(address)):
             raise ThumbnailError("公開アドレスでないホストです")
+
+    return prepared_url
 
 
 def fetch_image_bytes(url, session=None, timeout=DOWNLOAD_TIMEOUT_SECONDS):
@@ -95,7 +122,7 @@ def fetch_image_bytes(url, session=None, timeout=DOWNLOAD_TIMEOUT_SECONDS):
     headers = {"User-Agent": _USER_AGENT}
 
     for _ in range(MAX_REDIRECTS + 1):
-        _require_public_http_url(url)
+        url = _require_public_http_url(url)
         with session.get(
             url, headers=headers, timeout=timeout, stream=True, allow_redirects=False
         ) as response:

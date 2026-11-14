@@ -111,8 +111,13 @@ def backfill_thumbnails(store, storage, sleep_seconds=BACKFILL_SLEEP_SECONDS):
     for row in targets:
         thumbnail_url = build_thumbnail_url(storage, row["link"], row["image_url"])
         if thumbnail_url:
-            store.update_image_url(row["link"], thumbnail_url)
-            converted += 1
+            if store.update_image_url(row["link"], thumbnail_url):
+                converted += 1
+            else:
+                # 作っている間に毎時ジョブが期限切れの行を消した。置いた画像は孤児になるので消す。
+                # 残る窓: 毎時ジョブが期限切れの画像を数えたあと、行を消す前に、ここが置いて
+                # 更新し終えた場合。間は1往復で、孤児は1枚 約13KB なので受け入れる。
+                storage.delete([storage.name_from_url(thumbnail_url)])
         if sleep_seconds:
             time.sleep(sleep_seconds)
 

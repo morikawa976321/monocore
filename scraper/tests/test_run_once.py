@@ -34,12 +34,15 @@ class FakeStore:
         self.upserted = None
         self.deleted_with = None
         self.updated = {}
+        self.vanished_links = set()
 
     def fetch_existing_links(self):
         return set(self._existing_links)
 
     def upsert_articles(self, articles):
-        self.upserted = articles
+        # 呼び出し時点の中身を保存する。参照のまま持つと、upsert のあとに in-place で
+        # 書き換えても assert が通ってしまい、順序の取り違えを検出できない。
+        self.upserted = [dict(a) for a in articles]
         return len(articles)
 
     def fetch_expired_image_urls(self, max_age_days, now=None):
@@ -49,7 +52,10 @@ class FakeStore:
         return list(self._image_rows)
 
     def update_image_url(self, link, image_url):
+        if link in self.vanished_links:
+            return False
         self.updated[link] = image_url
+        return True
 
     def delete_expired(self, max_age_days, now=None):
         self.events.append("delete_rows")
@@ -161,9 +167,14 @@ def test_run_once_makes_thumbnails_for_new_articles_before_upsert():
     storage = FakeStorage()
     new = {"source": "S", "title": "T", "link": "https://a.test/1", "published": None, "image": "https://img.test/1.jpg"}
 
+    def fake_attach(st, arts):
+        for x in arts:
+            x["image"] = st.public_url("t.webp")
+        return len(arts)
+
     with (
         patch.object(run_once_module, "collect_new_rss_articles", side_effect=lambda *a, **k: [dict(new)] if "a.test" in a[0] else []),
-        patch.object(run_once_module, "attach_thumbnails", side_effect=lambda st, arts: [x.update(image=st.public_url("t.webp")) for x in arts]),
+        patch.object(run_once_module, "attach_thumbnails", side_effect=fake_attach),
     ):
         run_once(store, CONFIG, storage)
 
@@ -187,3 +198,18 @@ def test_backfill_only_touches_rows_pointing_outside_the_bucket():
 
     assert result == {"targets": 2, "converted": 1}
     assert store.updated == {"https://a.test/orig": FakeStorage.PREFIX + "new.webp"}
+
+
+def test_backfill_deletes_the_new_thumbnail_when_the_row_vanished_meanwhile():
+    """作っている間に期限切れ削除で行が消えたら、置いた画像は孤児になるので消すこと。"""
+    store = FakeStore(image_rows=[{"link": "https://a.test/gone", "image_url": "https://img.test/gone.jpg"}])
+    store.vanished_links.add("https://a.test/gone")
+    storage = FakeStorage()
+
+    with patch.object(
+        run_once_module, "build_thumbnail_url", side_effect=lambda st, link, url, fetch=None: st.public_url("gone.webp")
+    ):
+        result = run_once_module.backfill_thumbnails(store, storage, sleep_seconds=0)
+
+    assert result == {"targets": 1, "converted": 0}
+    assert storage.deleted == ["gone.webp"]

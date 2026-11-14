@@ -13,6 +13,7 @@ from thumbnails import (
     _require_public_http_url,
     attach_thumbnails,
     build_thumbnail_url,
+    fetch_image_bytes,
     make_thumbnail,
     thumbnail_name,
 )
@@ -94,6 +95,17 @@ def test_pixel_limit_rejects_before_decoding(monkeypatch):
         "http://169.254.169.254/latest/meta-data",
         "http://[::1]/a.png",
         "http://[fe80::1]/a.png",
+        # requests と urlparse で解釈が割れる URL(ホストは requests では 127.0.0.1)
+        "http://127.0.0.1\\@8.8.8.8/a.png",
+        "http://169.254.169.254\\@8.8.8.8/latest/meta-data",
+        "http://user:pw@8.8.8.8/a.png",
+        "http://example.com:99999/a.png",
+        "http://[::1/a.png",
+        "http://224.0.0.1/a.png",
+        "http://[ff02::1]/a.png",
+        "http://[64:ff9b::127.0.0.1]/a.png",
+        "http://[::ffff:127.0.0.1]/a.png",
+        "http://2130706433/a.png",
     ],
 )
 def test_non_public_or_non_http_urls_are_rejected(url):
@@ -101,8 +113,77 @@ def test_non_public_or_non_http_urls_are_rejected(url):
         _require_public_http_url(url)
 
 
-def test_public_literal_address_is_accepted():
-    _require_public_http_url("https://8.8.8.8/a.png")
+def test_public_literal_address_is_accepted_and_returned_normalized():
+    assert _require_public_http_url("https://8.8.8.8/a.png") == "https://8.8.8.8/a.png"
+    # NAT64 でも埋め込まれた IPv4 が公開アドレスなら通す。
+    _require_public_http_url("http://[64:ff9b::8.8.8.8]/a.png")
+
+
+class FakeStreamResponse:
+    def __init__(self, status_code=200, headers=None, chunks=()):
+        self.status_code = status_code
+        self.headers = headers or {}
+        self._chunks = chunks
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+    def iter_content(self, chunk_size=0):
+        return iter(self._chunks)
+
+
+class FakeGetSession:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.urls = []
+
+    def get(self, url, **kwargs):
+        self.urls.append(url)
+        assert kwargs["allow_redirects"] is False  # 自分で1回ずつ検査するため
+        return self.responses.pop(0)
+
+
+def test_fetch_checks_the_redirect_target_before_following():
+    session = FakeGetSession([FakeStreamResponse(302, {"Location": "http://127.0.0.1/internal.png"})])
+    with pytest.raises(ThumbnailError):
+        fetch_image_bytes("https://8.8.8.8/a.png", session=session)
+    assert session.urls == ["https://8.8.8.8/a.png"]  # 内側へは取りに行かない
+
+
+def test_fetch_follows_a_public_redirect_and_returns_bytes():
+    session = FakeGetSession(
+        [
+            FakeStreamResponse(301, {"Location": "/b.png"}),
+            FakeStreamResponse(200, {}, [b"ab", b"cd"]),
+        ]
+    )
+    assert fetch_image_bytes("https://8.8.8.8/a.png", session=session) == b"abcd"
+    assert session.urls == ["https://8.8.8.8/a.png", "https://8.8.8.8/b.png"]
+
+
+def test_fetch_gives_up_after_too_many_redirects():
+    loop = [FakeStreamResponse(302, {"Location": "https://8.8.8.8/next"}) for _ in range(thumbnails.MAX_REDIRECTS + 1)]
+    with pytest.raises(ThumbnailError):
+        fetch_image_bytes("https://8.8.8.8/a.png", session=FakeGetSession(loop))
+
+
+def test_fetch_rejects_oversize_by_content_length_and_by_streamed_total(monkeypatch):
+    monkeypatch.setattr(thumbnails, "MAX_DOWNLOAD_BYTES", 10)
+    declared = FakeGetSession([FakeStreamResponse(200, {"Content-Length": "11"}, [b"x"])])
+    with pytest.raises(ThumbnailError):
+        fetch_image_bytes("https://8.8.8.8/a.png", session=declared)
+
+    # Content-Length を偽る/省く相手でも、受け取った量で止める。
+    streamed = FakeGetSession([FakeStreamResponse(200, {}, [b"123456", b"123456"])])
+    with pytest.raises(ThumbnailError):
+        fetch_image_bytes("https://8.8.8.8/a.png", session=streamed)
 
 
 # ---------------------------------------------------------------

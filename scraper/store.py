@@ -127,7 +127,11 @@ class ArticleStore:
             raise StoreError(f"{what} に失敗しました: HTTP {response.status_code} {response.text}")
 
     def _fetch_all(self, url, params=None):
-        """GET を max_rows で切れないよう Range でページングして、全行のリストを返す。"""
+        """GET を max_rows で切れないよう Range でページングして、全行のリストを返す。
+
+        呼び出し側は order=link.asc を付けること。並びの無い OFFSET は、ページを別々の
+        リクエストで読むと境界で行が重複・欠落しうる。
+        """
         rows = []
         offset = 0
         while True:
@@ -145,14 +149,14 @@ class ArticleStore:
 
     def fetch_existing_links(self):
         """既存の link を全件返す。max_rows で切れないよう Range でページングする。"""
-        rows = self._fetch_all(self._endpoint, params={"select": "link"})
+        rows = self._fetch_all(self._endpoint, params={"select": "link", "order": "link.asc"})
         return {row["link"] for row in rows if row.get("link")}
 
     def fetch_image_rows(self):
         """画像のある記事の (link, image_url) を全件返す。サムネイルの作り直しに使う。"""
         return self._fetch_all(
             self._endpoint,
-            params={"select": "link,image_url", "image_url": "not.is.null"},
+            params={"select": "link,image_url", "image_url": "not.is.null", "order": "link.asc"},
         )
 
     def fetch_expired_image_urls(self, max_age_days, now=None):
@@ -165,20 +169,25 @@ class ArticleStore:
             now = datetime.now(timezone.utc)
         threshold = expiry_threshold(now, max_age_days)
         rows = self._fetch_all(
-            f"{self._endpoint}?select=image_url&image_url=not.is.null&{expired_filter(threshold)}"
+            f"{self._endpoint}?select=image_url&image_url=not.is.null&order=link.asc&{expired_filter(threshold)}"
         )
         return [row["image_url"] for row in rows if row.get("image_url")]
 
     def update_image_url(self, link, image_url):
-        """1記事の image_url だけを書き換える。"""
+        """1記事の image_url だけを書き換える。更新した行があれば True。
+
+        PostgREST の PATCH は対象が0行でも成功を返す。行が途中で(期限切れ削除で)
+        消えていた場合を呼び出し側が見分けられるよう、更新した行を返させて数える。
+        """
         response = self._session.patch(
             self._endpoint,
-            params={"link": f"eq.{link}"},
-            headers={**self._headers, "Prefer": "return=minimal"},
+            params={"link": f"eq.{link}", "select": "link"},
+            headers={**self._headers, "Prefer": "return=representation"},
             data=json.dumps({"image_url": image_url}, ensure_ascii=False).encode("utf-8"),
             timeout=self._timeout,
         )
         self._check(response, "画像URLの更新")
+        return len(response.json()) > 0
 
     def upsert_articles(self, articles, collected_at=None):
         """記事を link 単位で upsert する。既存行は上書きしない。

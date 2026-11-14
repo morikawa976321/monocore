@@ -33,6 +33,7 @@ class FakeSession:
 
     def __init__(self, get_responses=None, post_response=None, delete_response=None):
         self.patch_calls = []
+        self.patch_rows = [{"link": "x"}]
         self.get_responses = list(get_responses or [])
         self.post_response = post_response or FakeResponse(201)
         self.delete_response = delete_response or FakeResponse(204)
@@ -53,8 +54,8 @@ class FakeSession:
         return self.delete_response
 
     def patch(self, url, params=None, headers=None, data=None, timeout=None):
-        self.patch_calls.append({"url": url, "params": params, "data": data})
-        return FakeResponse(204)
+        self.patch_calls.append({"url": url, "params": params, "data": data, "headers": headers})
+        return FakeResponse(200, self.patch_rows)
 
 
 def make_store(session):
@@ -191,12 +192,33 @@ def test_fetch_expired_image_urls_uses_the_same_filter_as_delete():
     assert expired_filter(expiry_threshold(now, 8)) in session.get_calls[0]["url"]
 
 
+def test_update_image_url_reports_whether_a_row_was_updated():
+    session = FakeSession()
+    assert make_store(session).update_image_url("https://example.test/a", "https://x.test/t.webp") is True
+
+    session.patch_rows = []  # 対象の行が既に消えている
+    assert make_store(session).update_image_url("https://example.test/a", "https://x.test/t.webp") is False
+
+
+def test_paged_reads_are_ordered_so_page_boundaries_are_stable():
+    session = FakeSession(get_responses=[FakeResponse(200, []), FakeResponse(200, []), FakeResponse(200, [])])
+    store = make_store(session)
+
+    store.fetch_existing_links()
+    store.fetch_image_rows()
+    store.fetch_expired_image_urls(8)
+
+    assert session.get_calls[0]["params"]["order"] == "link.asc"
+    assert session.get_calls[1]["params"]["order"] == "link.asc"
+    assert "order=link.asc" in session.get_calls[2]["url"]
+
+
 def test_update_image_url_targets_one_link():
     session = FakeSession()
     make_store(session).update_image_url("https://example.test/a?x=1&y=2", "https://x.test/t.webp")
 
     call = session.patch_calls[0]
-    assert call["params"] == {"link": "eq.https://example.test/a?x=1&y=2"}
+    assert call["params"]["link"] == "eq.https://example.test/a?x=1&y=2"
     assert json.loads(call["data"].decode("utf-8")) == {"image_url": "https://x.test/t.webp"}
 
 
