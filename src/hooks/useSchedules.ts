@@ -722,11 +722,14 @@ export function useSchedules(
         ): Promise<string | null> => {
             const oldStartUtc = localTimeToUtc(oldStartDay, '0000', tz);
             const oldEndUtc = localTimeToUtc(format(addDays(parseISO(oldEndDay), 1), 'yyyy-MM-dd'), '0000', tz);
-            const [chunk, oldSchedules] = await Promise.all([
-                readStamp(chunkStartDay, chunkEndDay),
-                getSchedulesStamp(supabase, oldStartUtc, oldEndUtc),
-            ]);
-            if (chunk === null || oldSchedules.data === null) return null;
+            // 順番が要る: 広げる分を先に取り、旧範囲を後で確かめる。並べて取ると、旧範囲の確認のあとに旧範囲へ
+            // 直接書き込まれ、そのあと広げる分にも書き込まれて(新しい updated_at)、広げる分の目印がそれを
+            // 返すと、旧範囲の書き込みが広げる分の updated_at に隠れる。広げる分を先に取れば、そこに映った
+            // 書き込みより前の旧範囲の書き込みは、後の確認が必ず拾う。
+            const chunk = await readStamp(chunkStartDay, chunkEndDay);
+            if (chunk === null) return null;
+            const oldSchedules = await getSchedulesStamp(supabase, oldStartUtc, oldEndUtc);
+            if (oldSchedules.data === null) return null;
             return oldSchedules.data === schedulesPartOf(base.stamp) ? chunk : null;
         },
         [readStamp, supabase, tz]
