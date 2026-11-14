@@ -11,6 +11,10 @@
  * 拾えない(予定のテーブルへの直接の INSERT / UPDATE / DELETE は権限上できる)ので、呼び出し側は合成の前に、
  * 旧範囲の予定の目印が手元の目印と同じことを確かめる(schedulesPartOf)。メモは版を持たないので、日ごとに
  * 持って隠れないようにする。
+ *
+ * 残る穴(受け入れた): 版を進めない直接書き込みを、取引を開いたまま広げる操作をまたいで保持し、あとで
+ * COMMIT した場合。updated_at は取引の開始時刻(now())なので、広げる分の新しい updated_at に隠れる。
+ * 画面と AI は版つきの RPC でしか書かないので起きず、手作業の SQL でも、読み直し(再読み込みボタン)で直る。
  */
 
 type Parts = { schedules: string; revisions: string; notes: string };
