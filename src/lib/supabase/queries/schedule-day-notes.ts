@@ -20,23 +20,25 @@ export async function getScheduleDayNotes(
 }
 
 /**
- * 範囲内のメモの目印(行数といちばん新しい updated_at)。getSchedulesStamp と同じ考え方。メモは版を持たないので、
- * 先に始まって後から確定した upsert を見落とす隙間が残る(1文の upsert の取引の長さ、数ミリ秒程度)。
+ * 範囲内のメモの目印: 日ごとの day_key と updated_at をつないだ文字列(`日:updated_at,…`、日の昇順)。メモは版を
+ * 持たないので updated_at が頼りで、先に始まって後から確定した upsert を見落とす隙間が残る(1文の upsert の
+ * 取引の長さ、数ミリ秒程度)。行数と最新の updated_at だけにしないのは、無限スクロールで範囲を広げたとき、
+ * 隣り合う範囲の目印を合成して範囲全体の目印にするため(src/lib/schedules/stamp.ts)。最新の updated_at だけだと、
+ * 広げた分の新しい編集に旧範囲の編集が隠れる。メモは消さない(DELETE の権限が無い)ので、行は増えるだけ。
  */
 export async function getScheduleDayNotesStamp(
     supabase: SupabaseClient<Database>,
     startDay: string,
     endDay: string,
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
-    const { data, count, error } = await supabase
+    const { data, error } = await supabase
         .from('schedule_day_notes')
-        .select('updated_at', { count: 'exact' })
+        .select('day_key,updated_at')
         .gte('day_key', startDay)
         .lte('day_key', endDay)
-        .order('updated_at', { ascending: false })
-        .limit(1)
+        .order('day_key', { ascending: true })
     if (error) return { data: null, error }
-    return { data: `${count ?? 0}|${data?.[0]?.updated_at ?? ''}`, error: null }
+    return { data: (data ?? []).map((r) => `${r.day_key}:${r.updated_at}`).join(','), error: null }
 }
 
 /** 指定日のメモ本文を upsert する。user_id は DEFAULT auth.uid() + RLS により自動設定。 */

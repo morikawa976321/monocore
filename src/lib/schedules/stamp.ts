@@ -1,11 +1,15 @@
 /**
  * 復帰同期の目印(useSchedules の readStamp)の合成。
  *
- * 目印は `予定#版#メモ` の3つをつないだ文字列で、予定とメモは `行数|いちばん新しい updated_at`、版は
- * `日:版,日:版,…`(日の昇順)。どれも隣り合う範囲の目印から範囲全体の目印を作れる(行数は足し、updated_at は
- * 新しい方、版は日の順につなぐ)。無限スクロールで範囲を広げたとき、広げた分だけの目印を取って合成すれば、
- * 範囲全体の目印を取り直さずに「いま手元にある内容の目印」を保てる。合成したものが次の復帰で取った目印と
- * 食い違えば(旧範囲が離れている間に書き換わっていたなど)、今までどおり読み直す。
+ * 目印は `予定#版#メモ` の3つをつないだ文字列で、予定は `行数|いちばん新しい updated_at`、版は `日:版,日:版,…`、
+ * メモは `日:updated_at,…`(どちらも日の昇順)。どれも隣り合う範囲の目印から範囲全体の目印を作れる(予定は
+ * 行数を足して updated_at は新しい方、版とメモは日の順につなぐ)。無限スクロールで範囲を広げたとき、広げた分だけの
+ * 目印を取って合成すれば、範囲全体の目印を取り直さずに「いま手元にある内容の目印」を保てる。合成したものが
+ * 次の復帰で取った目印と食い違えば(旧範囲が離れている間に書き換わっていたなど)、今までどおり読み直す。
+ *
+ * 予定だけは「最新の updated_at」なので、旧範囲の編集が広げた分の新しい編集に隠れうる。それを拾うのは版
+ * (予定の書き込みは画面も AI も RPC で、その日の版を必ず進める)。メモは版を持たないので、日ごとに持って
+ * 隠れないようにする。
  */
 
 type Parts = { schedules: string; revisions: string; notes: string };
@@ -44,8 +48,9 @@ export function combineStamps(earlier: string, later: string): string | null {
     const b = split(later);
     if (!a || !b) return null;
     const schedules = combineCountAndLatest(a.schedules, b.schedules);
-    const notes = combineCountAndLatest(a.notes, b.notes);
-    if (schedules === null || notes === null) return null;
-    const revisions = [a.revisions, b.revisions].filter((part) => part !== '').join(',');
+    if (schedules === null) return null;
+    const join = (x: string, y: string) => [x, y].filter((part) => part !== '').join(',');
+    const revisions = join(a.revisions, b.revisions);
+    const notes = join(a.notes, b.notes);
     return `${schedules}#${revisions}#${notes}`;
 }
