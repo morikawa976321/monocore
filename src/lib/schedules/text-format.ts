@@ -123,20 +123,29 @@ export function scheduleRowsToDayContent(
 }
 
 export type DayContentIssue = {
-    /** 問題のある行の文字列（先頭行）。 */
+    /** 問題のある行の文字列（先頭行）。overlap は重なっている2行のうち開始が遅い方。 */
     line: string;
-    kind: 'orphan' | 'missing-end' | 'reversed';
+    kind: 'orphan' | 'missing-end' | 'reversed' | 'overlap';
 };
+
+function hhmmToMinutes(hhmm: string): number {
+    return parseInt(hhmm.slice(0, 2), 10) * 60 + parseInt(hhmm.slice(2, 4), 10);
+}
 
 /**
  * 1日分のテキストの不正な行を返す。1件でもあればその日は保存しない（useSchedules.saveDay）。
  * - orphan: 時刻ブロックに属さない非空行（DB に保存できない）
  * - missing-end: 起床以外で終了時刻の無い予定（空き時間の計算は全予定の開始・終了を前提にする）
  * - reversed: 終了が開始より前の予定（日付を跨ぐ予定は日ごとに分けて書く）
+ * - overlap: 別の予定と時間が重なる予定（本人指定 2026-11-14。時間の台帳を1本に保つため。
+ *   半開区間 [開始, 終了) で比べるので、終了と開始が同じ時刻で接するのは重ならない。
+ *   終了の無い行（起床）と、長さが 0 の行・逆向きの行は比べない）。
+ *   同じ規則を monocore.py の schedules add（AI の書き込み）と apply_default_schedules（既定予定の書き込み）も持つ。
  */
 export function findDayContentIssues(content: string): DayContentIssue[] {
     const lines = content.split(/\r?\n/);
     const issues: DayContentIssue[] = [];
+    const spans: { line: string; start: number; end: number }[] = [];
     let i = 0;
     while (i < lines.length) {
         const line = lines[i];
@@ -159,7 +168,16 @@ export function findDayContentIssues(content: string): DayContentIssue[] {
             if (!isWakeActivity(activity)) issues.push({ line, kind: 'missing-end' });
         } else if (endHhmm < startHhmm) {
             issues.push({ line, kind: 'reversed' });
+        } else if (endHhmm > startHhmm) {
+            spans.push({ line, start: hhmmToMinutes(startHhmm), end: hhmmToMinutes(endHhmm) });
         }
+    }
+    // 開始順に見て、それまでの予定のいちばん遅い終了より前に始まる行を重なりとする。
+    spans.sort((a, b) => a.start - b.start || a.end - b.end);
+    let latestEnd = -1;
+    for (const span of spans) {
+        if (span.start < latestEnd) issues.push({ line: span.line, kind: 'overlap' });
+        if (span.end > latestEnd) latestEnd = span.end;
     }
     return issues;
 }

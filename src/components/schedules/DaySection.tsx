@@ -10,6 +10,7 @@ const ISSUE_TEXT: Record<DayContentIssue['kind'], string> = {
     orphan: '時刻の無い行',
     'missing-end': '終了時刻が無い',
     reversed: '終了が開始より前',
+    overlap: '前の予定と時間が重なっている',
 };
 
 type DaySectionProps = {
