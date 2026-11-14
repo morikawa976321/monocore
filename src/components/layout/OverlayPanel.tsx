@@ -23,7 +23,7 @@ type OverlayPanelProps = {
 };
 
 /**
- * Schedules の上に開くモーダルの外枠（Inbox と Tasks で共有）。背面を暗くしてタップで閉じ、
+ * Schedules の上に開くモーダルの外枠（Inbox が使う）。背面を暗くしてタップで閉じ、
  * モバイルでは背面のスクロールを止め、ソフトキーボードで縮む可視領域（visualViewport）に合わせる。
  */
 export function OverlayPanel({ label, onClose, fitContent = false, children }: OverlayPanelProps) {

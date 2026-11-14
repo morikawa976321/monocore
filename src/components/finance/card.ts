@@ -1,6 +1,5 @@
 /**
- * 囲みの外枠と見出しの帯は、予定の板の日付セクション(DaySection)に揃える。Schedules の Tasks モーダル
- * (components/tasks/TasksPanel.tsx)のカードもここの CARD / CARD_HEADER / CARD_BODY を使う。
+ * 囲みの外枠と見出しの帯は、予定の板の日付セクション(DaySection)に揃える。
  */
 export const CARD = 'rounded overflow-hidden border border-neutral-400 bg-neutral-200 dark:border-neutral-600 dark:bg-neutral-800';
 export const CARD_HEADER =
