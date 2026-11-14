@@ -1,7 +1,8 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
-type ScheduleDayNoteRow = Database['public']['Tables']['schedule_day_notes']['Row']
+// 画面が使う列だけ(user_id・updated_at は読まない)。
+type ScheduleDayNoteRow = Pick<Database['public']['Tables']['schedule_day_notes']['Row'], 'day_key' | 'body'>
 
 /** day_key が startDay 以上 endDay 以下のメモを取得する。 */
 export async function getScheduleDayNotes(
@@ -11,7 +12,7 @@ export async function getScheduleDayNotes(
 ): Promise<{ data: ScheduleDayNoteRow[] | null; error: PostgrestError | null }> {
     const { data, error } = await supabase
         .from('schedule_day_notes')
-        .select('*')
+        .select('day_key,body')
         .gte('day_key', startDay)
         .lte('day_key', endDay)
         .order('day_key', { ascending: true })

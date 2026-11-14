@@ -2,7 +2,7 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
 
 type ScheduleRow = Pick<Database['public']['Tables']['schedules']['Row'], 'activity' | 'start_at' | 'end_at'>
-type ScheduleDayRevisionRow = Database['public']['Tables']['schedule_day_revisions']['Row']
+type ScheduleDayRevisionRow = Pick<Database['public']['Tables']['schedule_day_revisions']['Row'], 'day_key' | 'revision'>
 
 /**
  * 指定した時間範囲内のスケジュールを取得する。
@@ -104,7 +104,7 @@ export async function getScheduleDayRevisions(
 ): Promise<{ data: ScheduleDayRevisionRow[] | null; error: PostgrestError | null }> {
     const { data, error } = await supabase
         .from('schedule_day_revisions')
-        .select('*')
+        .select('day_key,revision')
         .gte('day_key', startDay)
         .lte('day_key', endDay)
         .order('day_key', { ascending: true })

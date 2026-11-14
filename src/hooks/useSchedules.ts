@@ -23,6 +23,7 @@ import {
     replaceSchedulesForDay,
 } from '@/src/lib/supabase/queries/schedules';
 import type { NotesLoadResult } from '@/src/hooks/useDayNotes';
+import { combineStamps } from '@/src/lib/schedules/stamp';
 import { getScheduleDayNotesStamp } from '@/src/lib/supabase/queries/schedule-day-notes';
 import { getDefaultTimezone, localTimeToUtc } from '@/src/lib/date';
 import {
@@ -682,61 +683,90 @@ export function useSchedules(
         requestResumeSync,
     ]);
 
+    /**
+     * 範囲を広げたあとも、復帰時の目印を引き継ぐ。目印(loadedStampRef)は手元の内容を読んだときのものなので、
+     * 今の範囲のもの(base)があれば、広げた分の目印(既定予定を書き込んだあと・読む前に取ったもの)を合成した
+     * ものが、広げたあとの手元の内容の目印になる(src/lib/schedules/stamp.ts)。範囲全体の目印を取り直さないので、
+     * 旧範囲が離れている間に書き換わっていれば次の復帰の目印と食い違い、今までどおり読み直す。記録しないのは、
+     * 広げている間に読み直しが入った(ref が base でなくなった)とき、広げた分を読み損ねたとき。そのときは
+     * 範囲が食い違うので、次の復帰が全部読み直す。
+     */
+    const extendLoadedStamp = useCallback(
+        (
+            base: { range: string; stamp: string },
+            chunkStamp: string | null,
+            chunkLoaded: boolean,
+            side: 'past' | 'future',
+            newRangeStart: string,
+            newRangeEnd: string
+        ) => {
+            if (loadedStampRef.current !== base || chunkStamp === null || !chunkLoaded) return;
+            const stamp = side === 'future' ? combineStamps(base.stamp, chunkStamp) : combineStamps(chunkStamp, base.stamp);
+            if (stamp !== null) loadedStampRef.current = { range: `${newRangeStart}..${newRangeEnd}`, stamp };
+        },
+        []
+    );
+
     const loadMoreFuture = useCallback(async () => {
-        if (loadingBottom || !rangeEnd) return;
+        if (loadingBottom || !rangeStart || !rangeEnd) return;
         setLoadingBottom(true);
+        const startDay = format(rangeStart, 'yyyy-MM-dd');
+        const endDay = format(rangeEnd, 'yyyy-MM-dd');
         const newEnd = addMonths(rangeEnd, 1);
+        const newEndDay = format(newEnd, 'yyyy-MM-dd');
+        const chunkStartDay = format(addDays(rangeEnd, 1), 'yyyy-MM-dd');
         const newEntries = generateDayEntries(addDays(rangeEnd, 1), newEnd);
-        void loadNotes(
-            format(addDays(rangeEnd, 1), 'yyyy-MM-dd'),
-            format(newEnd, 'yyyy-MM-dd')
-        );
-        const startUtc = localTimeToUtc(
-            format(addDays(rangeEnd, 1), 'yyyy-MM-dd'),
-            '0000',
-            tz
-        );
+        const startUtc = localTimeToUtc(chunkStartDay, '0000', tz);
         const endUtc = localTimeToUtc(format(addDays(newEnd, 1), 'yyyy-MM-dd'), '0000', tz);
-        await applyDefaults(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd'));
-        const [schedulesResult, revisionsResult] = await Promise.all([
+        // 手元の内容が目印と一致している間だけ、広げた分の目印を取る(取るのは既定予定を書き込んだあと、読む前)。
+        const base = loadedStampRef.current?.range === `${startDay}..${endDay}` ? loadedStampRef.current : null;
+        await applyDefaults(chunkStartDay, newEndDay);
+        const chunkStamp = base ? await readStamp(chunkStartDay, newEndDay) : null;
+        const [schedulesResult, revisionsResult, , notesResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
-            getScheduleDayRevisions(
-                supabase,
-                format(addDays(rangeEnd, 1), 'yyyy-MM-dd'),
-                format(newEnd, 'yyyy-MM-dd')
-            ),
-            readAppliedDays(format(addDays(rangeEnd, 1), 'yyyy-MM-dd'), format(newEnd, 'yyyy-MM-dd')),
+            getScheduleDayRevisions(supabase, chunkStartDay, newEndDay),
+            readAppliedDays(chunkStartDay, newEndDay),
+            loadNotes(chunkStartDay, newEndDay),
         ]);
         const merged = applyScheduleRevisions(
             mergeSchedulesIntoEntries(newEntries, schedulesResult.data ?? [], tz),
             revisionsResult.data ?? []
         );
+        if (base) {
+            extendLoadedStamp(
+                base,
+                chunkStamp,
+                !schedulesResult.error && !revisionsResult.error && !!notesResult?.applied,
+                'future',
+                startDay,
+                newEndDay
+            );
+        }
         setEntries((prev) => [...prev, ...merged]);
         setRangeEnd(newEnd);
         setLoadingBottom(false);
-    }, [loadingBottom, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays]);
+    }, [loadingBottom, rangeStart, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays, readStamp, extendLoadedStamp]);
 
     const loadMorePast = useCallback(async () => {
-        if (loadingTop || !hasMorePast || !rangeStart) return;
+        if (loadingTop || !hasMorePast || !rangeStart || !rangeEnd) return;
         setLoadingTop(true);
+        const startDay = format(rangeStart, 'yyyy-MM-dd');
+        const endDay = format(rangeEnd, 'yyyy-MM-dd');
         const newStart = subMonths(rangeStart, 1);
+        const newStartDay = format(newStart, 'yyyy-MM-dd');
+        const chunkEndDay = format(addDays(rangeStart, -1), 'yyyy-MM-dd');
         const newEntries = generateDayEntries(newStart, addDays(rangeStart, -1));
-        const startUtc = localTimeToUtc(format(newStart, 'yyyy-MM-dd'), '0000', tz);
-        const endUtc = localTimeToUtc(format(rangeStart, 'yyyy-MM-dd'), '0000', tz);
-        await applyDefaults(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd'));
+        const startUtc = localTimeToUtc(newStartDay, '0000', tz);
+        const endUtc = localTimeToUtc(startDay, '0000', tz);
+        const base = loadedStampRef.current?.range === `${startDay}..${endDay}` ? loadedStampRef.current : null;
+        await applyDefaults(newStartDay, chunkEndDay);
+        const chunkStamp = base ? await readStamp(newStartDay, chunkEndDay) : null;
         const [notesResult, [schedulesResult, revisionsResult]] = await Promise.all([
-            loadNotes(
-                format(newStart, 'yyyy-MM-dd'),
-                format(addDays(rangeStart, -1), 'yyyy-MM-dd')
-            ),
+            loadNotes(newStartDay, chunkEndDay),
             Promise.all([
                 getSchedules(supabase, startUtc, endUtc),
-                getScheduleDayRevisions(
-                    supabase,
-                    format(newStart, 'yyyy-MM-dd'),
-                    format(addDays(rangeStart, -1), 'yyyy-MM-dd')
-                ),
-                readAppliedDays(format(newStart, 'yyyy-MM-dd'), format(addDays(rangeStart, -1), 'yyyy-MM-dd')),
+                getScheduleDayRevisions(supabase, newStartDay, chunkEndDay),
+                readAppliedDays(newStartDay, chunkEndDay),
             ]),
         ]);
         const scheduleRows = schedulesResult.data ?? [];
@@ -749,6 +779,16 @@ export function useSchedules(
             mergeSchedulesIntoEntries(newEntries, scheduleRows, tz),
             revisionsResult.data ?? []
         );
+        if (base) {
+            extendLoadedStamp(
+                base,
+                chunkStamp,
+                !schedulesResult.error && !revisionsResult.error && !!notesResult?.applied,
+                'past',
+                newStartDay,
+                endDay
+            );
+        }
         if (scrollContainerRef.current) {
             scrollHeightBeforePrependRef.current = scrollContainerRef.current.scrollHeight;
             pendingScrollFixRef.current = true;
@@ -756,7 +796,7 @@ export function useSchedules(
         setEntries((prev) => [...merged, ...prev]);
         setRangeStart(newStart);
         setLoadingTop(false);
-    }, [loadingTop, hasMorePast, rangeStart, supabase, tz, loadNotes, applyDefaults, readAppliedDays]);
+    }, [loadingTop, hasMorePast, rangeStart, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays, readStamp, extendLoadedStamp]);
 
     useEffect(() => {
         const container = scrollContainerRef.current;
