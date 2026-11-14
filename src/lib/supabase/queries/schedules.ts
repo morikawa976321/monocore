@@ -48,7 +48,7 @@ export async function getSchedulesStamp(
 }
 
 /** PostgREST の1レスポンスの上限（supabase/config.toml の max_rows）。 */
-const PAGE_ROWS = 1000
+export const PAGE_ROWS = 1000
 
 /**
  * startDay〜endDay（両端含む）のうち、スケジュール画面が既定予定を書き込んだ記録
@@ -87,14 +87,23 @@ export async function getScheduleDayRevisionsStamp(
     startDay: string,
     endDay: string,
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
-    const { data, error } = await supabase
-        .from('schedule_day_revisions')
-        .select('day_key,revision')
-        .gte('day_key', startDay)
-        .lte('day_key', endDay)
-        .order('day_key', { ascending: true })
-    if (error) return { data: null, error }
-    return { data: (data ?? []).map((r) => `${r.day_key}:${r.revision}`).join(','), error: null }
+    // 1日1行で、範囲が 1000 日を超えると max_rows で切れる。目印が切れると後ろの日の書き込みを見落とすので、
+    // 切れないようページを分けて読む(日の昇順で並べるので、ページをまたいでも順序は変わらない)。
+    const parts: string[] = []
+    for (let offset = 0; ; ) {
+        const { data, error } = await supabase
+            .from('schedule_day_revisions')
+            .select('day_key,revision')
+            .gte('day_key', startDay)
+            .lte('day_key', endDay)
+            .order('day_key', { ascending: true })
+            .range(offset, offset + PAGE_ROWS - 1)
+        if (error) return { data: null, error }
+        if (!data || data.length === 0) return { data: parts.join(','), error: null }
+        for (const r of data) parts.push(`${r.day_key}:${r.revision}`)
+        if (data.length < PAGE_ROWS) return { data: parts.join(','), error: null }
+        offset += data.length
+    }
 }
 
 export async function getScheduleDayRevisions(

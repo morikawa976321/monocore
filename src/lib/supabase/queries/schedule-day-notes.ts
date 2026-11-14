@@ -1,5 +1,6 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../../types/database.types'
+import { PAGE_ROWS } from './schedules'
 
 // 画面が使う列だけ(user_id・updated_at は読まない)。
 type ScheduleDayNoteRow = Pick<Database['public']['Tables']['schedule_day_notes']['Row'], 'day_key' | 'body'>
@@ -31,14 +32,23 @@ export async function getScheduleDayNotesStamp(
     startDay: string,
     endDay: string,
 ): Promise<{ data: string | null; error: PostgrestError | null }> {
-    const { data, error } = await supabase
-        .from('schedule_day_notes')
-        .select('day_key,updated_at')
-        .gte('day_key', startDay)
-        .lte('day_key', endDay)
-        .order('day_key', { ascending: true })
-    if (error) return { data: null, error }
-    return { data: (data ?? []).map((r) => `${r.day_key}:${r.updated_at}`).join(','), error: null }
+    // 1日1行で、範囲が 1000 日を超えると max_rows で切れる。目印が切れると後ろの日の編集を見落とすので、
+    // 切れないようページを分けて読む。
+    const parts: string[] = []
+    for (let offset = 0; ; ) {
+        const { data, error } = await supabase
+            .from('schedule_day_notes')
+            .select('day_key,updated_at')
+            .gte('day_key', startDay)
+            .lte('day_key', endDay)
+            .order('day_key', { ascending: true })
+            .range(offset, offset + PAGE_ROWS - 1)
+        if (error) return { data: null, error }
+        if (!data || data.length === 0) return { data: parts.join(','), error: null }
+        for (const r of data) parts.push(`${r.day_key}:${r.updated_at}`)
+        if (data.length < PAGE_ROWS) return { data: parts.join(','), error: null }
+        offset += data.length
+    }
 }
 
 /** 指定日のメモ本文を upsert する。user_id は DEFAULT auth.uid() + RLS により自動設定。 */

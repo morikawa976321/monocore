@@ -23,7 +23,7 @@ import {
     replaceSchedulesForDay,
 } from '@/src/lib/supabase/queries/schedules';
 import type { NotesLoadResult } from '@/src/hooks/useDayNotes';
-import { combineStamps } from '@/src/lib/schedules/stamp';
+import { combineStamps, schedulesPartOf } from '@/src/lib/schedules/stamp';
 import { getScheduleDayNotesStamp } from '@/src/lib/supabase/queries/schedule-day-notes';
 import { getDefaultTimezone, localTimeToUtc } from '@/src/lib/date';
 import {
@@ -707,6 +707,31 @@ export function useSchedules(
         []
     );
 
+    /**
+     * 広げる分の目印。合わせて旧範囲の予定の目印を取り直し、手元の目印と同じときだけ返す(違えば null)。予定の
+     * 目印は「最新の updated_at」なので、合成すると、旧範囲への直接の書き込み(版を進めない)が広げた分の
+     * 新しい updated_at に隠れうる。旧範囲が変わっていないと確かめてから合成する(stamp.ts)。
+     */
+    const readChunkStamp = useCallback(
+        async (
+            base: { range: string; stamp: string },
+            oldStartDay: string,
+            oldEndDay: string,
+            chunkStartDay: string,
+            chunkEndDay: string
+        ): Promise<string | null> => {
+            const oldStartUtc = localTimeToUtc(oldStartDay, '0000', tz);
+            const oldEndUtc = localTimeToUtc(format(addDays(parseISO(oldEndDay), 1), 'yyyy-MM-dd'), '0000', tz);
+            const [chunk, oldSchedules] = await Promise.all([
+                readStamp(chunkStartDay, chunkEndDay),
+                getSchedulesStamp(supabase, oldStartUtc, oldEndUtc),
+            ]);
+            if (chunk === null || oldSchedules.data === null) return null;
+            return oldSchedules.data === schedulesPartOf(base.stamp) ? chunk : null;
+        },
+        [readStamp, supabase, tz]
+    );
+
     const loadMoreFuture = useCallback(async () => {
         if (loadingBottom || !rangeStart || !rangeEnd) return;
         setLoadingBottom(true);
@@ -721,7 +746,7 @@ export function useSchedules(
         // 手元の内容が目印と一致している間だけ、広げた分の目印を取る(取るのは既定予定を書き込んだあと、読む前)。
         const base = loadedStampRef.current?.range === `${startDay}..${endDay}` ? loadedStampRef.current : null;
         await applyDefaults(chunkStartDay, newEndDay);
-        const chunkStamp = base ? await readStamp(chunkStartDay, newEndDay) : null;
+        const chunkStamp = base ? await readChunkStamp(base, startDay, endDay, chunkStartDay, newEndDay) : null;
         const [schedulesResult, revisionsResult, , notesResult] = await Promise.all([
             getSchedules(supabase, startUtc, endUtc),
             getScheduleDayRevisions(supabase, chunkStartDay, newEndDay),
@@ -745,7 +770,7 @@ export function useSchedules(
         setEntries((prev) => [...prev, ...merged]);
         setRangeEnd(newEnd);
         setLoadingBottom(false);
-    }, [loadingBottom, rangeStart, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays, readStamp, extendLoadedStamp]);
+    }, [loadingBottom, rangeStart, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays, readChunkStamp, extendLoadedStamp]);
 
     const loadMorePast = useCallback(async () => {
         if (loadingTop || !hasMorePast || !rangeStart || !rangeEnd) return;
@@ -760,7 +785,7 @@ export function useSchedules(
         const endUtc = localTimeToUtc(startDay, '0000', tz);
         const base = loadedStampRef.current?.range === `${startDay}..${endDay}` ? loadedStampRef.current : null;
         await applyDefaults(newStartDay, chunkEndDay);
-        const chunkStamp = base ? await readStamp(newStartDay, chunkEndDay) : null;
+        const chunkStamp = base ? await readChunkStamp(base, startDay, endDay, newStartDay, chunkEndDay) : null;
         const [notesResult, [schedulesResult, revisionsResult]] = await Promise.all([
             loadNotes(newStartDay, chunkEndDay),
             Promise.all([
@@ -796,7 +821,7 @@ export function useSchedules(
         setEntries((prev) => [...merged, ...prev]);
         setRangeStart(newStart);
         setLoadingTop(false);
-    }, [loadingTop, hasMorePast, rangeStart, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays, readStamp, extendLoadedStamp]);
+    }, [loadingTop, hasMorePast, rangeStart, rangeEnd, supabase, tz, loadNotes, applyDefaults, readAppliedDays, readChunkStamp, extendLoadedStamp]);
 
     useEffect(() => {
         const container = scrollContainerRef.current;

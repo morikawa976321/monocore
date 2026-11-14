@@ -7,9 +7,10 @@
  * 目印を取って合成すれば、範囲全体の目印を取り直さずに「いま手元にある内容の目印」を保てる。合成したものが
  * 次の復帰で取った目印と食い違えば(旧範囲が離れている間に書き換わっていたなど)、今までどおり読み直す。
  *
- * 予定だけは「最新の updated_at」なので、旧範囲の編集が広げた分の新しい編集に隠れうる。それを拾うのは版
- * (予定の書き込みは画面も AI も RPC で、その日の版を必ず進める)。メモは版を持たないので、日ごとに持って
- * 隠れないようにする。
+ * 予定だけは「最新の updated_at」なので、旧範囲の編集が広げた分の新しい編集に隠れうる。版は直接書き込みを
+ * 拾えない(予定のテーブルへの直接の INSERT / UPDATE / DELETE は権限上できる)ので、呼び出し側は合成の前に、
+ * 旧範囲の予定の目印が手元の目印と同じことを確かめる(schedulesPartOf)。メモは版を持たないので、日ごとに
+ * 持って隠れないようにする。
  */
 
 type Parts = { schedules: string; revisions: string; notes: string };
@@ -37,6 +38,11 @@ function combineCountAndLatest(a: string, b: string): string | null {
         if (timeB > timeA || (timeB === timeA && latestB > latestA)) latest = latestB;
     }
     return `${count}|${latest}`;
+}
+
+/** 目印のうち予定の部分(`行数|いちばん新しい updated_at`)。形が合わなければ null。 */
+export function schedulesPartOf(stamp: string): string | null {
+    return split(stamp)?.schedules ?? null;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { combineStamps } from './stamp';
+import { combineStamps, schedulesPartOf } from './stamp';
 
 const T1 = '2026-11-01T01:00:00.123456+00:00';
 const T2 = '2026-11-05T09:30:00+00:00';
@@ -38,6 +38,13 @@ describe('combineStamps', () => {
 
 // サーバ側の目印(getSchedulesStamp / getScheduleDayRevisionsStamp / getScheduleDayNotesStamp)と同じ作り方を
 // 手元の行から再現し、「範囲全体の目印 = 隣り合う2つの範囲の目印の合成」を固定する。
+describe('schedulesPartOf', () => {
+    it('予定の部分だけを返し、形が違えば null', () => {
+        expect(schedulesPartOf(`2|${T1}#d:1#d:${T1}`)).toBe(`2|${T1}`);
+        expect(schedulesPartOf('x')).toBeNull();
+    });
+});
+
 describe('combineStamps と範囲全体の目印の一致', () => {
     type Row = { day: string; updatedAt: string; revision: number };
     const byDay = (rows: Row[]) => [...rows].sort((a, b) => a.day.localeCompare(b.day));
