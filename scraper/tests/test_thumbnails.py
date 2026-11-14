@@ -106,6 +106,17 @@ def test_pixel_limit_rejects_before_decoding(monkeypatch):
         "http://[64:ff9b::127.0.0.1]/a.png",
         "http://[::ffff:127.0.0.1]/a.png",
         "http://2130706433/a.png",
+        # 二重 % エンコードで、検査した IP と接続する IP が食い違う(argon の再レビュー)
+        "http://[::ffff:192.0.0.9%252530]/a.png",
+        "http://[2001:4860:4860::8888%252531]/a.png",
+        # getaddrinfo が UnicodeError を投げるホスト名
+        "http://a..com/a.png",
+        "http://example.com../a.png",
+        "http://" + "a" * 64 + ".com/a.png",
+        # ::/8 の予約域(旧 IPv4 互換アドレス)
+        "http://[::127.0.0.1]/a.png",
+        "http://[::169.254.169.254]/a.png",
+        "http://[::2]/a.png",
     ],
 )
 def test_non_public_or_non_http_urls_are_rejected(url):
@@ -155,6 +166,13 @@ def test_fetch_checks_the_redirect_target_before_following():
     with pytest.raises(ThumbnailError):
         fetch_image_bytes("https://8.8.8.8/a.png", session=session)
     assert session.urls == ["https://8.8.8.8/a.png"]  # 内側へは取りに行かない
+
+
+@pytest.mark.parametrize("location", ["http://[::1/a.png", "//[invalid]/a.png"])
+def test_fetch_turns_unparseable_redirect_target_into_thumbnail_error(location):
+    session = FakeGetSession([FakeStreamResponse(302, {"Location": location})])
+    with pytest.raises(ThumbnailError):
+        fetch_image_bytes("https://8.8.8.8/a.png", session=session)
 
 
 def test_fetch_follows_a_public_redirect_and_returns_bytes():

@@ -77,12 +77,12 @@ def thumbnail_name(link):
 
 
 def _is_public_address(address):
-    if address.is_multicast or not address.is_global:
-        return False
     # NAT64(64:ff9b::/96)は末尾32bitが IPv4 アドレスで、is_global は中身を見ない。
+    # ::/8 の予約域に含まれるので、予約の判定より先に見る。
     if isinstance(address, ipaddress.IPv6Address) and address in _NAT64_NETWORK:
         return _is_public_address(ipaddress.IPv4Address(int(address) & 0xFFFFFFFF))
-    return True
+    # is_global は予約域(::/8 の旧 IPv4 互換 ::127.0.0.1 など)を見ない。
+    return address.is_global and not address.is_multicast and not address.is_reserved
 
 
 def _require_public_http_url(url):
@@ -102,10 +102,18 @@ def _require_public_http_url(url):
     if parsed.scheme not in ("http", "https") or not parsed.host or parsed.auth:
         raise ThumbnailError("http/https の URL ではありません")
 
+    # 公開ホストにスコープ ID や % エンコードは要らない。urllib3 はホストの %25 を1段剥がし、
+    # requests は %XX をデコードするので、%252530 のような二重エンコードは、検査した
+    # アドレスと実際に接続するアドレスが食い違う。送る側(session.get)がもう一度整形しても
+    # URL が変わらないことを確かめて、その種の食い違い全般を塞ぐ。
+    if "%" in parsed.host or requests.Request("GET", prepared_url).prepare().url != prepared_url:
+        raise ThumbnailError("URL の解釈が安定しません")
+
     host = parsed.host.strip("[]")
     try:
         infos = socket.getaddrinfo(host, parsed.port, proto=socket.IPPROTO_TCP)
-    except OSError:
+    except (OSError, ValueError):
+        # 空ラベル(a..com)や64文字超のラベルは getaddrinfo が UnicodeError(ValueError)を投げる。
         raise ThumbnailError("ホスト名を解決できません") from None
 
     for info in infos:
@@ -130,7 +138,10 @@ def fetch_image_bytes(url, session=None, timeout=DOWNLOAD_TIMEOUT_SECONDS):
                 location = response.headers.get("Location")
                 if not location:
                     raise ThumbnailError("リダイレクト先がありません")
-                url = urljoin(url, location)
+                try:
+                    url = urljoin(url, location)
+                except ValueError:
+                    raise ThumbnailError("リダイレクト先を解釈できません") from None
                 continue
 
             response.raise_for_status()
