@@ -22,7 +22,7 @@ monocore
 │   │   │   ├── server.ts     # サーバーコンポーネント用接続設定
 │   │   │   └── queries/      # テーブルごとのDB操作関数（schedules.ts, inboxes.ts等）
 │   │   └── date.ts 等        # DBに関係ない汎用ユーティリティ
-│   ├── proxy.ts              # 【Security】認証チェック・リダイレクト処理（Next.js proxy）
+│   ├── proxy.ts              # 【Security】認証チェック・リダイレクト処理（Next.js proxy。クライアント描画だけの殻のページは matcher から外し、components/auth/AuthGate.tsx が担う）
 │   └── types/                # 【Definition】TypeScriptの型定義
 │       └── database.types.ts # Supabaseから自動生成された型
 ├── supabase/                 # 【Backend】Supabaseローカル環境の設定

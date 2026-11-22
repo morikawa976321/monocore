@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
+import { AuthGate } from "@/src/components/auth/AuthGate";
 import { Sidebar } from "@/src/components/layout/Sidebar";
 import { ThemeProvider } from "@/src/components/providers/ThemeProvider";
 
@@ -41,6 +42,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <AuthGate />
           <Sidebar />
           <main className="pl-0 sm:pl-12 min-h-screen">
             {children}

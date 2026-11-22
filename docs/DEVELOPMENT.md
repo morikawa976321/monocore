@@ -49,7 +49,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` ではログイン画面を出さない。ローカル Supabase（`127.0.0.1`）なら開発ユーザーで自動ログインする。リモート DB を叩く場合は `.env.local` に `DEV_AUTH_EMAIL` と `DEV_AUTH_PASSWORD` を置く。ログイン画面を確認したいときは `DEV_AUTH_BYPASS=0`。本番は従来どおりログイン必須。
+`npm run dev` ではログイン画面を出さない。ローカル Supabase（`127.0.0.1`）なら開発ユーザーで自動ログインする。リモート DB を叩く場合は `.env.local` に `DEV_AUTH_EMAIL` と `DEV_AUTH_PASSWORD` を置く。ログイン画面を確認したいときは `DEV_AUTH_BYPASS=0`。本番は従来どおりログイン必須。自動ログインはプロキシが `/login` を通ったときに働くので、殻のページ（`/schedules` など）を未ログインで開くと、`/login` → 自動ログイン → `/` の順になり、元のページには戻らない（開き直す）。
 
 その他のスクリプト:
 
@@ -111,7 +111,7 @@ npm run dev
 - **データ:** `src/lib/supabase/queries/` に集約（例: `schedules.ts`, `inboxes.ts`）。`page.tsx` で `supabase.from(...)` を直接書かない
 - **状態:** `src/hooks/`
 - **型:** `src/types/database.types.ts`（Supabase 生成型）を使う。`any` は避ける
-- **認証ゲート:** `src/proxy.ts`（セッション更新・未ログイン時のリダイレクト）
+- **認証ゲート:** `src/proxy.ts`（セッション更新・未ログイン時のリダイレクト）。クライアント描画だけの殻のページ（`/`・`/schedules`・`/finance`・`/news`・`/reports`・`/reports/[slug]`）は matcher から外し、`src/components/auth/AuthGate.tsx` がブラウザ側で未ログインを `/login` へ送る（理由は `docs/decisions.md`）。**サーバーで何かを描画するルートは、外さずプロキシに通す**（`/weather` は地点を HTML に入れる）。matcher は殻だけを列挙して外す形なので、新しいルートは既定でプロキシを通る。境目は `src/proxy.test.ts`
 - **`scraper/` だけ Python**（RSS 収集。Next.js のビルドには含まれない）。`requirements.txt` をリポジトリのルートに置かないこと — ルートの `requirements.txt` と `api/*.py` は Vercel の Python ランタイム自動検出の対象になる
 
 詳細は `docs/directory_structure.md` を参照。
