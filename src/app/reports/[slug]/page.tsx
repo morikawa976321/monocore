@@ -1,14 +1,13 @@
 'use client'
 
 import { ArrowLeft, List, X } from 'lucide-react'
-import Link from 'next/link'
-import { useParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { Button } from '@/src/components/ui/Button'
 import { LoadingIndicator } from '@/src/components/ui/LoadingIndicator'
 import { readCachedReport, removeCachedReport, writeCachedReport, type CachedReport } from '@/src/lib/reports/cache'
 import { parseToc, tocForDisplay, type TocEntry } from '@/src/lib/reports/toc'
+import { Link, useParams } from '@/src/lib/router/navigation'
 import { createClient } from '@/src/lib/supabase/client'
 import { getReportBySlug, getReportVersion, reportVersion } from '@/src/lib/supabase/queries/reports'
 
@@ -93,17 +92,25 @@ export default function ReportDetailPage() {
         setIsTocOpen(false)
         restoredRef.current = false
 
-        // 手元に本文があればすぐ出し、版の目印だけを問い合わせる。変わっていたときだけ本文を読み直す
-        // (src/lib/reports/cache.ts)。問い合わせに失敗しても(通信が無いなど)手元の本文はそのまま読める。
-        const cached = readCachedReport(slug)
-        if (cached) {
-            setReport(toDetail(cached))
-            setIsLoading(false)
-        } else {
-            setReport(null)
-        }
-
         void (async () => {
+            // ログインを確かめてから手元の本文を出す。サーバーの門番は無く、AuthGate の確認と並んで動くので、
+            // 待たずに出すと、セッションの無いブラウザに保存済みの本文が /login へ移るまで見える。
+            // セッションが無いと分かったら出さない(AuthGate が /login へ送る)。通信の失敗(error)は
+            // AuthGate と同じく、ログアウト扱いにしない。
+            const { data: session, error: sessionError } = await supabase.auth.getSession()
+            if (cancelled) return
+            if (!sessionError && !session.session) return
+
+            // 手元に本文があればすぐ出し、版の目印だけを問い合わせる。変わっていたときだけ本文を読み直す
+            // (src/lib/reports/cache.ts)。問い合わせに失敗しても(通信が無いなど)手元の本文はそのまま読める。
+            const cached = readCachedReport(slug)
+            if (cached) {
+                setReport(toDetail(cached))
+                setIsLoading(false)
+            } else {
+                setReport(null)
+            }
+
             if (cached) {
                 const stamp = await getReportVersion(supabase, slug)
                 if (cancelled) return

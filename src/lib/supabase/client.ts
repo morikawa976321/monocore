@@ -1,4 +1,4 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createFetchWithTimeout } from './fetch-with-timeout'
 
 /**
@@ -8,14 +8,26 @@ import { createFetchWithTimeout } from './fetch-with-timeout'
  */
 const REQUEST_TIMEOUT_MS = 15_000
 
+let client: SupabaseClient | null = null
+
 /**
- * クライアント（ブラウザ）側でSupabaseを使用するためのクライアントを作成します。
- * 'use client' を指定したコンポーネントで使用します。
+ * ブラウザで Supabase を使うクライアント。アプリ全体で 1 つを使い回す(呼ぶたびに作ると、
+ * 同じ保存先を触る認証クライアントが複数でき、警告と競合が出る)。
+ *
+ * 認証の設定(確かめた先: @supabase/auth-js の GoTrueClient の既定値と、@supabase/ssr の createBrowserClient):
+ * - flowType: 'pkce' — supabase-js の既定は implicit で、そのままだと Magic Link が ?code= を交換する流れにならない。
+ * - detectSessionInUrl: false — PKCE では SDK が初期化時に ?code= を自動で交換するが、交換は
+ *   src/app/auth/callback/page.tsx の 1 か所だけで行う(重複するとコードが 1 回しか使えず失敗する)。
+ * セッションは localStorage に保存される(@supabase/ssr の Cookie ではない)。
  */
-export function createClient() {
-    return createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-        { global: { fetch: createFetchWithTimeout(REQUEST_TIMEOUT_MS) } },
+export function createClient(): SupabaseClient {
+    client ??= createSupabaseClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        {
+            auth: { flowType: 'pkce', detectSessionInUrl: false },
+            global: { fetch: createFetchWithTimeout(REQUEST_TIMEOUT_MS) },
+        },
     )
+    return client
 }

@@ -1,54 +1,27 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono, Noto_Sans_JP } from "next/font/google";
-import "./globals.css";
 import { AuthGate } from "@/src/components/auth/AuthGate";
 import { Sidebar } from "@/src/components/layout/Sidebar";
 import { ThemeProvider } from "@/src/components/providers/ThemeProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const notoSansJp = Noto_Sans_JP({
-  variable: "--font-noto-sans-jp",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
-
-export const metadata: Metadata = {
-  title: "monocore",
-  description: "Personal OS",
-};
-
+/**
+ * 全画面に共通の枠。`<html>`・`<body>`・タイトル・アイコンは index.html、フォントは fonts.css が持つ。
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${notoSansJp.variable} antialiased bg-neutral-250 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 text-sm sm:text-base leading-6 sm:leading-7 min-h-screen`}
-      >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthGate />
-          <Sidebar />
-          <main className="pl-0 sm:pl-12 min-h-screen">
-            {children}
-          </main>
-        </ThemeProvider>
-      </body>
-    </html>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <AuthGate />
+      <Sidebar />
+      <main className="pl-0 sm:pl-12 min-h-screen">
+        {children}
+      </main>
+    </ThemeProvider>
   );
 }

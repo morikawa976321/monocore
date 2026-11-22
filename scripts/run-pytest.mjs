@@ -4,7 +4,6 @@
  * venv の python は Windows なら `.venv/Scripts`、Linux なら `.venv/bin` にある。
  * venv が無いときは黙って飛ばさず失敗させる: 飛ばすと pytest が誰にも回されない状態に戻る。
  */
-/* global process */
 
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'

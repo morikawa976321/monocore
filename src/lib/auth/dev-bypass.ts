@@ -1,18 +1,18 @@
 /**
- * `npm run dev` のときだけログインゲートを外す。
- * 本番 (`next start` / Vercel) は NODE_ENV=production なので必ず false。
- * ログイン画面を確認したいときは DEV_AUTH_BYPASS=0。
+ * `npm run dev` のときだけログインゲートを外す(AuthGate が開発用に自動ログインする)。
+ * 本番ビルドでは import.meta.env.DEV が false になり、この判定を呼ぶ側の分岐ごと取り除かれる。
+ * ログイン画面を確認したいときは .env.local に VITE_DEV_AUTH_BYPASS=0。
  */
 export function isDevAuthBypassEnabled(
-    nodeEnv: string | undefined = process.env.NODE_ENV,
-    flag: string | undefined = process.env.DEV_AUTH_BYPASS,
+    mode: string | undefined = import.meta.env.MODE,
+    flag: string | undefined = import.meta.env.VITE_DEV_AUTH_BYPASS,
 ): boolean {
-    if (nodeEnv !== 'development') return false
+    if (mode !== 'development') return false
     if (flag === '0' || flag === 'false') return false
     return true
 }
 
-export function isLocalSupabaseUrl(url: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL): boolean {
+export function isLocalSupabaseUrl(url: string | undefined = import.meta.env.VITE_SUPABASE_URL): boolean {
     if (!url) return false
     try {
         const host = new URL(url).hostname
@@ -27,9 +27,9 @@ const LOCAL_DEV_EMAIL = 'dev@localhost'
 const LOCAL_DEV_PASSWORD = 'local-dev-password'
 
 export function getDevAuthCredentials(
-    supabaseUrl: string | undefined = process.env.NEXT_PUBLIC_SUPABASE_URL,
-    email: string | undefined = process.env.DEV_AUTH_EMAIL,
-    password: string | undefined = process.env.DEV_AUTH_PASSWORD,
+    supabaseUrl: string | undefined = import.meta.env.VITE_SUPABASE_URL,
+    email: string | undefined = import.meta.env.VITE_DEV_AUTH_EMAIL,
+    password: string | undefined = import.meta.env.VITE_DEV_AUTH_PASSWORD,
 ): { email: string; password: string; canSignUp: boolean } | null {
     if (email && password) {
         return { email, password, canSignUp: false }

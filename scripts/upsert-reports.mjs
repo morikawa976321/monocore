@@ -25,7 +25,6 @@
  * 集合演算・フィルタ・リンク書き換え・セクション分割の純関数は
  * ./reports-payload.mjs にあり、テストで固定してある。
  */
-/* global process, console */
 
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'

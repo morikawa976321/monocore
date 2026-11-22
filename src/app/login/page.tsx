@@ -1,15 +1,8 @@
 import { LoginClient } from '@/src/components/auth/LoginClient'
 
-type LoginPageProps = {
-    searchParams?: Promise<Record<string, string | string[] | undefined>>
-}
-
-export default async function LoginPage({ searchParams }: LoginPageProps) {
-    const resolvedSearchParams = await searchParams
-    const errorParam = resolvedSearchParams?.error
-    const initialErrorCode = Array.isArray(errorParam)
-        ? (errorParam[0] ?? null)
-        : (errorParam ?? null)
+export default function LoginPage() {
+    // 期限切れ・無効なリンクのとき、/auth/callback が /login?error=… へ送ってくる。
+    const initialErrorCode = new URLSearchParams(window.location.search).get('error')
 
     return <LoginClient initialErrorCode={initialErrorCode} />
 }

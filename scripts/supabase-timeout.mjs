@@ -13,7 +13,6 @@
  *
  * @module supabase-timeout
  */
-/* global process, AbortSignal, fetch */
 
 import { writeSync } from 'node:fs'
 

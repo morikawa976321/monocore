@@ -2,7 +2,7 @@
 
 import { format, parseISO } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
-import Link from 'next/link'
+import { Link } from '@/src/lib/router/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/src/components/layout/PageHeader'
 import { Input } from '@/src/components/ui/Input'

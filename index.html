@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>monocore</title>
+    <meta name="description" content="Personal OS" />
+    <link rel="icon" href="/icon.png" />
+    <!-- 描画の前にテーマ(dark クラス)を決める。next-themes(storageKey は theme)は React の描画のあとに
+         付けるので、これが無いと、暗いテーマの人に一瞬明るい画面が出る。 -->
+    <script>
+      try {
+        var stored = localStorage.getItem('theme')
+        var dark =
+          stored === 'dark' ||
+          ((stored === null || stored === 'system') && matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.classList.add('dark')
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+      } catch (e) {}
+    </script>
+  </head>
+  <body
+    class="antialiased bg-neutral-250 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-50 text-sm sm:text-base leading-6 sm:leading-7 min-h-screen"
+  >
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

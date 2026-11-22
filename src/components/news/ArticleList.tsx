@@ -29,10 +29,9 @@ function Thumbnail({ src, alt }: { src: string | null; alt: string }) {
     }
 
     return (
-        // next/image を使わないのは、外部ドメインの許可設定が要るうえに
-        // この面に最適化(リサイズ・遅延生成)の必要が無いため。
+        // 画像は最適化サービスを通さず、記事の外部ドメインから直接読む。
+        // この面に最適化(リサイズ・遅延生成)の必要が無いため(Vercel の画像最適化の枠も使わない)。
         <div className="w-40 shrink-0 aspect-3/2 self-start">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
                 src={src ?? ''}
                 alt={alt}
