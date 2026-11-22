@@ -15,7 +15,7 @@
 - **ルーター**: 自作(History API。Link・usePathname・params で約 40 行、依存 0)。足りなくなったら wouter(依存 2)。
 - **ビルド**: Vite + `@vitejs/plugin-react` + `@tailwindcss/vite`。env は `NEXT_PUBLIC_*` → `VITE_*`(Vercel の環境変数も変える)。`@/src/...` の alias は `vite.config.ts` と `vitest.config.ts` に置く。
 - **配信**: Vercel のまま。静的出力(`dist`)と SPA フォールバックの rewrite(`vercel.json`)。関数が無くなる。
-- **認証**: すでにある `AuthGate`(ブラウザ側の門番)が全ページを担う。`proxy.ts`・`proxy.test.ts`・`lib/supabase/server.ts` は削除する。
+- **認証**: すでにある `AuthGate`(ブラウザ側の門番)が全ページを担う。`proxy.ts`・`proxy.test.ts`・`lib/supabase/server.ts` は削除する。**`AuthGate` の除外に `/auth/callback` を足す**(今の除外は `/login` だけで、`layout.tsx` に置かれている)。callback は今は route handler で `AuthGate` を通らないが、SPA では同じレイアウトの中に入る。交換が終わるまでセッションが無く、`detectSessionInUrl: false` では `getSession()` が手動交換の完了を待たないので、除外しないと交換の完了前に `/login` へ送ってしまう(sol が SDK で確かめた)。
 - **Supabase クライアント**: `@supabase/ssr` をやめて `@supabase/supabase-js` の `createClient` にする(依存 −2)。
   - **認証オプションを明示する**。`@supabase/ssr` のブラウザ用クライアントは `flowType: 'pkce'` を指定しているが、`supabase-js` の既定は `implicit` で、そのままだと Magic Link が `?code=` を交換するフローにならない(`code_challenge` が送られない)。`{ auth: { flowType: 'pkce', detectSessionInUrl: false } }` にする。`detectSessionInUrl` は既定が true で、PKCE のとき SDK が初期化時に `?code=` を自動で交換するので、callback での手動交換と重複する。交換は callback の 1 か所だけで行う(確かめた先: `node_modules/@supabase/ssr` の `createBrowserClient` と `@supabase/auth-js` の `GoTrueClient` の既定値、2026-11-23)。
   - **モジュールで 1 つに使い回すこと**。呼ぶたびに作ると GoTrueClient が複数でき、警告と競合が出る(今の `createBrowserClient` はブラウザで使い回される)。
@@ -26,7 +26,7 @@
 
 | 今 | 行き先 |
 |---|---|
-| `auth/callback/route.ts`(`exchangeCodeForSession` → リダイレクト) | SPA のルート `/auth/callback`。同じパスなので Supabase の Redirect URL 設定は変えない。コードは 1 回しか使えないので、クライアントを `detectSessionInUrl: false` にしたうえで、このルートの 1 か所だけで `exchangeCodeForSession` を呼び、StrictMode の二重実行で 2 回呼ばないようモジュール変数で 1 回に絞る |
+| `auth/callback/route.ts`(`exchangeCodeForSession` → リダイレクト) | SPA のルート `/auth/callback`。同じパスなので Supabase の Redirect URL 設定は変えない。コードは 1 回しか使えないので、クライアントを `detectSessionInUrl: false` にしたうえで、このルートの 1 か所だけで `exchangeCodeForSession` を呼び、StrictMode の二重実行で 2 回呼ばないようモジュール変数で 1 回に絞る。`AuthGate` の除外にこのパスを足す(「構成」の認証の項) |
 | `page.tsx`(`/`。Next の import は無いが `async function`) | `async` を外して同期コンポーネントにする(クライアントの React は async コンポーネントを描画できない) |
 | `login/page.tsx`(`async`。`searchParams` の error) | `async` を外し、クライアントで `URLSearchParams` を読む |
 | `weather/page.tsx`(`WEATHER_*` をサーバーでだけ読む。ログイン無しで取れる JS に地点を埋め込まないため) | テーブル `weather_locations` から読む(決定済み。「決定済み」の節) |
