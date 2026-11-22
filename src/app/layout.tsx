@@ -3,7 +3,7 @@ import { Sidebar } from "@/src/components/layout/Sidebar";
 import { ThemeProvider } from "@/src/components/providers/ThemeProvider";
 
 /**
- * 全画面に共通の枠。`<html>`・`<body>`・タイトル・アイコンは index.html、フォントは fonts.css が持つ。
+ * 全画面に共通の枠。`<html>`・`<body>`・タイトル・アイコンは index.html が持つ。
  */
 export default function RootLayout({
   children,

@@ -9,7 +9,6 @@ monocore
 │   ├── router.tsx            # 【Routing】URLと画面の対応表（ルート表）。画面を足したら1行足す
 │   ├── app/                  # 【Pages】画面の定義（URLとの対応は router.tsx）
 │   │   ├── layout.tsx        # 全ページ共通の枠組み（テーマ・AuthGate・サイドバー。<html>/<body> は index.html）
-│   │   ├── fonts.css         # 自己ホストのフォント（public/fonts の woff2 を指す）
 │   │   ├── page.tsx          # トップページ (/)
 │   │   └── [feature]/        # 各機能（例: schedules, inbox）
 │   │       └── page.tsx      # 機能のメイン画面（default export）

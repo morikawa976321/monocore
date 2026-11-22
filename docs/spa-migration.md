@@ -32,7 +32,7 @@
 | `weather/page.tsx`(`async`。今は `lib/supabase/server.ts` のクライアントで `weather_locations` の先頭の1件を読み、サーバーが地点を HTML に入れる。ログイン無しで取れる JS に地点を埋め込まないため) | `async` を外し、ブラウザの Supabase クライアントで同じクエリ(`getDefaultWeatherLocation`)を読む(決定済み。「決定済み」の節) |
 | `/reports/<slug>`(localStorage の本文をログイン確認より先に出すため、proxy の門番に残している) | 表示前に `getSession()`(通常は通信なし)で確認し、`SIGNED_OUT` で本文キャッシュを消す |
 | dev の自動ログイン(`proxy.ts` の `DEV_AUTH_*`) | `import.meta.env.DEV` でだけ動く開発用モジュールへ。`VITE_DEV_AUTH_*` は `.env.local` にだけ置き、ビルド後に `dist` を grep して混入が無いことを確かめる |
-| `next/font`(Geist・Geist Mono・Noto Sans JP の latin) | woff2 を `public/` に置いて `@font-face`(依存 0) |
+| `next/font`(Geist・Geist Mono・Noto Sans JP) | 読み込まない。実は旧版も Geist・Noto は使われておらずシステムフォントで描画されていた(「実装の結果」のフォント) |
 | `next-themes` | そのまま使う(依存 1・外部依存 0)。後で自作に替えてもよい |
 
 ## 決定済み
@@ -67,7 +67,7 @@
 
 - **ファイル配置**: `src/app/**/page.tsx` は残し、`src/router.tsx` のルート表(画面ごとに `lazy`)から読む。ルーターは `src/lib/router/`(`match.ts` がパスの突き合わせ、`navigation.tsx` が `Link`・`usePathname`・`useParams`・`navigate`)。`src/app/layout.tsx` は `<html>`・`<body>` を持たない共通の枠で、`<html>`・`<body>`・タイトル・アイコンは `index.html`。`src/app/icon.png` は `public/icon.png` へ移し、`vercel.json` で `/favicon.ico` をそこへ転送する。
 - **env**: `NEXT_PUBLIC_*` → `VITE_*`、`DEV_AUTH_*` → `VITE_DEV_AUTH_*`。Vite の設定は `vite.config.mts`(`.ts` だと package.json が `"type": "module"` でないため警告が出る)。
-- **フォント**: 設計では「woff2 を `public/` に置く」だったが、`next/font/google` は Noto Sans JP の全分割(124 ファイル。日本語はこの字形で描画されていた)を配信していた。見た目を変えないため、既存ビルド(`.next/static/media`)の woff2 135 個(Geist 5・Geist Mono 6・Noto Sans JP 124、計 5.2MB)を `public/fonts/` へコピーし、元の `@font-face` を `src/app/fonts.css` に書き直した(再取得はしていない。SIL OFL 1.1)。Noto Sans JP の 400 と 500 は同じ可変フォントのファイルだったので、1 宣言にまとめた。**5.2MB は置いてあるファイルの総量で、ブラウザが取るのはページの文字に要る分割だけ**(キャッシュ無しの実測、開発サーバー、2026-11-23: `/weather` は 23 ファイル 462KB、`/schedules` は 8 ファイル 136KB。`next/font` のときと同じ仕組みで、同じファイルを取る)。フォントの更新は、`next/font` の代わりに Google Fonts の CSS を取って同じ形に書き直す。
+- **フォント**: 読み込まない。画面は Tailwind 既定のシステムフォントで描画される(Windows は Segoe UI など)。`next/font` で Geist・Geist Mono・Noto Sans JP を入れていたが、`globals.css` の `--font-sans: var(--font-geist-sans)…` が指す変数は next/font が body にだけ定義していて、`:root` の Tailwind のテーマ変数からは見えず、`font-sans` / `font-mono` は無効のまま既定の字体に落ちていた(旧版を開発サーバーで測ると、`body` の `font-family` は Tailwind 既定のシステムフォントの並びで、`document.fonts` の読み込み済みは 0 件)。つまり Geist・Noto Sans JP は一度も使われていなかった。SPA で woff2 を自己ホストして `--font-geist-*` を定義した最初の本番は、そのせいで初めて実際に使われて見た目が変わった(本人: 「スマホでは変わらないが、PCだと見た目が変わった。ちょっと太くなったような」「スマホでもアルファベットと数字は変わったかも」)ので、woff2 135 個(5.2MB)と `fonts.css` を削除して元の見た目に戻した(2026-11-23)。`font-mono` の見出し(`/` の「monocore」)とレポートのインラインコードも、旧版から等幅にはなっていない(システムフォントのまま)。Geist などを本当に使うなら、`--font-geist-*` を `:root` に定義し直す必要があり、そのとき見た目が変わる。
 - **認証**: `AuthGate` が全画面を担う(`/auth/callback` は対象外)。ログイン済みで `/login` を開くと `/` へ戻す(プロキシがしていた)。`SIGNED_OUT` でレポートの本文と天気の手元の写しを消す。開発用の自動ログインは `AuthGate` が `import.meta.env.DEV` の中で `src/lib/auth/dev-login.ts` を動的に読んで行う(入れたらそのページを読み込み直すので、元のページに残る)。
 - **`/reports/[slug]`**: 手元の本文を出す前に `getSession()` を確かめる。セッションが無いときは本文を出さない(確認済み)。確認できなかったとき(`error`。期限切れのトークンの更新が通信の失敗で通らない、など)も出さず、「ログインを確認できませんでした」と知らせる(sol の指摘。`AuthGate` は通信の失敗でログアウト扱いにしないので、ここで止める)。
 - **画面の読み込み失敗**: `src/components/layout/RouteErrorBoundary.tsx` が、`lazy` の読み込み失敗(通信が切れた、デプロイのあとで古い画面が指すファイルが無い)や描画の例外を受け止め、サイドバーを残したまま「画面を読み込めませんでした」と「読み込み直す」を出す。別の画面へ移れば消える(sol の指摘。無いとアプリ全体が空白になる)。

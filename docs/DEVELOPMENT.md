@@ -79,7 +79,7 @@ npm run dev
 - **Styling:** Tailwind CSS v4（`@tailwindcss/vite`）
 - **UI:** カスタム Tailwind コンポーネント（ネイティブ要素 + ARIA 重視）
 - **Theme:** `next-themes`（system / light / dark。React だけで動く。描画前の dark クラスは `index.html` のスクリプトが付ける）
-- **Fonts:** 自己ホスト（`public/fonts/`、定義は `src/app/fonts.css`。Geist・Geist Mono・Noto Sans JP。出どころと作り方は `docs/spa-migration.md`）
+- **Fonts:** システムフォント(Tailwind 既定)。Geist・Noto Sans JP は読み込まない。経緯は `docs/spa-migration.md`「実装の結果」のフォント
 - **Icons:** `lucide-react` のみ
 
 ### Backend & Database

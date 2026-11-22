@@ -5,6 +5,11 @@
 
 /* --- Design System Foundations --- */
 @theme {
+  /* 注意: 次の2行が指す --font-geist-* などは、どこにも定義していない(Next.js 版では next/font が body にだけ
+     定義していて、ここ(:root)からは見えなかった)。そのため font-sans / font-mono は常に無効になり、
+     画面は Tailwind 既定のシステムフォント(Windows は Segoe UI など)で描画される。これが従来の見た目で、
+     Geist・Noto Sans JP は一度も使われていなかった。値を定義するとフォントが変わるので、消す・足すときは
+     見た目が変わることを前提にする(docs/spa-migration.md「フォント」)。 */
   --font-sans: var(--font-geist-sans), var(--font-noto-sans-jp);
   --font-mono: var(--font-geist-mono);
   /* ライトのページ背景専用の中間段(README-design.md §2-2・§3)。200(パネル)との明るさの差を
