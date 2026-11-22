@@ -838,6 +838,11 @@ export function useSchedules(
         const topSentinel = topSentinelRef.current;
         const bottomSentinel = bottomSentinelRef.current;
         if (!container || !topSentinel || !bottomSentinel) return;
+        // 初回の読み込みが終わるまでは監視しない。初回の範囲(今日の7日前〜14日先)は短く、空欄が多いと下端の
+        // センチネルが読み込み中から先読み範囲に入る。継ぎ足しが初回の結果より先に終わると、初回の結果
+        // (setEntries で全体を置き換える)が継ぎ足した日を消し、rangeEnd だけが広がったまま残って、次の継ぎ足しが
+        // 消えた分を飛ばす(sol の指摘 2026-11-23)。終わると監視を始め、見えているセンチネルにはその時点で通知が来る。
+        if (isInitialSyncing) return;
 
         const obs = new IntersectionObserver(
             (observed) => {
@@ -860,7 +865,7 @@ export function useSchedules(
         obs.observe(topSentinel);
         obs.observe(bottomSentinel);
         return () => obs.disconnect();
-    }, [loadMoreFuture, loadMorePast, hasMorePast]);
+    }, [loadMoreFuture, loadMorePast, hasMorePast, isInitialSyncing]);
 
     const focusDay = useCallback(
         (dateLabel: string) => {
