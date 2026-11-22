@@ -16,16 +16,19 @@
 - **ビルド**: Vite + `@vitejs/plugin-react` + `@tailwindcss/vite`。env は `NEXT_PUBLIC_*` → `VITE_*`(Vercel の環境変数も変える)。`@/src/...` の alias は `vite.config.ts` と `vitest.config.ts` に置く。
 - **配信**: Vercel のまま。静的出力(`dist`)と SPA フォールバックの rewrite(`vercel.json`)。関数が無くなる。
 - **認証**: すでにある `AuthGate`(ブラウザ側の門番)が全ページを担う。`proxy.ts`・`proxy.test.ts`・`lib/supabase/server.ts` は削除する。
-- **Supabase クライアント**: `@supabase/ssr` をやめて `@supabase/supabase-js` の `createClient` にする(依存 −2)。**モジュールで 1 つに使い回すこと**。呼ぶたびに作ると GoTrueClient が複数でき、警告と競合が出る(今の `createBrowserClient` はブラウザで使い回される)。
+- **Supabase クライアント**: `@supabase/ssr` をやめて `@supabase/supabase-js` の `createClient` にする(依存 −2)。
+  - **認証オプションを明示する**。`@supabase/ssr` のブラウザ用クライアントは `flowType: 'pkce'` を指定しているが、`supabase-js` の既定は `implicit` で、そのままだと Magic Link が `?code=` を交換するフローにならない(`code_challenge` が送られない)。`{ auth: { flowType: 'pkce', detectSessionInUrl: false } }` にする。`detectSessionInUrl` は既定が true で、PKCE のとき SDK が初期化時に `?code=` を自動で交換するので、callback での手動交換と重複する。交換は callback の 1 か所だけで行う(確かめた先: `node_modules/@supabase/ssr` の `createBrowserClient` と `@supabase/auth-js` の `GoTrueClient` の既定値、2026-11-23)。
+  - **モジュールで 1 つに使い回すこと**。呼ぶたびに作ると GoTrueClient が複数でき、警告と競合が出る(今の `createBrowserClient` はブラウザで使い回される)。
 
 ## サーバーに残っている部分と行き先
 
-今の `proxy.ts` の対象は `/login`・`/weather`・`/auth/callback`・`/reports/<slug>` だけ。他の殻ページは速度改善で `AuthGate` に移した。
+今の `proxy.ts` は、殻ページ(`/`・`/schedules`・`/finance`・`/news`・`/reports` の完全一致)と静的ファイル以外のすべてで動く(`src/proxy.ts` の matcher と `src/proxy.test.ts`)。実在するのは `/login`・`/weather`・`/auth/callback`・`/reports/<slug>` で、未知のパス(`/unknown`・`/schedules/x`)も未ログインなら `/login` へ送られる。殻ページは速度改善で `AuthGate` に移した。SPA ではルート表に無いパスの扱い(NotFound か `/` へ)を決める。
 
 | 今 | 行き先 |
 |---|---|
-| `auth/callback/route.ts`(`exchangeCodeForSession` → リダイレクト) | SPA のルート `/auth/callback`。同じパスなので Supabase の Redirect URL 設定は変えない。コードは 1 回しか使えないので、StrictMode の二重実行で 2 回交換しないようモジュール変数で 1 回に絞る |
-| `login/page.tsx`(`searchParams` の error) | クライアントで `URLSearchParams` を読む |
+| `auth/callback/route.ts`(`exchangeCodeForSession` → リダイレクト) | SPA のルート `/auth/callback`。同じパスなので Supabase の Redirect URL 設定は変えない。コードは 1 回しか使えないので、クライアントを `detectSessionInUrl: false` にしたうえで、このルートの 1 か所だけで `exchangeCodeForSession` を呼び、StrictMode の二重実行で 2 回呼ばないようモジュール変数で 1 回に絞る |
+| `page.tsx`(`/`。Next の import は無いが `async function`) | `async` を外して同期コンポーネントにする(クライアントの React は async コンポーネントを描画できない) |
+| `login/page.tsx`(`async`。`searchParams` の error) | `async` を外し、クライアントで `URLSearchParams` を読む |
 | `weather/page.tsx`(`WEATHER_*` をサーバーでだけ読む。ログイン無しで取れる JS に地点を埋め込まないため) | テーブル `weather_locations` から読む(決定済み。「決定済み」の節) |
 | `/reports/<slug>`(localStorage の本文をログイン確認より先に出すため、proxy の門番に残している) | 表示前に `getSession()`(通常は通信なし)で確認し、`SIGNED_OUT` で本文キャッシュを消す |
 | dev の自動ログイン(`proxy.ts` の `DEV_AUTH_*`) | `import.meta.env.DEV` でだけ動く開発用モジュールへ。`VITE_DEV_AUTH_*` は `.env.local` にだけ置き、ビルド後に `dist` を grep して混入が無いことを確かめる |
@@ -44,7 +47,7 @@
 ## 手順(提案。1 つのブランチか worktree で進め、main の本番は動かしたまま)
 
 1. Vite の骨組み・ルーター・`index.html`・フォント・Supabase クライアントを足し、既存の `page.tsx` から Next 固有の import を外す。`npm run dev` で全画面が動く。
-2. login・callback・weather・`reports/<slug>` を SPA 用に直す(上の表)。weather は `weather_locations` の先頭の行(`sort_order` 最小、同点は作った順)を読み、行が無ければ東京駅にする。クエリは `lib/supabase/queries/weather-locations.ts` に置く。
+2. `/`・login・callback・weather・`reports/<slug>` を SPA 用に直す(上の表。`/`・login・weather は `async` を外す)。weather は `weather_locations` の先頭の行(`sort_order` 最小、同点は作った順)を読み、行が無ければ東京駅にする。クエリは `lib/supabase/queries/weather-locations.ts` に置く。
 3. next・`@supabase/ssr`・`eslint-config-next`・postcss 設定・`next.config.ts`・proxy 一式を削除し、ESLint を typescript-eslint + react-hooks の flat config に替える。AGENTS.md・`docs/DEVELOPMENT.md`・`docs/directory_structure.md` を更新する。
 4. Vercel の設定(Framework Preset: Vite、出力 `dist`、env 名)を替えて Preview デプロイ。
 5. Preview で下の確認項目を通し、sol レビュー(AGENTS.md の規則)のあと本番へ。戻すときは前のデプロイへロールバックする。
