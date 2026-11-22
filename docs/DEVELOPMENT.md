@@ -13,7 +13,7 @@
 | ルート | 役割 |
 | :--- | :--- |
 | `/schedules` | 予定の一覧・編集。日別メモ欄と、Inbox のモーダルを同居。日カードの見出しに睡眠・非自由・自由の3色の帯 |
-| `/weather` | 指定した地点（環境変数 `WEATHER_NAME` / `WEATHER_LATITUDE` / `WEATHER_LONGITUDE`。サーバーでだけ読む。未設定なら東京駅）の1時間ごとの天気（今の時刻から明日の終わりまで）と14日間の週間予報（読み取り専用） |
+| `/weather` | 指定した地点（テーブル `weather_locations` の先頭の1件。`sort_order` が最小、同点は作った順。サーバーが読む。行が無ければ東京駅）の1時間ごとの天気（今の時刻から明日の終わりまで）と14日間の週間予報（読み取り専用） |
 | `/reports` | `mf/reports/` の読み取り専用ミラー |
 | `/news` | RSS で集めた記事の一覧（ソース別。読み取り専用） |
 
@@ -127,7 +127,7 @@ monocore は AI 活用基盤（context-engine）の**人間向け窓口**であ�
 | `inboxes` | 画面（単一 TEXT blob） | monocore |
 | `finance_events` | 画面（`/finance`。計画イベント） | monocore |
 | `finance_measurements` | 画面（`/finance`。月末の Cash・NISA 実測） | monocore |
-| `weather_locations` | 本人が SQL エディタか `service_role` のスクリプトで入れる。どちらも `auth.uid()` が NULL なので **`user_id` を明示する**（省略すると `23502`。`docs/database.md` §1）。画面は未実装で、`/weather` はまだ環境変数 `WEATHER_*` を読んでおり、このテーブルは読んでいない | monocore |
+| `weather_locations` | 本人が SQL エディタか `service_role` のスクリプトで入れる。どちらも `auth.uid()` が NULL なので **`user_id` を明示する**（省略すると `23502`。`docs/database.md` §1）。画面は未実装。`/weather` が先頭の1件（`sort_order` 最小、同点は作った順）を読む。複数地点の切り替えの画面は無い(monocore#5) | monocore |
 | `reports` | `service_role` のみ（`scripts/upsert-reports.mjs` が `mf/reports/*.md` を HTML にして upsert。ops-daily の `sync-reports.ps1` が毎日呼ぶ） | `mf/reports/` |
 | `articles` | `service_role` のみ（`scraper/` が毎時投入） | **このDB自身** |
 

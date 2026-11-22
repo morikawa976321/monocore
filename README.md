@@ -43,7 +43,8 @@ npm run dev                 # http://localhost:3000
 | 変数 | 内容 |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | 必須。Supabase の接続先 |
-| `WEATHER_NAME` / `WEATHER_LATITUDE` / `WEATHER_LONGITUDE` | 任意。天気の地点（未設定なら東京駅）。サーバーでだけ読む |
+
+天気の地点は環境変数ではなく、テーブル `weather_locations` に本人が入れます（行が無ければ東京駅）。
 
 **ニュースの収集**は `scraper/`（Python）が行います。手元の PC で定期実行する前提で、Windows のタスクスケジューラに登録するスクリプトがあります（`scraper/register-task.ps1`）。
 

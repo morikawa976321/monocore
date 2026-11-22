@@ -29,7 +29,7 @@
 | `auth/callback/route.ts`(`exchangeCodeForSession` → リダイレクト) | SPA のルート `/auth/callback`。同じパスなので Supabase の Redirect URL 設定は変えない。コードは 1 回しか使えないので、クライアントを `detectSessionInUrl: false` にしたうえで、このルートの 1 か所だけで `exchangeCodeForSession` を呼び、StrictMode の二重実行で 2 回呼ばないようモジュール変数で 1 回に絞る。`AuthGate` の除外にこのパスを足す(「構成」の認証の項) |
 | `page.tsx`(`/`。Next の import は無いが `async function`) | `async` を外して同期コンポーネントにする(クライアントの React は async コンポーネントを描画できない) |
 | `login/page.tsx`(`async`。`searchParams` の error) | `async` を外し、クライアントで `URLSearchParams` を読む |
-| `weather/page.tsx`(`WEATHER_*` をサーバーでだけ読む。ログイン無しで取れる JS に地点を埋め込まないため) | テーブル `weather_locations` から読む(決定済み。「決定済み」の節) |
+| `weather/page.tsx`(`async`。今は `lib/supabase/server.ts` のクライアントで `weather_locations` の先頭の1件を読み、サーバーが地点を HTML に入れる。ログイン無しで取れる JS に地点を埋め込まないため) | `async` を外し、ブラウザの Supabase クライアントで同じクエリ(`getDefaultWeatherLocation`)を読む(決定済み。「決定済み」の節) |
 | `/reports/<slug>`(localStorage の本文をログイン確認より先に出すため、proxy の門番に残している) | 表示前に `getSession()`(通常は通信なし)で確認し、`SIGNED_OUT` で本文キャッシュを消す |
 | dev の自動ログイン(`proxy.ts` の `DEV_AUTH_*`) | `import.meta.env.DEV` でだけ動く開発用モジュールへ。`VITE_DEV_AUTH_*` は `.env.local` にだけ置き、ビルド後に `dist` を grep して混入が無いことを確かめる |
 | `next/font`(Geist・Geist Mono・Noto Sans JP の latin) | woff2 を `public/` に置いて `@font-face`(依存 0) |
@@ -37,7 +37,7 @@
 
 ## 決定済み
 
-- **天気の地点はテーブル `weather_locations` に置く**(本人、2026-11-23。理由: 将来、複数の地点を切り替えたい)。1 行 1 地点で、列は `WeatherLocation` の `name` / `latitude` / `longitude` に `sort_order` を足したもの。RLS で本人の行だけ読める。migration は `20261123120000_add_weather_locations.sql`。実際の地点は公開リポジトリに置かないので、本人が SQL エディタか service_role のスクリプトで入れる(どちらも `user_id` の明示が要る。`docs/DEVELOPMENT.md` の表)。行が無いときは今と同じ東京駅。**この移行より前に作った。`/weather` はまだ環境変数を読んでいる**。読む側の切り替えは手順 2 で行う。
+- **天気の地点はテーブル `weather_locations` に置く**(本人、2026-11-23。理由: 将来、複数の地点を切り替えたい)。1 行 1 地点で、列は `WeatherLocation` の `name` / `latitude` / `longitude` に `sort_order` を足したもの。RLS で本人の行だけ読める。migration は `20261123120000_add_weather_locations.sql`。実際の地点は公開リポジトリに置かないので、本人が SQL エディタか service_role のスクリプトで入れる(どちらも `user_id` の明示が要る。`docs/DEVELOPMENT.md` の表)。行が無いときは今と同じ東京駅。**この移行より前に作り、`/weather` の読み取りも先に切り替えた(2026-11-23)**。環境変数 `WEATHER_*` は読まない。今はサーバーが読むので、手順 2 ではその読み取りをブラウザ側に移すだけでよい。複数地点の切り替え(画面)は別の課題(monocore#5)。
 
 ## 決めること(本人)
 

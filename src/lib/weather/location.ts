@@ -1,13 +1,12 @@
 import type { WeatherLocation } from './forecast'
 
 /**
- * 予報の地点。住んでいる地域が分かるので、実際の値は環境変数で与えて公開リポジトリに置かない(未設定なら東京駅)。
- * サーバーでだけ読む。NEXT_PUBLIC_ にするとログイン無しで取れる _next/static の JS に値が埋め込まれる。
+ * 予報の地点の行が無いとき(weather_locations が空のとき)に使う地点。東京駅。
+ * 実際の地点は住んでいる地域が分かるので、このリポジトリには置かず、テーブル weather_locations に本人が入れる
+ * (src/lib/supabase/queries/weather-locations.ts が先頭の1件を読む)。
  */
-export function readWeatherLocation(): WeatherLocation {
-    return {
-        name: process.env.WEATHER_NAME || '東京',
-        latitude: Number(process.env.WEATHER_LATITUDE || 35.6812),
-        longitude: Number(process.env.WEATHER_LONGITUDE || 139.7671),
-    }
+export const DEFAULT_WEATHER_LOCATION: WeatherLocation = {
+    name: '東京',
+    latitude: 35.6812,
+    longitude: 139.7671,
 }
