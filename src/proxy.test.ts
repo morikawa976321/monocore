@@ -10,14 +10,14 @@ function matches(path: string): boolean {
 
 describe('proxy matcher', () => {
     it('クライアント描画だけの殻のページはプロキシを通さない', () => {
-        for (const path of ['/', '/schedules', '/finance', '/news', '/reports', '/reports/some-slug']) {
+        for (const path of ['/', '/schedules', '/finance', '/news', '/reports']) {
             expect(matches(path), path).toBe(false)
         }
     })
 
     it('先読み(_rsc)も殻のページと同じ扱い', () => {
         expect(matches('/schedules?_rsc=abc')).toBe(false)
-        expect(matches('/reports/some-slug?_rsc=abc')).toBe(false)
+        expect(matches('/reports?_rsc=abc')).toBe(false)
     })
 
     it('サーバーで描画するルートと認証まわりはプロキシを通す', () => {
@@ -27,8 +27,19 @@ describe('proxy matcher', () => {
         }
     })
 
+    it('レポートの本文ページはプロキシを通す', () => {
+        // 開いたレポートの本文を localStorage から、AuthGate の確認より先に出す。外すと、セッションの無い
+        // ブラウザに保存済みの本文が /login への転送が終わるまで見える。
+        for (const path of ['/reports/some-slug', '/reports/some-slug?_rsc=abc']) {
+            expect(matches(path), path).toBe(true)
+        }
+    })
+
     it('殻の名前で始まるだけの別のパスや、深い階層は通す(新しいルートは既定で門番を通る)', () => {
-        for (const path of ['/schedules/x', '/finance/x', '/news/x', '/reports/a/b', '/schedulesx', '/newsletter', '/admin', '/unknown']) {
+        for (const path of [
+            '/schedules/x', '/schedules/a/b', '/finance/x', '/news/x', '/reports/a/b', '/reports/a/b/c',
+            '/schedulesx', '/newsletter', '/admin', '/unknown',
+        ]) {
             expect(matches(path), path).toBe(true)
         }
     })

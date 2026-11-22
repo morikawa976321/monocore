@@ -56,8 +56,10 @@ export async function updateSession(request: NextRequest) {
     // 開発サーバーではログイン画面を出さない。RLS を通すため、
     // ローカル Supabase なら開発ユーザーで入り、それ以外は DEV_AUTH_* があれば入る。
     if (!isAuthenticated && isDevAuthBypassEnabled()) {
-        await tryDevPasswordSignIn(supabase)
-        if (pathname.startsWith('/login')) {
+        const signedIn = await tryDevPasswordSignIn(supabase)
+        // 入れたときだけ / へ送る。失敗したのに送ると、殻のページの AuthGate が /login へ戻して / と往復し続ける
+        // (ローカル Supabase が止まっているときなど)。失敗したら /login を出して止める。
+        if (signedIn && pathname.startsWith('/login')) {
             return redirectWithSessionCookies('/')
         }
         return supabaseResponse
@@ -104,18 +106,20 @@ export async function proxy(request: NextRequest) {
  *
  * 外すもの(下の正規表現の先読みに並べたもの):
  * - _next/static (静的ファイル)、_next/image (画像最適化)、favicon.ico、画像の拡張子
- * - クライアント描画だけの殻のページ: / ・ /schedules ・ /finance ・ /news ・ /reports ・ /reports/<slug>。
+ * - クライアント描画だけの殻のページ: / ・ /schedules ・ /finance ・ /news ・ /reports。
  *   HTML にデータを持たず、データはブラウザから Supabase へ直接取りに行く(RLS)ので、サーバーで門番をする
  *   意味が無い。プロキシを通すと、ページ取得のたびに関数の起動が約 110ms 乗る(2026-11-22 本番の実測。
  *   Cookie なしでも同じ。docs/decisions.md「認証ゲートの一部をクライアントへ移した」)。未ログインは
  *   src/components/auth/AuthGate.tsx がブラウザ側で /login へ送る。
  *
- * 外さないもの: /weather(地点をサーバーが HTML に入れる)、/login、/auth/callback、未知のパス。
+ * 外さないもの: /weather(地点をサーバーが HTML に入れる)、/login、/auth/callback、未知のパス、
+ * /reports/<slug>(開いたレポートの本文を localStorage から、AuthGate の確認より先に出す。外すと、セッションの
+ * 無いブラウザに保存済みの本文が /login へ転送が終わるまで見える。サーバーの門番なら HTML を返す前に転送する)。
  * 殻だけを列挙して外す形にしてあるので、新しいルートは既定でプロキシを通る。殻のページを足したときだけ、
  * ここに足す(足し忘れても遅くなるだけで、門番は外れない)。境目は src/proxy.test.ts が検査する。
  */
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|(?:schedules|finance|news|reports|reports/[^/]+)?$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|(?:schedules|finance|news|reports)?$).*)',
     ],
 }

@@ -111,7 +111,7 @@ npm run dev
 - **データ:** `src/lib/supabase/queries/` に集約（例: `schedules.ts`, `inboxes.ts`）。`page.tsx` で `supabase.from(...)` を直接書かない
 - **状態:** `src/hooks/`
 - **型:** `src/types/database.types.ts`（Supabase 生成型）を使う。`any` は避ける
-- **認証ゲート:** `src/proxy.ts`（セッション更新・未ログイン時のリダイレクト）。クライアント描画だけの殻のページ（`/`・`/schedules`・`/finance`・`/news`・`/reports`・`/reports/[slug]`）は matcher から外し、`src/components/auth/AuthGate.tsx` がブラウザ側で未ログインを `/login` へ送る（理由は `docs/decisions.md`）。**サーバーで何かを描画するルートは、外さずプロキシに通す**（`/weather` は地点を HTML に入れる）。matcher は殻だけを列挙して外す形なので、新しいルートは既定でプロキシを通る。境目は `src/proxy.test.ts`
+- **認証ゲート:** `src/proxy.ts`（セッション更新・未ログイン時のリダイレクト）。クライアント描画だけの殻のページ（`/`・`/schedules`・`/finance`・`/news`・`/reports`）は matcher から外し、`src/components/auth/AuthGate.tsx` がブラウザ側で未ログインを `/login` へ送る（理由は `docs/decisions.md`）。**サーバーで何かを描画するルート、ブラウザに置いたデータをゲートの確認より先に出すルートは、外さずプロキシに通す**（`/weather` は地点を HTML に入れる。`/reports/[slug]` は localStorage のレポート本文を先に出す）。matcher は殻だけを列挙して外す形なので、新しいルートは既定でプロキシを通る。境目は `src/proxy.test.ts`
 - **`scraper/` だけ Python**（RSS 収集。Next.js のビルドには含まれない）。`requirements.txt` をリポジトリのルートに置かないこと — ルートの `requirements.txt` と `api/*.py` は Vercel の Python ランタイム自動検出の対象になる
 
 詳細は `docs/directory_structure.md` を参照。
