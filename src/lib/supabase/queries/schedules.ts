@@ -62,9 +62,9 @@ export async function getDefaultAppliedDays(
 ): Promise<{ data: Set<string> | null; error: PostgrestError | null }> {
     const days = new Set<string>()
     for (let offset = 0; ; ) {
-        const { data, error } = await supabase
+        const { data, error, count } = await supabase
             .from('default_schedule_applications')
-            .select('day_key')
+            .select('day_key', { count: 'exact' })
             .gte('day_key', startDay)
             .lte('day_key', endDay)
             .order('day_key', { ascending: true })
@@ -73,10 +73,13 @@ export async function getDefaultAppliedDays(
         if (error) return { data: null, error }
         if (!data || data.length === 0) return { data: days, error: null }
         for (const row of data) days.add(row.day_key)
-        // 1ページに満たなければ最後。満たないページの次を読むと、空のページを返すだけの往復が毎回1つ増える
-        // (初回の読み込みでは、ほかの読み込みが終わった後にこれだけが残って、完了を約 100ms 遅らせていた)。
-        if (data.length < PAGE_ROWS) return { data: days, error: null }
         offset += data.length
+        // 総数に届いたら最後。空のページが返るまで読むと、空を返すだけの往復が毎回1つ増える(初回の読み込みでは、
+        // ほかの読み込みが終わった後にこれだけが残って、完了を約 100ms 遅らせていた)。「1ページに満たなければ
+        // 最後」としないのは、サーバーの max_rows が PAGE_ROWS より小さいと、短い応答を末尾と見誤って黙って
+        // 取りこぼすため(本番の設定は config.toml と別。sol の指摘 2026-11-23)。count が取れないときは、従来どおり
+        // 空のページまで読む。
+        if (count !== null && offset >= count) return { data: days, error: null }
     }
 }
 
