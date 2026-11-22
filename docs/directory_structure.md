@@ -14,7 +14,7 @@ monocore
 │   │   └── [feature]/        # 各機能（例: schedules, inbox）
 │   │       └── page.tsx      # 機能のメイン画面（default export）
 │   ├── components/           # 【UI Parts】再利用可能な部品
-│   │   ├── layout/           # Sidebar, Header など、app/layout で呼び出す部品
+│   │   ├── layout/           # Sidebar など枠の部品。RouteErrorBoundary は画面の読み込み・描画の失敗を受け止める
 │   │   ├── ui/               # Button, Input, Textarea など、汎用的な最小パーツ
 │   │   └── [feature]/        # DaySection, InboxPanel など、特定の機能に紐づくパーツ
 │   ├── hooks/                # 【Logic】Reactの状態管理ロジック（useSchedules等）

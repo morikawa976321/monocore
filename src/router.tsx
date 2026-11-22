@@ -1,4 +1,5 @@
 import { lazy, Suspense, type ComponentType } from 'react'
+import { RouteErrorBoundary } from '@/src/components/layout/RouteErrorBoundary'
 import { matchPath } from '@/src/lib/router/match'
 import { Link, RouteParamsProvider, usePathname } from '@/src/lib/router/navigation'
 
@@ -28,9 +29,11 @@ export function Routes() {
             const Page = route.component
             return (
                 <RouteParamsProvider value={params}>
-                    <Suspense fallback={null}>
-                        <Page />
-                    </Suspense>
+                    <RouteErrorBoundary key={pathname}>
+                        <Suspense fallback={null}>
+                            <Page />
+                        </Suspense>
+                    </RouteErrorBoundary>
                 </RouteParamsProvider>
             )
         }

@@ -95,11 +95,18 @@ export default function ReportDetailPage() {
         void (async () => {
             // ログインを確かめてから手元の本文を出す。サーバーの門番は無く、AuthGate の確認と並んで動くので、
             // 待たずに出すと、セッションの無いブラウザに保存済みの本文が /login へ移るまで見える。
-            // セッションが無いと分かったら出さない(AuthGate が /login へ送る)。通信の失敗(error)は
-            // AuthGate と同じく、ログアウト扱いにしない。
+            // セッションが無いと分かったら出さない(AuthGate が /login へ送る)。
+            // 確認できなかったとき(error。期限切れのトークンの更新が通信の失敗で通らない、など)も出さない:
+            // 有効なセッションを確かめられないまま本文を出し続けないため。AuthGate は電波が弱いだけの人を
+            // ログアウト扱いにしないので /login へは送らず、ここで知らせる(通信が戻ったら読み込み直す)。
             const { data: session, error: sessionError } = await supabase.auth.getSession()
             if (cancelled) return
-            if (!sessionError && !session.session) return
+            if (sessionError) {
+                setErrorMessage('ログインを確認できませんでした。通信を確認して、読み込み直してください。')
+                setIsLoading(false)
+                return
+            }
+            if (!session.session) return
 
             // 手元に本文があればすぐ出し、版の目印だけを問い合わせる。変わっていたときだけ本文を読み直す
             // (src/lib/reports/cache.ts)。問い合わせに失敗しても(通信が無いなど)手元の本文はそのまま読める。
