@@ -5,31 +5,34 @@
 ```text
 monocore
 ├── src/
-│   ├── app/                  # 【Routing】URLと画面の定義
-│   │   ├── layout.tsx        # 全ページ共通の枠組み（HTML/Bodyタグ、共通ヘッダー等）
+│   ├── main.tsx              # 【Entry】React の起動（index.html から読まれる）
+│   ├── router.tsx            # 【Routing】URLと画面の対応表（ルート表）。画面を足したら1行足す
+│   ├── app/                  # 【Pages】画面の定義（URLとの対応は router.tsx）
+│   │   ├── layout.tsx        # 全ページ共通の枠組み（テーマ・AuthGate・サイドバー。<html>/<body> は index.html）
+│   │   ├── fonts.css         # 自己ホストのフォント（public/fonts の woff2 を指す）
 │   │   ├── page.tsx          # トップページ (/)
 │   │   └── [feature]/        # 各機能（例: schedules, inbox）
-│   │       ├── page.tsx      # 機能のメイン画面
-│   │       └── layout.tsx    # (任意) その機能グループ専用のレイアウト
+│   │       └── page.tsx      # 機能のメイン画面（default export）
 │   ├── components/           # 【UI Parts】再利用可能な部品
 │   │   ├── layout/           # Sidebar, Header など、app/layout で呼び出す部品
 │   │   ├── ui/               # Button, Input, Textarea など、汎用的な最小パーツ
 │   │   └── [feature]/        # DaySection, InboxPanel など、特定の機能に紐づくパーツ
 │   ├── hooks/                # 【Logic】Reactの状態管理ロジック（useSchedules等）
 │   ├── lib/                  # 【Infrastructure】外部接続と汎用関数
+│   │   ├── router/           # 自前ルーター（match.ts: パスの突き合わせ、navigation.tsx: Link・usePathname・useParams・navigate）
 │   │   ├── supabase/
-│   │   │   ├── client.ts     # クライアントコンポーネント用接続設定
-│   │   │   ├── server.ts     # サーバーコンポーネント用接続設定
+│   │   │   ├── client.ts     # ブラウザ用の supabase-js クライアント（アプリで1つ。PKCE・localStorage）
 │   │   │   └── queries/      # テーブルごとのDB操作関数（schedules.ts, inboxes.ts等）
 │   │   └── date.ts 等        # DBに関係ない汎用ユーティリティ
-│   ├── proxy.ts              # 【Security】認証チェック・リダイレクト処理（Next.js proxy。クライアント描画だけの殻のページは matcher から外し、components/auth/AuthGate.tsx が担う）
 │   └── types/                # 【Definition】TypeScriptの型定義
 │       └── database.types.ts # Supabaseから自動生成された型
 ├── supabase/                 # 【Backend】Supabaseローカル環境の設定
 │   ├── config.toml           # ローカル環境の構成設定（ポート、Auth設定等）
 │   ├── seed.sql              # 開発用テストデータ（初期投入データ）
 │   └── migrations/           # DBスキーマ変更の履歴ファイル群
-└── (root configs)            # package.json, tsconfig.json 等
+├── index.html                # 【Entry】<html>/<body>・タイトル・アイコン・テーマの先付けスクリプト
+├── public/                   # そのまま配信するファイル（icon.png、fonts/）
+└── (root configs)            # package.json, tsconfig.json, vite.config.mts, vercel.json 等
 ```
 
 ---
@@ -40,7 +43,7 @@ monocore
 
 | パス | 役割 (1行説明) |
 | :--- | :--- |
-| `src/app/` | **ルーティングと画面**: 各URLに対応するページとレイアウトの定義。 |
+| `src/app/` | **画面**: 各URLに対応するページとレイアウト。URLとの対応は `src/router.tsx`。 |
 | `src/components/` | **UIコンポーネント**: 再利用可能な部品（ボタン、リスト、フォームなど）。 |
 | `src/hooks/` | **カスタムフック**: Reactの状態管理や副作用（データ取得中など）の共通ロジック。 |
 | `src/lib/` | **外部連携・道具箱**: Supabaseのクライアント設定や、共通のユーティリティ関数。 |
@@ -64,10 +67,11 @@ monocore
 
 ## 3. 主要フォルダの設計意図と使い分け
 
-### 📂 `src/app/` (App Router)
-Next.js 独自のルーティングシステムです。フォルダ名がそのままURLになります。
-* **動的ルーティング `[id]`**: `/schedules/123` のように、URLの一部をIDとして受け取る画面に使用。
-* **(auth) フォルダ**: `( )` で囲むと、URLには影響を与えず、認証関連のページを論理的にグループ化できます。
+### 📂 `src/app/` (画面) と `src/router.tsx` (ルート表)
+フォルダ構成は Next.js の App Router のときのまま残してありますが、**フォルダ名は URL を決めません**。URL との対応は `src/router.tsx` のルート表が持ちます（画面ごとに読み込みを分ける）。
+* **画面を足す**: `src/app/<名前>/page.tsx` を作り（default export）、`src/router.tsx` に 1 行足す。ルート表に無いパスは NotFound。
+* **動的パラメータ `:slug`**: ルート表の `'/reports/:slug'` のように書き、画面側は `useParams()`（`src/lib/router/navigation.tsx`）で受け取る。
+* **リンク**: アプリ内は `@/src/lib/router/navigation` の `Link`（ページを読み込み直さない）。
 
 ### 📂 `src/components/` (Component Atomic)
 UIを構成するパーツです。機能ごとにサブフォルダを作ります。
@@ -94,7 +98,7 @@ UIを構成するパーツです。機能ごとにサブフォルダを作りま
 2. その中のメインエリアに、URLに応じた **Page** が描画される。
 3. **Page** は、機能を最小単位に分割した **Components** を組み合わせて表示を作る。
 
-* **Layout (器)**: `src/app/layout.tsx` + `src/components/layout/`
+* **Layout (器)**: `src/app/layout.tsx` + `src/components/layout/`（`src/main.tsx` が `layout` の `children` にルート表の画面を入れる）
    - URLが変わっても消えない、アプリ共通の枠組み。
    - サイドバー、ヘッダー、背景デザインなど。
 * **Page (中身)**: `src/app/**/page.tsx`

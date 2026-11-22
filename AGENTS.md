@@ -22,12 +22,13 @@ Reference: `docs/DEVELOPMENT.md` (Database Management, Testing)
 
 ## Architecture
 
-- **Routing / pages:** `src/app/` — URL = folder; `page.tsx` per route. Use `(auth)` for route-grouping without URL.
+- **Stack:** static SPA — React + Vite (no Next.js, no server). The server only returns static files (`vercel.json`: SPA rewrite to `index.html`). Details: `docs/spa-migration.md`.
+- **Routing / pages:** `src/app/**/page.tsx` (default export per page). **URL ↔ page table is `src/router.tsx`** (own router on the History API: `src/lib/router/`; `Link` / `usePathname` / `useParams` / `navigate`). A new page = the file + one line in `src/router.tsx`. `src/app/layout.tsx` is the shared frame (no `<html>`/`<body>`: those are in `index.html`).
 - **UI components:** `src/components/` — `layout/` (Sidebar, Header), `ui/` (Button, …), `[feature]/` (e.g. DaySection).
-- **Data / infra:** `src/lib/` — `lib/supabase/client.ts`, `server.ts`; **all DB access in `lib/supabase/queries/`** (e.g. `schedules.ts`, `inboxes.ts`). Do not put `supabase.from(...)` in `page.tsx`.
+- **Data / infra:** `src/lib/` — `lib/supabase/client.ts` (one `supabase-js` browser client, PKCE, session in localStorage); **all DB access in `lib/supabase/queries/`** (e.g. `schedules.ts`, `inboxes.ts`). Do not put `supabase.from(...)` in `page.tsx`. Env vars are `VITE_*` (`import.meta.env`).
 - **State / logic:** `src/hooks/` — e.g. `useSchedules` for fetch + loading + persistence orchestration.
 - **Types:** `src/types/` — use generated `database.types.ts`; avoid `any`.
-- **Auth gate:** `src/proxy.ts` (Next.js proxy; not `middleware.ts`). Client-only shell pages (`/`, `/schedules`, `/finance`, `/news`, `/reports`) are excluded from its matcher, because a proxy invocation costs ~110 ms per page request, and are gated in the browser by `src/components/auth/AuthGate.tsx`. A route that renders anything on the server (e.g. `/weather`), or that shows data kept in the browser before the gate has checked (`/reports/[slug]` shows the cached report body from localStorage), must stay behind the proxy; `src/proxy.test.ts` checks the boundary. Reason and measurements: `docs/decisions.md`.
+- **Auth gate:** there is no server-side gate. `src/components/auth/AuthGate.tsx` sends a logged-out browser to `/login` for every page (`/auth/callback` is excluded: it must finish the code exchange). The HTML holds no data and data is fetched from the browser under RLS, so a logged-out visitor can read nothing. A page that shows data kept in the browser (e.g. `/reports/[slug]` shows the cached report body from localStorage) must check `getSession()` itself before showing it. Reason and history: `docs/decisions.md`.
 - **Backend / DB:** `supabase/migrations/`, `supabase/config.toml`, `supabase/seed.sql`.
 
 **Rule:** "Pages in `app`, UI in `components`, data functions in `lib`, state in `hooks`." When adding a feature: add/update migration → types → `lib/supabase/queries/*` → components → `app/**/page.tsx`.
@@ -40,7 +41,7 @@ Reference: `docs/directory_structure.md`
 
 1. **Schedules-centered Personal OS** — Schedules is the primary surface; Inbox is a companion panel on that page (not a peer route). Projects, Reports, and Finance are separate resources with their own routes.
 2. **Form follows function / Cognitive load minimization** — No decorative animation; maximize information density and speed; minimize clicks.
-3. **Focus on app logic** — Use `@supabase/ssr` fully; keep boilerplate minimal.
+3. **Focus on app logic** — Use `supabase-js` as is; keep boilerplate and dependencies minimal.
 4. **Prioritize development speed above all** — In this solo, small-scale project, default decisions should favor faster implementation and iteration unless they introduce major product risk.
 
 Reference: `docs/DEVELOPMENT.md` (Technology Stack, Development Philosophy)

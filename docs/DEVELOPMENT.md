@@ -13,7 +13,7 @@
 | ルート | 役割 |
 | :--- | :--- |
 | `/schedules` | 予定の一覧・編集。日別メモ欄と、Inbox のモーダルを同居。日カードの見出しに睡眠・非自由・自由の3色の帯 |
-| `/weather` | 指定した地点（テーブル `weather_locations` の先頭の1件。`sort_order` が最小、同点は作った順。サーバーが読む。行が無ければ東京駅）の1時間ごとの天気（今の時刻から明日の終わりまで）と14日間の週間予報（読み取り専用） |
+| `/weather` | 指定した地点（テーブル `weather_locations` の先頭の1件。`sort_order` が最小、同点は作った順。ブラウザが読む。行が無ければ東京駅）の1時間ごとの天気（今の時刻から明日の終わりまで）と14日間の週間予報（読み取り専用） |
 | `/reports` | `mf/reports/` の読み取り専用ミラー |
 | `/news` | RSS で集めた記事の一覧（ソース別。読み取り専用） |
 
@@ -49,14 +49,16 @@ npm install
 npm run dev
 ```
 
-`npm run dev` ではログイン画面を出さない。ローカル Supabase（`127.0.0.1`）なら開発ユーザーで自動ログインする。リモート DB を叩く場合は `.env.local` に `DEV_AUTH_EMAIL` と `DEV_AUTH_PASSWORD` を置く。ログイン画面を確認したいときは `DEV_AUTH_BYPASS=0`。本番は従来どおりログイン必須。自動ログインはプロキシが `/login` を通ったときに働くので、殻のページ（`/schedules` など）を未ログインで開くと、`/login` → 自動ログイン → `/` の順になり、元のページには戻らない（開き直す）。
+`npm run dev`（Vite。`http://localhost:3000`）ではログイン画面を出さない。ローカル Supabase（`127.0.0.1`）なら開発ユーザーで自動ログインする。リモート DB を叩く場合は `.env.local` に `VITE_DEV_AUTH_EMAIL` と `VITE_DEV_AUTH_PASSWORD` を置く。ログイン画面を確認したいときは `VITE_DEV_AUTH_BYPASS=0`。本番は従来どおりログイン必須。自動ログインは `AuthGate`（`src/components/auth/AuthGate.tsx`）が、セッションが無いときに `import.meta.env.DEV` の中でだけ行い（`src/lib/auth/dev-login.ts`）、入れたらそのページを読み込み直す（元のページに残る）。本番ビルドには入らない（`npm run build` のあと `dist` を grep して確かめる: `DEV_AUTH`・`local-dev-password`）。`.env.local` の `VITE_*` は `vite build` も読むので、`VITE_DEV_AUTH_*` を Vercel の環境変数には置かない。
+
+環境変数は `VITE_SUPABASE_URL` と `VITE_SUPABASE_PUBLISHABLE_KEY`（`.env.example`。以前の `NEXT_PUBLIC_*` から名前が変わった）。Vercel の環境変数にも同じ名前で設定する。
 
 その他のスクリプト:
 
 | コマンド | 内容 |
 | :--- | :--- |
-| `npm run build` | 本番ビルド |
-| `npm start` | 本番サーバー起動 |
+| `npm run build` | 型チェックと本番ビルド（`dist`） |
+| `npm run preview` | ビルドした `dist` を手元で配信して確かめる |
 | `npm test` | Vitest（単発）のあと `scraper/` の pytest（下記「Testing」） |
 | `npm run test:py` | `scraper/` の pytest だけ |
 | `npm run test:watch` | Vitest（ウォッチ） |
@@ -72,22 +74,24 @@ npm run dev
 
 ### Frontend
 
-- **Framework:** Next.js 16（App Router） / React 19 / TypeScript 6
-- **Styling:** Tailwind CSS v4
+- **Framework:** React 19 / TypeScript 6 / Vite 8（静的 SPA。サーバーは静的ファイルを返すだけ。`docs/spa-migration.md`）
+- **Router:** 自前（History API。`src/lib/router/`、ルート表は `src/router.tsx`）
+- **Styling:** Tailwind CSS v4（`@tailwindcss/vite`）
 - **UI:** カスタム Tailwind コンポーネント（ネイティブ要素 + ARIA 重視）
-- **Theme:** `next-themes`（system / light / dark）
+- **Theme:** `next-themes`（system / light / dark。React だけで動く。描画前の dark クラスは `index.html` のスクリプトが付ける）
+- **Fonts:** 自己ホスト（`public/fonts/`、定義は `src/app/fonts.css`。Geist・Geist Mono・Noto Sans JP。出どころと作り方は `docs/spa-migration.md`）
 - **Icons:** `lucide-react` のみ
 
 ### Backend & Database
 
 - **BaaS:** Supabase（Auth / Postgres / RLS）
-- **SDK:** `@supabase/ssr` + `@supabase/supabase-js`
+- **SDK:** `@supabase/supabase-js`（ブラウザから直接。セッションは localStorage、PKCE）
 - **Philosophy:** ボイラープレートを抑え、アプリロジックに集中する
 
 ### Dev Tools
 
 - **Test:** Vitest（TypeScript）＋ pytest（`scraper/`）
-- **Lint:** ESLint（`eslint-config-next`）
+- **Lint:** ESLint（typescript-eslint + react-hooks の flat config）
 
 ---
 
@@ -98,7 +102,7 @@ npm run dev
 2. **Form follows function / Cognitive Load Minimization**  
    装飾的なアニメーションは排し、情報密度と操作スピードを最大化する。認知負荷の最小化を優先する。
 3. **Focus on App Logic**  
-   `@supabase/ssr` を全面採用し、認証・セッション周りのボイラープレートを最小化する。
+   `supabase-js` を素のまま使い、認証・セッション周りのボイラープレートを最小化する。
 4. **開発速度を最優先する**  
    個人開発の小規模アプリとして、重大な品質リスクがない限り、実装・反復の速さを優先する。
 
@@ -106,13 +110,13 @@ npm run dev
 
 ## Architecture（要約）
 
-- **画面:** `src/app/`（URL = フォルダ）
+- **画面:** `src/app/**/page.tsx`（default export）。URL との対応は `src/router.tsx` のルート表（1 画面 1 行。新しい画面は足す）。ルート表に無いパスは NotFound
 - **UI:** `src/components/`（`layout/` / `ui/` / 機能別）
 - **データ:** `src/lib/supabase/queries/` に集約（例: `schedules.ts`, `inboxes.ts`）。`page.tsx` で `supabase.from(...)` を直接書かない
 - **状態:** `src/hooks/`
 - **型:** `src/types/database.types.ts`（Supabase 生成型）を使う。`any` は避ける
-- **認証ゲート:** `src/proxy.ts`（セッション更新・未ログイン時のリダイレクト）。クライアント描画だけの殻のページ（`/`・`/schedules`・`/finance`・`/news`・`/reports`）は matcher から外し、`src/components/auth/AuthGate.tsx` がブラウザ側で未ログインを `/login` へ送る（理由は `docs/decisions.md`）。**サーバーで何かを描画するルート、ブラウザに置いたデータをゲートの確認より先に出すルートは、外さずプロキシに通す**（`/weather` は地点を HTML に入れる。`/reports/[slug]` は localStorage のレポート本文を先に出す）。matcher は殻だけを列挙して外す形なので、新しいルートは既定でプロキシを通る。境目は `src/proxy.test.ts`
-- **`scraper/` だけ Python**（RSS 収集。Next.js のビルドには含まれない）。`requirements.txt` をリポジトリのルートに置かないこと — ルートの `requirements.txt` と `api/*.py` は Vercel の Python ランタイム自動検出の対象になる
+- **認証ゲート:** サーバーの門番は無い（静的ファイルを返すだけ）。`src/components/auth/AuthGate.tsx` がブラウザ側で、全画面について未ログインを `/login` へ送る。HTML にデータは無く、データは RLS で守られたブラウザからの直接取得なので、未ログインで画面の枠が見えても読めるものは無い。**ブラウザに置いたデータ（localStorage のレポート本文など）をゲートの確認より先に出す画面は、自分で `getSession` を確かめてから出す**（`/reports/[slug]`）。`/auth/callback` はゲートの対象外（コードの交換が終わるまでセッションが無いため）。理由と経緯は `docs/decisions.md`
+- **`scraper/` だけ Python**（RSS 収集。フロントのビルドには含まれない）。`requirements.txt` をリポジトリのルートに置かないこと — ルートの `requirements.txt` と `api/*.py` は Vercel の Python ランタイム自動検出の対象になる
 
 詳細は `docs/directory_structure.md` を参照。
 

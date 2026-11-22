@@ -1,6 +1,6 @@
 # 静的 SPA への移行案(Next.js をやめる)
 
-状態: **設計案(未着手)**。2026-11-23 に本人が「React も Next.js も依存が多く、その変更や脆弱性の影響を受けやすい。フレームワークをよりシンプルなものに変えることを積極的に考えていきたい」と述べ、選択肢のうち「静的 SPA 案」で詰めることを選んだ。以下の構成・手順は AI の提案で、本人が採否を決めることにしていた3点(天気の地点の置き場所・再ログインの受け入れ・ルーター)は 2026-11-23 にすべて決まった(「決定済み」の節)。
+状態: **実装済み(ブランチ `spa-migration`。main への取り込みと本番切り替えはこれから。「実装の結果」の節)**。2026-11-23 に本人が「React も Next.js も依存が多く、その変更や脆弱性の影響を受けやすい。フレームワークをよりシンプルなものに変えることを積極的に考えていきたい」と述べ、選択肢のうち「静的 SPA 案」で詰めることを選んだ。以下の構成・手順は AI の提案で、本人が採否を決めることにしていた3点(天気の地点の置き場所・再ログインの受け入れ・ルーター)は 2026-11-23 にすべて決まった(「決定済み」の節)。
 
 ## 実測(2026-11-23)
 
@@ -13,7 +13,7 @@
 
 - **ファイル配置は変えない**(AGENTS.md「承認なしにファイル名を変えない」)。`src/app/**/page.tsx` は残し、ルート表(`src/router.tsx`)から import する。`layout.tsx` の `<html><body>` は `index.html` へ移す。
 - **ルーター**: 自作(History API。Link・usePathname・params で約 40 行、依存 0)。足りなくなったら wouter(依存 2)。
-- **ビルド**: Vite + `@vitejs/plugin-react` + `@tailwindcss/vite`。env は `NEXT_PUBLIC_*` → `VITE_*`(Vercel の環境変数も変える)。`@/src/...` の alias は `vite.config.ts` と `vitest.config.ts` に置く。
+- **ビルド**: Vite + `@vitejs/plugin-react` + `@tailwindcss/vite`。env は `NEXT_PUBLIC_*` → `VITE_*`(Vercel の環境変数も変える)。`@/src/...` の alias は `vite.config.mts` と `vitest.config.ts` に置く。
 - **配信**: Vercel のまま。静的出力(`dist`)と SPA フォールバックの rewrite(`vercel.json`)。関数が無くなる。
 - **認証**: すでにある `AuthGate`(ブラウザ側の門番)が全ページを担う。`proxy.ts`・`proxy.test.ts`・`lib/supabase/server.ts` は削除する。**`AuthGate` の除外に `/auth/callback` を足す**(今の除外は `/login` だけで、`layout.tsx` に置かれている)。callback は今は route handler で `AuthGate` を通らないが、SPA では同じレイアウトの中に入る。交換が終わるまでセッションが無く、`detectSessionInUrl: false` では `getSession()` が手動交換の完了を待たないので、除外しないと交換の完了前に `/login` へ送ってしまう(sol が SDK で確かめた)。
 - **Supabase クライアント**: `@supabase/ssr` をやめて `@supabase/supabase-js` の `createClient` にする(依存 −2)。
@@ -60,6 +60,20 @@
 - 天気が正しい地点で出る。`dist` に地点の値・`DEV_AUTH`・`service_role` が無い。
 - `/schedules` の初回ロード時間を `docs/decisions.md` の実測と同じ手順で測り、悪化していない(殻はすでに proxy の外なので、改善は小さい)。
 - vitest が通る。
+
+## 実装の結果(2026-11-23)
+
+設計からの変更点と、残っていること。
+
+- **ファイル配置**: `src/app/**/page.tsx` は残し、`src/router.tsx` のルート表(画面ごとに `lazy`)から読む。ルーターは `src/lib/router/`(`match.ts` がパスの突き合わせ、`navigation.tsx` が `Link`・`usePathname`・`useParams`・`navigate`)。`src/app/layout.tsx` は `<html>`・`<body>` を持たない共通の枠で、`<html>`・`<body>`・タイトル・アイコンは `index.html`。`src/app/icon.png` は `public/icon.png` へ移し、`vercel.json` で `/favicon.ico` をそこへ転送する。
+- **env**: `NEXT_PUBLIC_*` → `VITE_*`、`DEV_AUTH_*` → `VITE_DEV_AUTH_*`。Vite の設定は `vite.config.mts`(`.ts` だと package.json が `"type": "module"` でないため警告が出る)。
+- **フォント**: 設計では「woff2 を `public/` に置く」だったが、`next/font/google` は Noto Sans JP の全分割(124 ファイル。日本語はこの字形で描画されていた)を配信していた。見た目を変えないため、既存ビルド(`.next/static/media`)の woff2 135 個(Geist 5・Geist Mono 6・Noto Sans JP 124、計 5.2MB)を `public/fonts/` へコピーし、元の `@font-face` を `src/app/fonts.css` に書き直した(再取得はしていない。SIL OFL 1.1)。Noto Sans JP の 400 と 500 は同じ可変フォントのファイルだったので、1 宣言にまとめた。フォントの更新は、`next/font` の代わりに Google Fonts の CSS を取って同じ形に書き直す。
+- **認証**: `AuthGate` が全画面を担う(`/auth/callback` は対象外)。ログイン済みで `/login` を開くと `/` へ戻す(プロキシがしていた)。`SIGNED_OUT` でレポートの本文と天気の手元の写しを消す。開発用の自動ログインは `AuthGate` が `import.meta.env.DEV` の中で `src/lib/auth/dev-login.ts` を動的に読んで行う(入れたらそのページを読み込み直すので、元のページに残る)。
+- **`/reports/[slug]`**: 手元の本文を出す前に `getSession()` を確かめる。セッションが無いときは本文を出さない(確認済み)。
+- **`/weather`**: `useWeatherLocation`(ブラウザから `getDefaultWeatherLocation`)で地点を読んでから `WeatherView` を出す。読めなかったときは東京を出さず、失敗を出す。地点を読む1往復ぶん、サーバーが HTML に入れていたときより最初の表示が遅れる(測っていない)。
+- **ESLint**: `typescript-eslint` + `eslint-plugin-react-hooks`(`globals`・`@eslint/js`)の flat config。`overrides` の `typescript-eslint` は直接の依存にしたので外した。
+- **確かめたこと**: `docs/decisions.md`「Next.js をやめて静的 SPA(Vite)に移した」。vitest は全部通る(`proxy.test.ts` は消え、`src/lib/router/match.test.ts` を足した)。`tsc`・ESLint は 0 件。
+- **まだのこと**: (1) Vercel に `VITE_SUPABASE_URL`・`VITE_SUPABASE_PUBLISHABLE_KEY` を足す(足してから main に入れる)。(2) Preview でメールのリンクから戻すには、Supabase の Auth の Redirect URL に Preview の URL を足す。(3) `/schedules` の初回ロード時間を `docs/decisions.md` の基準値(中央値 約 400ms)と同じ手順で測る。(4) main のあとの変更を取り込み、sol のレビュー。(5) 本番に入れたら全端末で再ログイン。
 
 ## 期待できること / できないこと
 

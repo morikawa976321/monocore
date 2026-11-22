@@ -42,7 +42,7 @@ npm run dev                 # http://localhost:3000
 
 | 変数 | 内容 |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | 必須。Supabase の接続先 |
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` | 必須。Supabase の接続先 |
 
 天気の地点は環境変数ではなく、テーブル `weather_locations` に本人が入れます（行が無ければ東京駅）。
 
@@ -52,7 +52,7 @@ npm run dev                 # http://localhost:3000
 
 | 層 | 使っているもの |
 |---|---|
-| フロントエンド | Next.js 16（App Router）、React 19、TypeScript、Tailwind CSS v4 |
+| フロントエンド | React 19、Vite 8（静的 SPA）、TypeScript、Tailwind CSS v4 |
 | バックエンド | Supabase（Auth のメールワンタイムログイン、Postgres、RLS）、マイグレーション 26 本 |
 | 収集 | Python（feedparser）|
 | テスト | Vitest、fast-check、pytest |
