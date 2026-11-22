@@ -70,6 +70,9 @@ export async function getDefaultAppliedDays(
             .order('day_key', { ascending: true })
             .order('default_schedule_id', { ascending: true })
             .range(offset, offset + PAGE_ROWS - 1)
+        // 読んでいる間に行が消えて総数が offset を下回ると、PostgREST は空の配列ではなく 416(PGRST103)を返す。
+        // 範囲の先に行は無いという意味なので、ここまでに読んだ分で終える。
+        if (error?.code === 'PGRST103') return { data: days, error: null }
         if (error) return { data: null, error }
         if (!data || data.length === 0) return { data: days, error: null }
         for (const row of data) days.add(row.day_key)

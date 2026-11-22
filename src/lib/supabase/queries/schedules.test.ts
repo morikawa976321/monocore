@@ -8,7 +8,12 @@ import { getDefaultAppliedDays, PAGE_ROWS } from './schedules'
  * 切った応答を返す。チェーンの形は検査しない(どのメソッドも自分を返す)。数えるのは「何回問い合わせたか」と
  * 「どの日が取れたか」だけ。
  */
-function fakeSupabase(dayKeys: string[], maxRows: number, failAtRequest?: number) {
+function fakeSupabase(
+    dayKeys: string[],
+    maxRows: number,
+    failAtRequest?: number,
+    afterRequest?: (requestNumber: number, keys: string[]) => void,
+) {
     let requests = 0
     const client = {
         from() {
@@ -32,12 +37,23 @@ function fakeSupabase(dayKeys: string[], maxRows: number, failAtRequest?: number
                                     resolve({ data: null, error: { message: 'boom' }, count: null })
                                     return
                                 }
+                                // 総数が分かっていて、範囲の始まりが総数以上のとき、PostgREST は 416 を返す。
+                                if (dayKeys.length > 0 && from >= dayKeys.length) {
+                                    resolve({
+                                        data: null,
+                                        error: { code: 'PGRST103', message: 'Requested range not satisfiable' },
+                                        count: null,
+                                    })
+                                    afterRequest?.(requests, dayKeys)
+                                    return
+                                }
                                 const end = Math.min(to + 1, from + maxRows)
                                 resolve({
                                     data: dayKeys.slice(from, end).map((day_key) => ({ day_key })),
                                     error: null,
                                     count: dayKeys.length,
                                 })
+                                afterRequest?.(requests, dayKeys)
                             }
                         }
                         return () => query
@@ -94,6 +110,17 @@ describe('getDefaultAppliedDays', () => {
         const { supabase } = fakeSupabase(rowsOf(70, 3), 100)
         const { data } = await getDefaultAppliedDays(supabase, '2026-12-01', '2027-02-28')
         expect(data?.size).toBe(70)
+    })
+
+    it('読んでいる間に行が消えて範囲の先が無くなっても(416)、エラーにせずそこまでの分で終える', async () => {
+        // 210 行を 100 行ずつ読む。最初のページのあとで総数が 70 行に減り、offset=100 は範囲の外になる。
+        const { supabase } = fakeSupabase(rowsOf(70, 3), 100, undefined, (n, keys) => {
+            if (n === 1) keys.length = 70
+        })
+        const { data, error } = await getDefaultAppliedDays(supabase, '2026-12-01', '2027-02-28')
+        expect(error).toBeNull()
+        // 最初の 100 行は 1 日 3 行の 34 日分(34 日目は 1 行だけ)。
+        expect(data?.size).toBe(34)
     })
 
     it('途中の問い合わせが失敗したら、それまでの分を返さずエラーを返す', async () => {
