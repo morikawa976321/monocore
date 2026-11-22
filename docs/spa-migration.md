@@ -1,6 +1,6 @@
 # 静的 SPA への移行案(Next.js をやめる)
 
-状態: **実装済み(ブランチ `spa-migration`。main への取り込みと本番切り替えはこれから。「実装の結果」の節)**。2026-11-23 に本人が「React も Next.js も依存が多く、その変更や脆弱性の影響を受けやすい。フレームワークをよりシンプルなものに変えることを積極的に考えていきたい」と述べ、選択肢のうち「静的 SPA 案」で詰めることを選んだ。以下の構成・手順は AI の提案で、本人が採否を決めることにしていた3点(天気の地点の置き場所・再ログインの受け入れ・ルーター)は 2026-11-23 にすべて決まった(「決定済み」の節)。
+状態: **本番に反映済み(2026-11-23。「実装の結果」の節)**。2026-11-23 に本人が「React も Next.js も依存が多く、その変更や脆弱性の影響を受けやすい。フレームワークをよりシンプルなものに変えることを積極的に考えていきたい」と述べ、選択肢のうち「静的 SPA 案」で詰めることを選んだ。以下の構成・手順は AI の提案で、本人が採否を決めることにしていた3点(天気の地点の置き場所・再ログインの受け入れ・ルーター)は 2026-11-23 にすべて決まった(「決定済み」の節)。
 
 ## 実測(2026-11-23)
 
@@ -74,7 +74,9 @@
 - **`/weather`**: `useWeatherLocation`(ブラウザから `getDefaultWeatherLocation`)で地点を読んでから `WeatherView` を出す。読めなかったときは東京を出さず、失敗を出す。地点を読む1往復ぶん、サーバーが HTML に入れていたときより最初の表示が遅れる(測っていない)。
 - **ESLint**: `typescript-eslint` + `eslint-plugin-react-hooks`(`globals`・`@eslint/js`)の flat config。`overrides` の `typescript-eslint` は直接の依存にしたので外した。
 - **確かめたこと**: `docs/decisions.md`「Next.js をやめて静的 SPA(Vite)に移した」。vitest は全部通る(`proxy.test.ts` は消え、`src/lib/router/match.test.ts` を足した)。`tsc`・ESLint は 0 件。
-- **まだのこと**: (1) Vercel に `VITE_SUPABASE_URL`・`VITE_SUPABASE_PUBLISHABLE_KEY` を足す(足してから main に入れる)。(2) Preview でメールのリンクから戻すには、Supabase の Auth の Redirect URL に Preview の URL を足す。(3) `/schedules` の初回ロード時間を `docs/decisions.md` の基準値(中央値 約 400ms)と同じ手順で測る。(4) main のあとの変更を取り込み、sol のレビュー。(5) 本番に入れたら全端末で再ログイン。
+- **本番への切り替え(2026-11-23)**: sol のレビューを通して main へ push、Vercel の Production に反映した。Preview の確認(配信の設定・未ログインの転送・長期キャッシュ)は通ったが、Preview でのメールのリンクによるログインと、`/schedules` の初回ロード時間の測定は、本人の指示(「検証は簡略化して。本番に deploy していい」)で省いた。全端末は一度だけ再ログインになる(セッションの保存先が Cookie から localStorage に変わったため)。
+- **Vercel の環境変数で踏んだこと**: (1) `VITE_` で始まる変数は公開の値なので、Vercel の追加画面で「Sensitive(秘密)」にできない(`visibility: config` にする)。(2) `VITE_SUPABASE_URL` は API の URL(`https://<project-ref>.supabase.co`)で、Supabase ダッシュボードの URL(`https://supabase.com/dashboard/project/<project-ref>`)ではない。取り違えてもビルドは通り、ログイン画面も出て、メールを送るときに初めて失敗する。デプロイ後に `dist/assets/index-*.js` の中の接続先を確かめる(値は `VITE_` の変数としてビルドのときに埋め込まれるので、変えたら再デプロイが要る)。
+- **まだのこと**: `/schedules` の初回ロード時間を `docs/decisions.md` の基準値(中央値 約 400ms)と同じ手順で測る(本番で)。Vercel の古い環境変数 `NEXT_PUBLIC_*`・`WEATHER_*` は使わなくなったので消せる。
 
 ## 期待できること / できないこと
 
