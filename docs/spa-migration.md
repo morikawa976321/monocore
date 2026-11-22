@@ -1,6 +1,6 @@
 # 静的 SPA への移行案(Next.js をやめる)
 
-状態: **設計案(未着手)**。2026-11-23 に本人が「React も Next.js も依存が多く、その変更や脆弱性の影響を受けやすい。フレームワークをよりシンプルなものに変えることを積極的に考えていきたい」と述べ、選択肢のうち「静的 SPA 案」で詰めることを選んだ。以下の構成・手順は AI の提案で、本人が採否を決めるのは「決めること」の3点。
+状態: **設計案(未着手)**。2026-11-23 に本人が「React も Next.js も依存が多く、その変更や脆弱性の影響を受けやすい。フレームワークをよりシンプルなものに変えることを積極的に考えていきたい」と述べ、選択肢のうち「静的 SPA 案」で詰めることを選んだ。以下の構成・手順は AI の提案で、本人が採否を決めるのは「決めること」の2点(天気の地点の置き場所は 2026-11-23 に本人が決めた)。
 
 ## 実測(2026-11-23)
 
@@ -26,22 +26,25 @@
 |---|---|
 | `auth/callback/route.ts`(`exchangeCodeForSession` → リダイレクト) | SPA のルート `/auth/callback`。同じパスなので Supabase の Redirect URL 設定は変えない。コードは 1 回しか使えないので、StrictMode の二重実行で 2 回交換しないようモジュール変数で 1 回に絞る |
 | `login/page.tsx`(`searchParams` の error) | クライアントで `URLSearchParams` を読む |
-| `weather/page.tsx`(`WEATHER_*` をサーバーでだけ読む。ログイン無しで取れる JS に地点を埋め込まないため) | 決めること① |
+| `weather/page.tsx`(`WEATHER_*` をサーバーでだけ読む。ログイン無しで取れる JS に地点を埋め込まないため) | テーブル `weather_locations` から読む(決定済み。「決定済み」の節) |
 | `/reports/<slug>`(localStorage の本文をログイン確認より先に出すため、proxy の門番に残している) | 表示前に `getSession()`(通常は通信なし)で確認し、`SIGNED_OUT` で本文キャッシュを消す |
 | dev の自動ログイン(`proxy.ts` の `DEV_AUTH_*`) | `import.meta.env.DEV` でだけ動く開発用モジュールへ。`VITE_DEV_AUTH_*` は `.env.local` にだけ置き、ビルド後に `dist` を grep して混入が無いことを確かめる |
 | `next/font`(Geist・Geist Mono・Noto Sans JP の latin) | woff2 を `public/` に置いて `@font-face`(依存 0) |
 | `next-themes` | そのまま使う(依存 1・外部依存 0)。後で自作に替えてもよい |
 
+## 決定済み
+
+- **天気の地点はテーブル `weather_locations` に置く**(本人、2026-11-23。理由: 将来、複数の地点を切り替えたい)。1 行 1 地点で、列は `WeatherLocation` の `name` / `latitude` / `longitude` に `sort_order` を足したもの。RLS で本人の行だけ読める。migration は `20261123120000_add_weather_locations.sql`。実際の地点は公開リポジトリに置かないので、本人が SQL エディタか service_role のスクリプトで入れる。行が無いときは今と同じ東京駅。**この移行より前に作った。`/weather` はまだ環境変数を読んでいる**。読む側の切り替えは手順 2 で行う。
+
 ## 決めること(本人)
 
-1. **天気の地点の置き場所**。提案: Supabase Auth の `user_metadata`(ログインした端末だけが読める。テーブルも関数も増えない。設定は service_role のスクリプトで 1 回)。代替は、1 行のテーブル(migration と RLS が増える)、または Vercel 関数を 1 本残す(サーバーが残る)。
-2. **セッションの保存先が Cookie(`@supabase/ssr`)から localStorage(`supabase-js`)に変わる**ので、全端末で 1 回再ログイン(Magic Link)になる。提案: 受け入れる。
-3. **ルーター**。提案: 自作。
+1. **セッションの保存先が Cookie(`@supabase/ssr`)から localStorage(`supabase-js`)に変わる**ので、全端末で 1 回再ログイン(Magic Link)になる。提案: 受け入れる。
+2. **ルーター**。提案: 自作。
 
 ## 手順(提案。1 つのブランチか worktree で進め、main の本番は動かしたまま)
 
 1. Vite の骨組み・ルーター・`index.html`・フォント・Supabase クライアントを足し、既存の `page.tsx` から Next 固有の import を外す。`npm run dev` で全画面が動く。
-2. login・callback・weather・`reports/<slug>` を SPA 用に直す(上の表)。
+2. login・callback・weather・`reports/<slug>` を SPA 用に直す(上の表)。weather は `weather_locations` の先頭の行(`sort_order` 最小、同点は作った順)を読み、行が無ければ東京駅にする。クエリは `lib/supabase/queries/weather-locations.ts` に置く。
 3. next・`@supabase/ssr`・`eslint-config-next`・postcss 設定・`next.config.ts`・proxy 一式を削除し、ESLint を typescript-eslint + react-hooks の flat config に替える。AGENTS.md・`docs/DEVELOPMENT.md`・`docs/directory_structure.md` を更新する。
 4. Vercel の設定(Framework Preset: Vite、出力 `dist`、env 名)を替えて Preview デプロイ。
 5. Preview で下の確認項目を通し、sol レビュー(AGENTS.md の規則)のあと本番へ。戻すときは前のデプロイへロールバックする。

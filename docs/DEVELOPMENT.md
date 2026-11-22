@@ -127,6 +127,7 @@ monocore は AI 活用基盤（context-engine）の**人間向け窓口**であ�
 | `inboxes` | 画面（単一 TEXT blob） | monocore |
 | `finance_events` | 画面（`/finance`。計画イベント） | monocore |
 | `finance_measurements` | 画面（`/finance`。月末の Cash・NISA 実測） | monocore |
+| `weather_locations` | 本人が SQL エディタか `service_role` のスクリプトで入れる（画面は未実装。`/weather` はまだ環境変数 `WEATHER_*` を読んでおり、このテーブルは読んでいない） | monocore |
 | `reports` | `service_role` のみ（`scripts/upsert-reports.mjs` が `mf/reports/*.md` を HTML にして upsert。ops-daily の `sync-reports.ps1` が毎日呼ぶ） | `mf/reports/` |
 | `articles` | `service_role` のみ（`scraper/` が毎時投入） | **このDB自身** |
 
