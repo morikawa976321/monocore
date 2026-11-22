@@ -34,7 +34,7 @@
 
 ## 決定済み
 
-- **天気の地点はテーブル `weather_locations` に置く**(本人、2026-11-23。理由: 将来、複数の地点を切り替えたい)。1 行 1 地点で、列は `WeatherLocation` の `name` / `latitude` / `longitude` に `sort_order` を足したもの。RLS で本人の行だけ読める。migration は `20261123120000_add_weather_locations.sql`。実際の地点は公開リポジトリに置かないので、本人が SQL エディタか service_role のスクリプトで入れる。行が無いときは今と同じ東京駅。**この移行より前に作った。`/weather` はまだ環境変数を読んでいる**。読む側の切り替えは手順 2 で行う。
+- **天気の地点はテーブル `weather_locations` に置く**(本人、2026-11-23。理由: 将来、複数の地点を切り替えたい)。1 行 1 地点で、列は `WeatherLocation` の `name` / `latitude` / `longitude` に `sort_order` を足したもの。RLS で本人の行だけ読める。migration は `20261123120000_add_weather_locations.sql`。実際の地点は公開リポジトリに置かないので、本人が SQL エディタか service_role のスクリプトで入れる(どちらも `user_id` の明示が要る。`docs/DEVELOPMENT.md` の表)。行が無いときは今と同じ東京駅。**この移行より前に作った。`/weather` はまだ環境変数を読んでいる**。読む側の切り替えは手順 2 で行う。
 
 ## 決めること(本人)
 
