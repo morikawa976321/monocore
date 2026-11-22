@@ -73,6 +73,9 @@ export async function getDefaultAppliedDays(
         if (error) return { data: null, error }
         if (!data || data.length === 0) return { data: days, error: null }
         for (const row of data) days.add(row.day_key)
+        // 1ページに満たなければ最後。満たないページの次を読むと、空のページを返すだけの往復が毎回1つ増える
+        // (初回の読み込みでは、ほかの読み込みが終わった後にこれだけが残って、完了を約 100ms 遅らせていた)。
+        if (data.length < PAGE_ROWS) return { data: days, error: null }
         offset += data.length
     }
 }

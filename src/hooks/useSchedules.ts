@@ -272,19 +272,22 @@ export function useSchedules(
         const endUtc = localTimeToUtc(format(addDays(end, 1), 'yyyy-MM-dd'), '0000', tz);
         const startDay = format(start, 'yyyy-MM-dd');
         const endDay = format(end, 'yyyy-MM-dd');
-        // 既定予定を書き込む → 目印を取る → 予定・版・既定予定の記録・メモを読む、の順（目印は読む前に取る）。
-        void applyDefaults(startDay, endDay)
-            .then((applied) => {
+        // 既定予定の書き込みと目印の取得を同時に出し、両方が終わってから予定・版・既定予定の記録・メモを読む
+        // (目印は読む前に取る。往復を1つ減らすため、書き込みを待たずに取る。2026-11-23)。目印は書き込みの後で
+        // ある必要が無い: 書き込みが予定や版を足した日は、目印が読んだ内容より古い向きに食い違うが、それは次の
+        // 復帰で余分に1回読み直すだけで、変更の見落としにはならない。目印が読んだ内容より新しくなることは無い
+        // (読むのは両方が終わった後)。書き込みを待ってから読むことは変わらない(applyDefaultSchedules の注意)。
+        void Promise.all([applyDefaults(startDay, endDay), readStamp(startDay, endDay)])
+            .then(([applied, stamp]) => {
                 if (applied) defaultsFailedRef.current = false;
-                return readStamp(startDay, endDay);
+                return Promise.all([
+                    getSchedules(supabase, startUtc, endUtc),
+                    getScheduleDayRevisions(supabase, startDay, endDay),
+                    readAppliedDays(startDay, endDay),
+                    loadNotes(startDay, endDay),
+                    stamp,
+                ]);
             })
-            .then((stamp) => Promise.all([
-                getSchedules(supabase, startUtc, endUtc),
-                getScheduleDayRevisions(supabase, startDay, endDay),
-                readAppliedDays(startDay, endDay),
-                loadNotes(startDay, endDay),
-                stamp,
-            ]))
             .then(([schedulesResult, revisionsResult, , notesResult, stamp]) => {
                 if (schedulesResult.error || revisionsResult.error) {
                     setSyncError('スケジュールの読み込みに失敗しました。');

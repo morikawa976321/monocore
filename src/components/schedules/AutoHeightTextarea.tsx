@@ -3,6 +3,14 @@ import { Textarea } from '@/src/components/ui/Textarea';
 
 function fitHeight(ta: HTMLTextAreaElement | null) {
     if (!ta) return;
+    // 空の欄は測らない。内容が無いので高さは既定(rows=1 と最低高)のままでよく、前に測った高さが残っていれば
+    // 外すだけ。測ると scrollHeight の読みごとに強制レイアウトが走り、読み込み直後の全欄(約 70 日 × 2 = 138 欄は
+    // すべて空)で 1周 約 138ms かかる(2026-11-23 本番の実測)。空の欄 58 個で、明示の高さを外しても
+    // offsetHeight が変わらないことを確かめた。
+    if (ta.value === '') {
+        if (ta.style.height !== '') ta.style.height = '';
+        return;
+    }
     // 呼び出し側が grow で列の高さいっぱいに伸ばしていると、scrollHeight が「伸びた後の高さ」になり、
     // 隣の欄が縮んでも高さが戻らなくなる。測る間だけ grow を切って、内容の高さを取る。
     ta.style.flexGrow = '0';
