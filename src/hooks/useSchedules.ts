@@ -55,6 +55,9 @@ const RESUME_RELOAD_TIMEOUT_MS = 75_000;
 /** 既定予定を書き込んだ記録を読み損ねた日があるときの表示。その日は前の判定のまま描かれる。再読み込みで直る。 */
 const APPLIED_DAYS_ERROR = '既定予定の記録の読み込みに失敗しました（睡眠の帯が正しくない日があります）。';
 
+/** 初回に読む未来の日数(今日から数えて)。広げるのは端に着いたときに1か月ずつ。 */
+const INITIAL_FUTURE_DAYS = 14;
+
 type UseSchedulesCompanions = {
     loadNotes: (startDay: string, endDay: string, isCurrent?: () => boolean) => Promise<NotesLoadResult | null>;
     flushPendingNoteSaves: () => void;
@@ -261,7 +264,8 @@ export function useSchedules(
         const str = format(toZonedTime(new Date(), tz), 'yyyy-MM-dd');
         const today = parseISO(str);
         const start = addDays(today, -7);
-        const end = addMonths(today, 2);
+        // 初回は未来を 14 日先まで読む(2026-11-23 本人指定)。以前は 2 か月先まで。端に着くと1か月ずつ広がる。
+        const end = addDays(today, INITIAL_FUTURE_DAYS);
         setTodayStr(str);
         setRangeStart(start);
         setRangeEnd(end);
